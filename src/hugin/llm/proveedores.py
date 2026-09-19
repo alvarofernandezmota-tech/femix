@@ -1,14 +1,15 @@
 import os
 import requests
 from ..puertos.llm import MotorLLM
+from .prompts import PROMPT_SISTEMA
 
 class ProveedorOllama(MotorLLM):
-    def __init__(self, modelo: str = "llama3.1"):
+    def __init__(self, modelo: str = "qwen2.5:3b"):
         self._modelo = modelo
         self._url = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/chat")
 
     def generar(self, contexto: str, entrada: str) -> str:
-        mensajes = [{"role": "system", "content": "Eres HUGIN, un asistente conversacional en español."}]
+        mensajes = [{"role": "system", "content": PROMPT_SISTEMA}]
         if contexto:
             mensajes.append({"role": "system", "content": f"Contexto previo:\n{contexto}"})
         mensajes.append({"role": "user", "content": entrada})
@@ -17,6 +18,7 @@ class ProveedorOllama(MotorLLM):
             "model": self._modelo,
             "messages": mensajes,
             "stream": False,
+            "options": {"temperature": 0.5},
         })
         resp.raise_for_status()
         return resp.json()["message"]["content"]
@@ -28,7 +30,7 @@ class ProveedorOpenAI(MotorLLM):
         self._modelo = modelo
 
     def generar(self, contexto: str, entrada: str) -> str:
-        mensajes = [{"role": "system", "content": "Eres HUGIN, un asistente conversacional."}]
+        mensajes = [{"role": "system", "content": PROMPT_SISTEMA}]
         if contexto:
             mensajes.append({"role": "system", "content": f"Contexto previo:\n{contexto}"})
         mensajes.append({"role": "user", "content": entrada})
