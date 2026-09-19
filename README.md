@@ -22,8 +22,16 @@ HUGIN es un bot conversacional autónomo que combina un modelo de lenguaje (LLM)
 ## Componentes
 
 - **LLM**: motor de razonamiento y generación de respuestas.
-- **RAG**: consulta de conocimiento externo/documental.
-- **Agentes**: ejecución de tareas y acciones delegadas.
-- **Memoria**: persistencia de contexto y estado entre sesiones.
-- **Agenda / tareas / diario**: gestión de productividad personal.
-- **Canales**: Telegram y Teléfono como interfaces de entrada/salida.
+- **RAG**: consulta de conocimiento externo/documental. *(pendiente de implementar)*
+- **Agentes**: ejecución de tareas y acciones delegadas. *(pendiente de implementar)*
+- **Memoria**: persistencia de contexto y estado entre sesiones (`mente/memoria.py`).
+- **Comprensión de intención**: clasificación básica por reglas del texto entrante
+  en `comando` / `pregunta` / `charla` (`mente/entender.py`).
+- **Dominio personal** (`dominio/personal/`): lógica de negocio real, persistida en
+  JSON dentro de `datos/` (no versionado), siguiendo el mismo patrón que `memoria.py`:
+  - `hoy.py` — resumen de la fecha/hora actual.
+  - `tareas.py` — crear, listar y completar tareas.
+  - `diario.py` — registrar entradas de diario con fecha/hora.
+  - `recordatorios.py` — crear recordatorios y listar los pendientes (sin scheduler real todavía).
+- **Canales**: Telegram (texto y voz) implementado en `conectores/telegram/`.
+  Teléfono (llamadas/webhooks) todavía no está implementado.
