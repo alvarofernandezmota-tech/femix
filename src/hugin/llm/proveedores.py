@@ -13,15 +13,21 @@ class ProveedorOllama(MotorLLM):
         if contexto:
             mensajes.append({"role": "system", "content": f"Contexto previo:\n{contexto}"})
         mensajes.append({"role": "user", "content": entrada})
-
-        resp = requests.post(self._url, json={
-            "model": self._modelo,
-            "messages": mensajes,
-            "stream": False,
-            "options": {"temperature": 0.5},
-        })
-        resp.raise_for_status()
-        return resp.json()["message"]["content"]
+        try:
+            resp = requests.post(self._url, json={
+                "model": self._modelo,
+                "messages": mensajes,
+                "stream": False,
+                "options": {"temperature": 0.5},
+            }, timeout=60)
+            resp.raise_for_status()
+            return resp.json()["message"]["content"]
+        except requests.exceptions.ConnectionError:
+            return "No puedo conectar con Ollama ahora mismo. ¿Está encendido?"
+        except requests.exceptions.Timeout:
+            return "El modelo está tardando demasiado. Prueba con algo más corto."
+        except Exception as e:
+            return f"Algo falló generando la respuesta: {e}"
 
 class ProveedorOpenAI(MotorLLM):
     def __init__(self, modelo: str = "gpt-4o-mini"):
