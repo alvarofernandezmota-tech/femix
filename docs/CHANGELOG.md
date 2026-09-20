@@ -146,9 +146,41 @@
   disco, ingerir en A y buscar desde B (no encuentra nada), dos inquilinos con el mismo documento,
   índice contaminado a mano para probar la defensa en profundidad, traversal rechazado, y los cuatro
   casos de migración. Suite completa: 163 tests en verde (`python3 -m pytest tests/ -v`).
-- **Pendiente, no hecho aquí:** el adaptador que implementa el puerto `puertos/busqueda.Buscador`
-  sobre `IndiceEmbeddings`, que es lo que conectaría este RAG a `AgenteBusqueda` y por tanto a
-  `Femix.procesar()`. Hoy el RAG sigue sin estar enchufado al bot.
+- El adaptador al puerto `puertos/busqueda.Buscador` no se hizo en estos commits, sino en la
+  sección siguiente («RAG conectado al bot»), que es la que enchufa este índice a
+  `Femix.procesar()`.
 - No se tocó `rag/fragmentos.py`, `rag/embeddings_local.py`, `rag/contexto.py`,
   `puertos/embeddings.py`, `agentes/`, `llm/`, `mente/`, `bot/`, `dominio/`, `conectores/` ni
   `requirements.txt`. Sin dependencias nuevas.
+
+## feat/rag-por-inquilino — RAG conectado al bot
+- Añadido `src/femix/rag/adaptador.py`: `IndiceEmbeddingsBuscador`, que implementa el puerto
+  `puertos/busqueda.Buscador` sobre `IndiceEmbeddings`. Cierra la diferencia de forma entre los dos
+  lados — el puerto recibe el `inquilino_id` en cada llamada, un `IndiceEmbeddings` es de un solo
+  inquilino — y devuelve ya el contexto en texto, así que `agentes/` nunca ve fragmentos, vectores
+  ni rutas.
+- Abre un índice nuevo en cada búsqueda **a propósito**: cachearlos por inquilino ahorraría releer
+  el JSON, pero dejaría invisibles los documentos ingeridos después de arrancar el bot. El
+  `motor_embeddings` sí se comparte entre llamadas (un proveedor real puede tener un modelo cargado).
+- `puntuacion_minima` (0.05) filtra resultados irrelevantes, porque `IndiceEmbeddings.buscar()`
+  devuelve el mejor `k` aunque no valga nada. El umbral es deliberadamente bajo: con
+  `MotorEmbeddingsHash` (sin stopwords ni IDF) los dos errores caen muy cerca — una consulta sin
+  relación saca ~0.25 solo por compartir "de", y un documento que sí viene a cuento pero solo
+  comparte "horario" se queda en ~0.14. Perder documentación buena es peor que aportar de más, así
+  que el filtro solo promete descartar lo que no comparte **ninguna** palabra. Para relevancia de
+  verdad hay que enchufar embeddings reales por el puerto `MotorEmbeddings`.
+- `Subagente` acepta `buscador` y monta él el `AgenteBusqueda`, al final de la cadena (solo aporta
+  contexto, así que primero va quien puede resolver y cortar). Construye una cadena nueva en vez de
+  mutar la que le pasan. `Femix` pasa su `buscador` al subagente en vez de montar el agente él
+  mismo, para no construirlo en dos sitios.
+- Camino completo, ya conectado: `Femix.procesar()` → `necesita_agente()` → `Subagente` →
+  `AgenteBusqueda` → puerto `Buscador` → `IndiceEmbeddingsBuscador` →
+  `datos/{inquilino_id}/rag/indice.json`. El contexto recuperado llega al prompt sumado al de
+  `Memoria`. Sin `buscador`, comportamiento idéntico al anterior.
+- 23 tests nuevos (`tests/test_rag_adaptador.py`, `tests/test_rag_en_femix.py`), los de punta a
+  punta con RAG real en vez de un fake del puerto. Suite completa: 186 tests en verde.
+- **Falta el último tramo:** `bot/main.py` y `conectores/telegram/bot.py` siguen construyendo
+  `Femix()` sin `buscador`, así que en el bot desplegado el RAG está conectado pero apagado.
+  Encenderlo es pasar `buscador=IndiceEmbeddingsBuscador(directorio_datos=...)` en esos dos sitios;
+  con el índice vacío no cambia nada (no hay resultados, el agente no aporta y el flujo es el de
+  siempre), así que es seguro, pero se deja como decisión de despliegue.

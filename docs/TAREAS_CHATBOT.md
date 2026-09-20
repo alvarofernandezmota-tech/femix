@@ -15,9 +15,12 @@
 - [x] `IndiceEmbeddings` actualizado (+ migración automática del formato plano anterior)
 - [x] Tests de aislamiento por inquilino (ingerir en A, buscar desde B: no encuentra nada)
 - [x] `inquilino_id` validado como nombre de carpeta (sin traversal)
-- [x] 24 tests nuevos (163 total)
+- [x] Adaptador `IndiceEmbeddingsBuscador` al puerto `puertos/busqueda.Buscador`
+- [x] `buscador` enchufado a `Femix.procesar()` vía `Subagente` → `AgenteBusqueda`
+- [x] 47 tests nuevos (186 total)
 - [ ] Merge a `integracion/femix-completa`
 
-**Pendiente para el siguiente bloque:** adaptador de `IndiceEmbeddings` al puerto
-`puertos/busqueda.Buscador`, que es lo que conecta este RAG con `AgenteBusqueda` y por tanto con
-`Femix.procesar()`. Hoy el RAG sigue sin estar enchufado al bot.
+**Último tramo pendiente:** `bot/main.py` y `conectores/telegram/bot.py` siguen construyendo
+`Femix()` sin `buscador`, así que en el bot desplegado el RAG está conectado pero apagado.
+Encenderlo es pasar `buscador=IndiceEmbeddingsBuscador(directorio_datos=...)` en esos dos sitios
+(con el índice vacío no cambia nada, así que es seguro). Se deja como decisión de despliegue.

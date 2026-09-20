@@ -69,15 +69,26 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
   lleva `inquilino_id` obligatorio, así que un fragmento sin dueño no se puede construir. Migración
   automática del formato plano anterior (se mueve, no se copia; nunca pisa un índice ya migrado).
   `datos/{inquilino_id}/` deja el hueco para que `Memoria` y `dominio/personal/` cuelguen de ahí en
-  la Fase 2, pero eso **no** se ha hecho todavía. 163 tests en verde
-  (`python3 -m pytest tests/ -v`).
+  la Fase 2, pero eso **no** se ha hecho todavía.
+- RAG conectado al bot (`src/femix/rag/adaptador.py`, rama `feat/rag-por-inquilino`):
+  `IndiceEmbeddingsBuscador` implementa el puerto `puertos/busqueda.Buscador` sobre
+  `IndiceEmbeddings`, y `Subagente` monta el `AgenteBusqueda` al final de su cadena cuando recibe
+  un `buscador`. Camino completo: `Femix.procesar()` → `necesita_agente()` → `Subagente` →
+  `AgenteBusqueda` → `Buscador` → `datos/{inquilino_id}/rag/indice.json`, y lo recuperado se suma
+  al contexto de `Memoria` en el prompt. Sin `buscador`, comportamiento idéntico al anterior.
+  186 tests en verde (`python3 -m pytest tests/ -v`).
 
 ## Qué está a medias o pendiente
 - `inquilino/` no existe todavía como código (solo como concepto de diseño).
-- RAG sigue **sin enchufar** a `Femix.procesar()`: falta el adaptador de `IndiceEmbeddings` al
-  puerto `puertos/busqueda.Buscador`, que es lo que lo conectaría con `AgenteBusqueda`. Los dos
-  lados ya existen y encajan por el puerto; falta escribir el adaptador y pasarle el `buscador` a
-  `Femix`.
+- RAG ya está enchufado a `Femix.procesar()` (`rag/adaptador.py` → puerto `Buscador` →
+  `AgenteBusqueda`), pero **apagado en el bot desplegado**: `bot/main.py` y
+  `conectores/telegram/bot.py` construyen `Femix()` sin `buscador`. Encenderlo es pasarles
+  `buscador=IndiceEmbeddingsBuscador(directorio_datos=...)`; con el índice vacío no cambia nada.
+- La relevancia del RAG es débil mientras el motor de embeddings sea `MotorEmbeddingsHash` (bolsa
+  de palabras por hashing, sin stopwords ni IDF): las palabras vacías compartidas inflan la
+  similitud. El umbral del adaptador solo descarta con fiabilidad lo que no comparte ninguna
+  palabra. Se arregla enchufando un proveedor real por el puerto `MotorEmbeddings`, sin tocar nada
+  más.
 - Migración de lógica de negocio de `hugin` (citas, Postgres, teléfono) no iniciada.
 - Los dos LLM (rápido + complejo) ya están implementados y enchufados, pero sin medir en
   producción: falta decidir qué modelo concreto va en cada carril con la CPU actual (ver la nota de
