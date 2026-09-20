@@ -89,3 +89,8 @@
 - [x] Subagente integrado en Femix.procesar()
 - [x] Múltiples LLMs configurables
 - [x] 55 tests nuevos (139 total)
+
+### Tarea 3.5: Esperando RAG por inquilino
+- [ ] Claude trabajando en `feat/rag-por-inquilino`
+- [ ] Pendiente: merge de RAG a `integracion/femix-completa`
+- [ ] Pendiente: actualizar `release/docker-chatbot-base` con RAG
