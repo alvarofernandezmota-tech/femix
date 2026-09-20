@@ -15,6 +15,13 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
 - Clasificador de intención por reglas (`mente/entender.py`, sin LLM): `comando` / `pregunta` /
   `charla` / `desconocida`.
 
+- Configuración de proveedores LLM (`src/femix/llm/configuracion.py`, rama
+  `feat/fase-10-config-proveedores-llm`): `ConfiguracionLLM` (proveedor, modelo, temperatura,
+  timeout, url, api key) + `configuracion_desde_entorno()`. `router.obtener_motor()` acepta ahora
+  una `ConfiguracionLLM` opcional; sin argumentos se comporta exactamente igual que antes (mismas
+  variables de entorno, mismos valores por defecto — verificado con test explícito y smoke test).
+  `ProveedorOllama`/`ProveedorOpenAI` ganan parámetros opcionales (`temperatura`,
+  `timeout_segundos`, `url`, `api_key`) con los mismos valores por defecto que tenían hardcodeados.
 - RAG local (`src/femix/rag/`, `src/femix/puertos/embeddings.py`, rama `feat/fase-9-rag-local`):
   `fragmentar()`, `MotorEmbeddingsHash` (embeddings locales deterministas por hashing, sin
   descargas ni dependencias nuevas, sustituible por un proveedor real vía el puerto

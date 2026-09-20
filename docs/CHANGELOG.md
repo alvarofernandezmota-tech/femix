@@ -60,3 +60,16 @@
 - No se tocó `llm/proveedores.py`, `llm/router.py`, `mente/memoria.py`, `conectores/`,
   `bot/femix.py`, `requirements.txt`. Sin `TenantContext`; aislamiento por `inquilino_id` string,
   igual que el resto del proyecto.
+
+## feat/fase-10-config-proveedores-llm
+- Añadido `src/femix/llm/configuracion.py`: `ConfiguracionLLM` (dataclass: proveedor, modelo,
+  temperatura, timeout_segundos, ollama_url, openai_api_key) + `configuracion_desde_entorno()`.
+- `router.obtener_motor()` acepta una `ConfiguracionLLM` opcional; sin argumentos lee las mismas
+  variables de entorno de siempre (`HUGIN_LLM_PROVEEDOR`, `HUGIN_LLM_MODELO`, `OLLAMA_URL`,
+  `OPENAI_API_KEY`) — compatibilidad 100% verificada con test y smoke test.
+- `ProveedorOllama`/`ProveedorOpenAI` ganan parámetros opcionales (antes hardcodeados:
+  `temperature: 0.5`, `timeout: 60`) sin cambiar ningún valor por defecto.
+- 7 tests nuevos con `monkeypatch` de variables de entorno, sin llamadas reales a Ollama/OpenAI.
+  Suite completa: 84 tests en verde.
+- No se tocó `mente/memoria.py`, `puertos/`, `dominio/`, `rag/`, `conectores/`, `bot/femix.py`,
+  `requirements.txt`. Sin `TenantContext`.
