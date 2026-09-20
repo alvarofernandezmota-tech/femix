@@ -15,6 +15,15 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
 - Clasificador de intención por reglas (`mente/entender.py`, sin LLM): `comando` / `pregunta` /
   `charla` / `desconocida`.
 
+- RAG local (`src/femix/rag/`, `src/femix/puertos/embeddings.py`, rama `feat/fase-9-rag-local`):
+  `fragmentar()`, `MotorEmbeddingsHash` (embeddings locales deterministas por hashing, sin
+  descargas ni dependencias nuevas, sustituible por un proveedor real vía el puerto
+  `MotorEmbeddings`), `IndiceEmbeddings` (ingesta + búsqueda por similitud coseno, aislado por
+  `inquilino_id`, persistencia JSON local igual que el resto del dominio), `construir_contexto()`
+  (con cita de fuente y límite de caracteres). **Sin conectar todavía** a `Femix.procesar()` ni al
+  LLM — son módulos independientes, importables, con 20 tests propios. Producción futura: sustituir
+  `MotorEmbeddingsHash` por un adaptador real (Ollama/OpenAI embeddings) y el JSON por un índice
+  vectorial, sin tocar `IndiceEmbeddings` ni el resto del pipeline (mismo puerto).
 - Personalidad estructurada (`src/femix/llm/personalidad.py`, rama `feat/fase-8-prompts-personalidad`):
   `Personalidad` (identidad/tono/reglas/límites/formato/herramientas) + `ensamblar_prompt_sistema()`.
   `llm/prompts.py` sigue exportando `PROMPT_SISTEMA` (mismo nombre/tipo), ahora ensamblado en vez de

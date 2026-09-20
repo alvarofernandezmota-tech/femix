@@ -44,3 +44,19 @@
   `bot/femix.py`, `bot/comandos.py`. Sin dependencias nuevas.
 - Configuración de personalidad por inquilino queda fuera de esta fase; no se introdujo `TenantContext`.
 - 57 tests en verde (`python3 -m pytest tests/ -v`).
+
+## feat/fase-9-rag-local
+- Añadido `src/femix/puertos/embeddings.py` (puerto `MotorEmbeddings`, mismo patrón que `MotorLLM`/`MotorVoz`).
+- Añadido `src/femix/rag/`: `fragmentar()` (chunking con solapamiento), `embeddings_local.py`
+  (`MotorEmbeddingsHash`, determinista, bag-of-words con hashing, sin descargas ni dependencias
+  nuevas — sustituible), `indice.py` (`IndiceEmbeddings`: ingesta + búsqueda por similitud coseno,
+  aislado por `inquilino_id`, rechaza documentos de otro inquilino, persistencia JSON con escritura
+  atómica), `contexto.py` (`construir_contexto()`: cita fuente por fragmento, respeta límite de
+  caracteres).
+- No se conecta todavía a `Femix.procesar()`, `llm/proveedores.py` ni Telegram — queda para una
+  fase posterior de integración, igual que se hizo con dominio personal (Fase 7).
+- 20 tests nuevos, todos con fakes deterministas, sin llamadas externas reales. Suite completa: 77
+  tests en verde.
+- No se tocó `llm/proveedores.py`, `llm/router.py`, `mente/memoria.py`, `conectores/`,
+  `bot/femix.py`, `requirements.txt`. Sin `TenantContext`; aislamiento por `inquilino_id` string,
+  igual que el resto del proyecto.
