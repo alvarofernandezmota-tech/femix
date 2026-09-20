@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  femix:
+    build: .
+    ports:
+      - "8000:8000"  # Panel web
+    environment:
+      - FEMIX_INQUILINO_ID=${FEMIX_INQUILINO_ID}
+      - FEMIX_USUARIO_ID=${FEMIX_USUARIO_ID}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
+    volumes:
+      - femix_datos:/app/datos
+      - femix_memoria:/app/memoria
+
+volumes:
+  femix_datos:
+  femix_memoria:
