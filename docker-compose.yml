@@ -1,19 +1,53 @@
 version: '3.8'
 
 services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    # Si tienes GPU NVIDIA:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
   femix:
     build: .
+    container_name: femix
+    restart: unless-stopped
+    depends_on:
+      - ollama
     ports:
-      - "8000:8000"  # Panel web
+      - "8000:8000"
     environment:
       - FEMIX_INQUILINO_ID=${FEMIX_INQUILINO_ID}
       - FEMIX_USUARIO_ID=${FEMIX_USUARIO_ID}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_BASE_URL=${OPENAI_BASE_URL}
+      - FEMIX_MODELO_BASE=${FEMIX_MODELO_BASE:-mistral}
+      - FEMIX_MODELO_RAPIDO=${FEMIX_MODELO_RAPIDO:-llama3.2}
+      - FEMIX_MODELO_PENSAMIENTO=${FEMIX_MODELO_PENSAMIENTO:-qwen3.5}
+      - OPENAI_API_KEY=ollama
+      - OPENAI_BASE_URL=http://ollama:11434/v1
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
     volumes:
       - femix_datos:/app/datos
       - femix_memoria:/app/memoria
+    networks:
+      - femix_network
 
 volumes:
+  ollama_models:
   femix_datos:
   femix_memoria:
+
+networks:
+  femix_network:
+    driver: bridge
