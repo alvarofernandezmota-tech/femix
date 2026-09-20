@@ -15,6 +15,11 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
 - Clasificador de intención por reglas (`mente/entender.py`, sin LLM): `comando` / `pregunta` /
   `charla` / `desconocida`.
 
+- Personalidad estructurada (`src/femix/llm/personalidad.py`, rama `feat/fase-8-prompts-personalidad`):
+  `Personalidad` (identidad/tono/reglas/límites/formato/herramientas) + `ensamblar_prompt_sistema()`.
+  `llm/prompts.py` sigue exportando `PROMPT_SISTEMA` (mismo nombre/tipo), ahora ensamblado en vez de
+  literal. `llm/proveedores.py` y `llm/router.py` sin cambios. Configuración por inquilino queda para
+  una fase posterior (solo se deja la estructura lista para parametrizarse). 57 tests en verde.
 - Comandos de texto (`src/femix/bot/comandos.py`, rama `feat/fase-7-integracion-dominio`):
   `/hoy`, `/tarea crear|listar|completar|consultar`, `/diario`, `/recordatorio crear|listar`.
   `Femix.procesar()` los detecta vía `entender.clasificar_intencion()` y los despacha sin llamar

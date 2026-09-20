@@ -34,3 +34,13 @@
   `requirements.txt`, systemd, Ollama ni `.env`. No se introdujo `TenantContext`; `usuario_id`/
   `inquilino_id` siguen siendo strings.
 - 51 tests en verde (`python3 -m pytest tests/ -v`).
+
+## feat/fase-8-prompts-personalidad
+- Añadido `src/femix/llm/personalidad.py`: `Personalidad` (identidad, tono, reglas, límites, formato,
+  herramientas) + `ensamblar_prompt_sistema()`, puro y determinista.
+- `src/femix/llm/prompts.py` pasa de constante literal a `PROMPT_SISTEMA = ensamblar_prompt_sistema(PERSONALIDAD_FEMIX)`
+  — mismo nombre, mismo tipo `str`, compatible con `proveedores.py` sin tocarlo.
+- No se tocó `llm/proveedores.py`, `llm/router.py`, `puertos/`, `dominio/`, `mente/`, `conectores/`,
+  `bot/femix.py`, `bot/comandos.py`. Sin dependencias nuevas.
+- Configuración de personalidad por inquilino queda fuera de esta fase; no se introdujo `TenantContext`.
+- 57 tests en verde (`python3 -m pytest tests/ -v`).
