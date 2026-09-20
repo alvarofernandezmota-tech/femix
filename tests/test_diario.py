@@ -65,3 +65,23 @@ def test_listar_devuelve_entradas_en_orden(tmp_path):
 def test_listar_vacio_sin_entradas(tmp_path):
     d = Diario("usuario1", directorio_datos=str(tmp_path), reloj=RelojFalso(datetime(2020, 1, 1)))
     assert d.listar() == []
+
+def test_guardar_limpia_el_temporal_si_falla_la_escritura(tmp_path, monkeypatch):
+    fijo = datetime(2020, 1, 1)
+    d = Diario("usuario1", directorio_datos=str(tmp_path), reloj=RelojFalso(fijo))
+    d.registrar("primera entrada")
+
+    def os_replace_que_falla(origen, destino):
+        raise OSError("disco lleno (simulado)")
+
+    monkeypatch.setattr(os, "replace", os_replace_que_falla)
+    try:
+        d.registrar("segunda entrada")
+        assert False, "debía propagar el OSError"
+    except OSError:
+        pass
+
+    # el except debe borrar solo el temporal, no el diario_usuario1.json real ya persistido
+    assert os.listdir(str(tmp_path)) == ["diario_usuario1.json"]
+    releido = Diario("usuario1", directorio_datos=str(tmp_path), reloj=RelojFalso(fijo))
+    assert [e["texto"] for e in releido.listar()] == ["primera entrada"]

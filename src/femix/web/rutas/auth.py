@@ -1,14 +1,18 @@
+import fcntl
 import hashlib
 import os
 import secrets
 import tempfile
 import json
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Cookie, Form, Header, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+
+from femix.rag.rutas import validar_inquilino_id
 
 DURACION_SESION_HORAS = 24
 
@@ -20,6 +24,24 @@ _templates = Jinja2Templates(directory=_DIRECTORIO_TEMPLATES)
 
 def directorio_datos_web() -> str:
     return os.environ.get("FEMIX_WEB_DATOS_DIR", "datos")
+
+
+@contextmanager
+def _bloqueo(directorio: str, nombre: str):
+    """Bloqueo exclusivo entre procesos para el ciclo leer-modificar-escribir de un almacén JSON.
+
+    Sin esto, dos peticiones concurrentes (dos workers de uvicorn, o dos hilos del mismo proceso)
+    pueden leer el mismo estado, modificarlo cada una por su cuenta y que la segunda en escribir se
+    coma los cambios de la primera (last-writer-wins): un login o un alta de inquilino que
+    devuelve éxito pero cuyo dato nunca llega a persistir.
+    """
+    ruta_lock = os.path.join(directorio, f".{nombre}.lock")
+    with open(ruta_lock, "w") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
 
 
 def _hash_password(password: str, sal: "str | None" = None) -> str:
@@ -34,6 +56,12 @@ def _verificar_password(password: str, password_hash: str) -> bool:
     except ValueError:
         return False
     return secrets.compare_digest(_hash_password(password, sal), password_hash)
+
+
+# Hash de referencia para cuando el inquilino_id no existe: verificar_credenciales() lo usa para
+# que la petición tarde lo mismo (una derivación PBKDF2 completa) exista o no el inquilino, y así
+# no se pueda enumerar qué inquilino_id son válidos midiendo el tiempo de respuesta de /login.
+_HASH_DUMMY = _hash_password("marcador-de-tiempo-constante")
 
 
 @dataclass
@@ -73,20 +101,21 @@ class AlmacenInquilinos:
             raise
 
     def crear(self, inquilino_id: str, nombre: str, password: str) -> Inquilino:
-        if not inquilino_id:
-            raise ValueError("inquilino_id no puede estar vacío")
-        if inquilino_id in self._inquilinos:
-            raise ValueError(f"El inquilino '{inquilino_id}' ya existe")
+        inquilino_id = validar_inquilino_id(inquilino_id)
         if not password:
             raise ValueError("password no puede estar vacío")
-        inquilino = Inquilino(
-            id=inquilino_id,
-            nombre=nombre or inquilino_id,
-            password_hash=_hash_password(password),
-            fecha_alta=datetime.utcnow().isoformat(),
-        )
-        self._inquilinos[inquilino_id] = inquilino
-        self._guardar()
+        with _bloqueo(self._directorio, "inquilinos"):
+            self._inquilinos = self._cargar()
+            if inquilino_id in self._inquilinos:
+                raise ValueError(f"El inquilino '{inquilino_id}' ya existe")
+            inquilino = Inquilino(
+                id=inquilino_id,
+                nombre=nombre or inquilino_id,
+                password_hash=_hash_password(password),
+                fecha_alta=datetime.utcnow().isoformat(),
+            )
+            self._inquilinos[inquilino_id] = inquilino
+            self._guardar()
         return inquilino
 
     def obtener(self, inquilino_id: str) -> "Inquilino | None":
@@ -97,9 +126,9 @@ class AlmacenInquilinos:
 
     def verificar_credenciales(self, inquilino_id: str, password: str) -> "Inquilino | None":
         inquilino = self.obtener(inquilino_id)
-        if inquilino is None:
-            return None
-        if not _verificar_password(password, inquilino.password_hash):
+        referencia = inquilino.password_hash if inquilino is not None else _HASH_DUMMY
+        password_valida = _verificar_password(password, referencia)
+        if inquilino is None or not password_valida:
             return None
         return inquilino
 
@@ -130,8 +159,10 @@ class AlmacenSesiones:
     def crear(self, inquilino_id: str) -> str:
         session_id = secrets.token_urlsafe(32)
         expira = (datetime.utcnow() + timedelta(hours=DURACION_SESION_HORAS)).isoformat()
-        self._sesiones[session_id] = {"inquilino_id": inquilino_id, "expira": expira}
-        self._guardar()
+        with _bloqueo(self._directorio, "sesiones"):
+            self._sesiones = self._cargar()
+            self._sesiones[session_id] = {"inquilino_id": inquilino_id, "expira": expira}
+            self._guardar()
         return session_id
 
     def obtener_inquilino_id(self, session_id: "str | None") -> "str | None":
@@ -141,15 +172,21 @@ class AlmacenSesiones:
         if sesion is None:
             return None
         if datetime.fromisoformat(sesion["expira"]) < datetime.utcnow():
-            del self._sesiones[session_id]
-            self._guardar()
+            with _bloqueo(self._directorio, "sesiones"):
+                self._sesiones = self._cargar()
+                self._sesiones.pop(session_id, None)
+                self._guardar()
             return None
         return sesion["inquilino_id"]
 
     def eliminar(self, session_id: "str | None"):
-        if session_id and session_id in self._sesiones:
-            del self._sesiones[session_id]
-            self._guardar()
+        if not session_id:
+            return
+        with _bloqueo(self._directorio, "sesiones"):
+            self._sesiones = self._cargar()
+            if session_id in self._sesiones:
+                del self._sesiones[session_id]
+                self._guardar()
 
 
 def verificar_token_admin(token: "str | None") -> bool:
@@ -190,6 +227,7 @@ async def procesar_login(inquilino_id: str = Form(...), password: str = Form(...
         key="session_id",
         value=session_id,
         httponly=True,
+        secure=True,
         max_age=DURACION_SESION_HORAS * 3600,
     )
     return respuesta

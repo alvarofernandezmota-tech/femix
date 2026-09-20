@@ -1,9 +1,10 @@
 import os
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from femix.dominio.personal.diario import Diario
 from femix.dominio.personal.recordatorios import Recordatorios
@@ -30,6 +31,15 @@ class CrearEntradaDiarioPeticion(BaseModel):
 class CrearRecordatorioPeticion(BaseModel):
     texto: str
     cuando: str
+
+    @field_validator("cuando")
+    @classmethod
+    def _validar_cuando(cls, valor: str) -> str:
+        try:
+            datetime.fromisoformat(valor)
+        except ValueError:
+            raise ValueError("cuando debe ser una fecha/hora en formato ISO 8601")
+        return valor
 
 
 @router.get("/")
@@ -58,6 +68,10 @@ async def crear_tarea(peticion: CrearTareaPeticion, inquilino: Inquilino = Depen
 @router.post("/tareas/{indice}/completar")
 async def completar_tarea(indice: int, inquilino: Inquilino = Depends(obtener_inquilino_actual)):
     mensaje = Tareas(inquilino.id, directorio_datos_web()).completar(indice)
+    # Tareas.completar() no lanza: para índices fuera de rango devuelve este mensaje como texto,
+    # pensado para responderlo tal cual por chat (bot/comandos.py). Aquí sí hay que traducirlo a 404.
+    if mensaje.startswith("No existe la tarea número"):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=mensaje)
     return {"mensaje": mensaje}
 
 
@@ -70,7 +84,10 @@ async def listar_diario(inquilino: Inquilino = Depends(obtener_inquilino_actual)
 async def registrar_diario(
     peticion: CrearEntradaDiarioPeticion, inquilino: Inquilino = Depends(obtener_inquilino_actual)
 ):
-    mensaje = Diario(inquilino.id, directorio_datos_web()).registrar(peticion.texto)
+    try:
+        mensaje = Diario(inquilino.id, directorio_datos_web()).registrar(peticion.texto)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return {"mensaje": mensaje}
 
 

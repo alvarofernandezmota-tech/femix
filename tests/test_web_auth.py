@@ -1,6 +1,9 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+import time
+from concurrent.futures import ThreadPoolExecutor
+
 from femix.web.rutas.auth import (
     AlmacenInquilinos,
     AlmacenSesiones,
@@ -20,6 +23,32 @@ def test_password_no_se_guarda_en_claro(tmp_path):
     almacen = AlmacenInquilinos(str(tmp_path))
     inquilino = almacen.crear("acme", "ACME S.L.", "clave-secreta")
     assert "clave-secreta" not in inquilino.password_hash
+
+
+def test_inquilino_id_con_barra_lanza(tmp_path):
+    almacen = AlmacenInquilinos(str(tmp_path))
+    for id_malicioso in ("a/b", "../evil", "..", "a b"):
+        try:
+            almacen.crear(id_malicioso, "X", "clave-secreta")
+            assert False, f"debía lanzar ValueError para {id_malicioso!r}"
+        except ValueError:
+            pass
+
+
+def test_altas_concurrentes_de_inquilino_no_pierden_datos(tmp_path):
+    almacen = AlmacenInquilinos(str(tmp_path))
+    n = 20
+
+    def crear(i):
+        almacen.crear(f"inquilino{i}", f"Inquilino {i}", "clave-secreta")
+
+    with ThreadPoolExecutor(max_workers=n) as executor:
+        list(executor.map(crear, range(n)))
+
+    releido = AlmacenInquilinos(str(tmp_path))
+    assert len(releido.listar()) == n
+    for i in range(n):
+        assert releido.obtener(f"inquilino{i}") is not None
 
 
 def test_inquilino_duplicado_lanza(tmp_path):
@@ -58,6 +87,18 @@ def test_sesion_eliminar(tmp_path):
     assert sesiones.obtener_inquilino_id(session_id) is None
 
 
+def test_altas_concurrentes_de_sesion_no_pierden_datos(tmp_path):
+    sesiones = AlmacenSesiones(str(tmp_path))
+    n = 20
+
+    with ThreadPoolExecutor(max_workers=n) as executor:
+        session_ids = list(executor.map(sesiones.crear, [f"inquilino{i}" for i in range(n)]))
+
+    releido = AlmacenSesiones(str(tmp_path))
+    resueltos = {releido.obtener_inquilino_id(sid) for sid in session_ids}
+    assert resueltos == {f"inquilino{i}" for i in range(n)}
+
+
 def test_sesion_expirada_devuelve_none(tmp_path):
     sesiones = AlmacenSesiones(str(tmp_path))
     session_id = sesiones.crear("acme")
@@ -73,6 +114,40 @@ def test_verificar_token_admin(monkeypatch):
     assert verificar_token_admin("token-correcto") is True
     assert verificar_token_admin("token-incorrecto") is False
     assert verificar_token_admin(None) is False
+
+
+def test_almacen_inquilinos_guardar_limpia_temporal_si_falla(tmp_path, monkeypatch):
+    almacen = AlmacenInquilinos(str(tmp_path))
+    almacen.crear("acme", "ACME S.L.", "clave-secreta")
+
+    monkeypatch.setattr(os, "replace", lambda origen, destino: (_ for _ in ()).throw(OSError("disco lleno")))
+    try:
+        almacen.crear("beta", "Beta Inc.", "clave-beta")
+        assert False, "debía propagar el OSError"
+    except OSError:
+        pass
+
+    ficheros = [f for f in os.listdir(str(tmp_path)) if not f.startswith(".")]
+    assert ficheros == ["inquilinos.json"]
+    releido = AlmacenInquilinos(str(tmp_path))
+    assert [i.id for i in releido.listar()] == ["acme"]
+
+
+def test_almacen_sesiones_guardar_limpia_temporal_si_falla(tmp_path, monkeypatch):
+    sesiones = AlmacenSesiones(str(tmp_path))
+    primera = sesiones.crear("acme")
+
+    monkeypatch.setattr(os, "replace", lambda origen, destino: (_ for _ in ()).throw(OSError("disco lleno")))
+    try:
+        sesiones.crear("beta")
+        assert False, "debía propagar el OSError"
+    except OSError:
+        pass
+
+    ficheros = [f for f in os.listdir(str(tmp_path)) if not f.startswith(".")]
+    assert ficheros == ["sesiones.json"]
+    releido = AlmacenSesiones(str(tmp_path))
+    assert releido.obtener_inquilino_id(primera) == "acme"
 
 
 def test_verificar_token_admin_sin_configurar(monkeypatch):

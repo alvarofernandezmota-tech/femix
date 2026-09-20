@@ -90,7 +90,13 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
   quedan pendientes. El panel web usa su propio `IndiceEmbeddings` (subida/listado de documentos vía
   `/usuario/rag`) pero no pasa por `IndiceEmbeddingsBuscador`/`Femix.procesar()`; es el mismo índice
   en disco, así que un documento subido desde el panel ya es visible para el bot en cuanto se
-  conecta un `buscador` para ese inquilino.
+  conecta un `buscador` para ese inquilino. Endurecido tras una revisión adversarial (14/14
+  hallazgos confirmados): `inquilino_id` validado igual que en RAG, login a tiempo constante
+  (sin filtrar por temporización qué inquilinos existen), cookie de sesión `secure`, lock de
+  fichero entre procesos en `AlmacenInquilinos`/`AlmacenSesiones` (evita perder altas/sesiones
+  bajo concurrencia — real con `uvicorn --workers 4`), `cuando` de recordatorios validado, y
+  errores de dominio (texto vacío, índice inválido) traducidos a 400/404 en vez de 500. 248 tests
+  en verde.
 
 ## Qué está a medias o pendiente
 - `inquilino/` no existe todavía como código (solo como concepto de diseño).

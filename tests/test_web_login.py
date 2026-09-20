@@ -9,7 +9,7 @@ from femix.web.rutas.auth import AlmacenInquilinos
 
 def _cliente(tmp_path, monkeypatch):
     monkeypatch.setenv("FEMIX_WEB_DATOS_DIR", str(tmp_path))
-    return TestClient(app)
+    return TestClient(app, base_url="https://testserver")
 
 
 def test_pagina_login_accesible(tmp_path, monkeypatch):

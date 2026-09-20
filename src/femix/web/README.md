@@ -73,8 +73,10 @@ FEMIX_WEB_DATOS_DIR="datos"                # opcional, por defecto "datos"
 ## Autenticación
 
 - **Admin**: token en header `X-Admin-Token`, comparado contra `FEMIX_WEB_ADMIN_TOKEN` con `secrets.compare_digest`. Al ser un header y no una cookie, `/admin/*` no es navegable a pelo desde un navegador sin algo (JS, un cliente HTTP) que lo añada a la petición — pensado para llamadas API/una futura SPA de admin, no para escribir la URL directamente.
-- **Usuario (inquilino)**: sesión por cookie `session_id` (token opaco, 24h de validez), creada en `POST /login` tras verificar `inquilino_id` + `password` contra `AlmacenInquilinos` (contraseñas con PBKDF2-HMAC-SHA256 + sal, nunca en claro).
+- **Usuario (inquilino)**: sesión por cookie `session_id` (token opaco, 24h de validez, `httponly` + `secure`), creada en `POST /login` tras verificar `inquilino_id` + `password` contra `AlmacenInquilinos` (contraseñas con PBKDF2-HMAC-SHA256 + sal, nunca en claro; el hash se calcula siempre, exista o no el `inquilino_id`, para no filtrar por temporización qué inquilinos existen). Como la cookie es `secure`, el panel necesita servirse por HTTPS (o probarse con `TestClient(app, base_url="https://...")`); por HTTP puro el navegador no la guardará.
+- `inquilino_id` se valida con las mismas reglas que ya usaba RAG (`rag/rutas.py::validar_inquilino_id`: letras, dígitos, punto, guion y guion bajo) porque también se usa para nombrar ficheros en disco — sin esto, un id con `/` rompía las rutas de `dominio/personal/` con un 500, y en el peor caso permitía escribir fuera de `datos/`.
 - Los inquilinos los da de alta el admin vía `POST /admin/inquilinos`; no hay auto-registro.
+- `AlmacenInquilinos` y `AlmacenSesiones` serializan sus lecturas/escrituras con un lock de fichero (`fcntl.flock`) entre procesos: sin esto, altas de inquilino o logins concurrentes (el propio `uvicorn --workers 4` de "Ejecución") podían perderse en silencio (last-writer-wins sobre el JSON completo).
 
 ## Integración con Femix
 

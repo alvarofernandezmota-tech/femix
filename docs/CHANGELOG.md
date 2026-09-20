@@ -242,3 +242,28 @@
   además subir documentos RAG desde el panel: añadido `GET/POST /usuario/rag(/documentos)` e
   `IndiceEmbeddings.listar_documentos()` (no existía). Editar/borrar inquilino y `/usuario/config`
   quedan pendientes (ver `CONTEXT.md`). 28 tests nuevos más. Suite completa: 224 tests en verde.
+- **Revisión adversarial (seguridad/correctitud/tests) sobre este mismo PR:** 14 hallazgos, los 14
+  confirmados tras verificación escéptica independiente (con reproducción real, no solo lectura).
+  Corregidos en `rutas/auth.py` y `rutas/usuario.py`:
+  - `AlmacenInquilinos.crear()` no validaba `inquilino_id` (podía romper `dominio/personal/` con un
+    500, o en el peor caso escribir fuera de `datos/`) — ahora reutiliza
+    `rag/rutas.py::validar_inquilino_id`.
+  - `POST /login` filtraba por temporización qué `inquilino_id` existen (el hash PBKDF2 solo se
+    calculaba si el inquilino existía) — ahora se calcula siempre, contra un hash de referencia fijo
+    si no existe.
+  - Cookie de sesión sin `secure` — añadido (rompe pruebas por HTTP puro a propósito; los tests usan
+    `TestClient(app, base_url="https://...")`).
+  - `AlmacenInquilinos`/`AlmacenSesiones` sin ningún lock: altas/logins concurrentes podían perderse
+    en silencio (reproducido con hilos: 19 de 20 altas perdidas). Añadido lock de fichero
+    (`fcntl.flock`) alrededor de cada ciclo leer-modificar-escribir.
+  - `POST /usuario/tareas/{i}/completar` con índice inválido devolvía 200 con el error como texto
+    — ahora 404.
+  - `cuando` de `POST /usuario/recordatorios` no se validaba como fecha (quedaba persistido y
+    reventaba luego cualquier lectura con 500) — validación Pydantic, ahora 422.
+  - `POST /usuario/diario` con texto vacío devolvía 500 en vez de 400 (a diferencia del mismo patrón
+    ya usado en `admin.py`) — ahora captura el `ValueError` del dominio.
+  - Huecos de cobertura cerrados con tests: las 6 rutas de `/usuario/*` que no comprobaban 401 sin
+    sesión, la rama "inquilino no encontrado" de `obtener_inquilino_actual`, y el `except` de
+    limpieza del fichero temporal en `Diario._guardar()`/`AlmacenInquilinos._guardar()`/
+    `AlmacenSesiones._guardar()` (forzando el fallo de escritura con `monkeypatch`).
+  - 12 tests nuevos. Suite completa: 248 tests en verde.
