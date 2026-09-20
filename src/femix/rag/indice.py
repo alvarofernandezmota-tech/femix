@@ -111,6 +111,16 @@ class IndiceEmbeddings:
             self._guardar()
         return len(trozos)
 
+    def listar_documentos(self) -> list[dict]:
+        documentos: dict[str, dict] = {}
+        for fragmento in self._fragmentos:
+            info = documentos.setdefault(
+                fragmento.documento_id,
+                {"documento_id": fragmento.documento_id, "fuente": fragmento.fuente, "fragmentos": 0},
+            )
+            info["fragmentos"] += 1
+        return list(documentos.values())
+
     def buscar(self, consulta: str, k: int = 3) -> list[ResultadoBusqueda]:
         if not consulta:
             return []

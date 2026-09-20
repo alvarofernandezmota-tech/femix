@@ -71,6 +71,39 @@ def test_crear_y_listar_recordatorio(tmp_path, monkeypatch):
     }
 
 
+def test_subir_y_listar_documento_rag(tmp_path, monkeypatch):
+    client = _cliente_autenticado(tmp_path, monkeypatch)
+
+    respuesta = client.post(
+        "/usuario/rag/documentos",
+        files={"archivo": ("manual.txt", b"contenido de prueba para el indice RAG", "text/plain")},
+    )
+    assert respuesta.status_code == 201
+    cuerpo = respuesta.json()
+    assert cuerpo["fuente"] == "manual.txt"
+    assert cuerpo["fragmentos"] == 1
+
+    respuesta = client.get("/usuario/rag")
+    documentos = respuesta.json()["documentos"]
+    assert len(documentos) == 1
+    assert documentos[0]["fuente"] == "manual.txt"
+
+
+def test_subir_documento_rag_vacio_falla(tmp_path, monkeypatch):
+    client = _cliente_autenticado(tmp_path, monkeypatch)
+    respuesta = client.post(
+        "/usuario/rag/documentos",
+        files={"archivo": ("vacio.txt", b"   ", "text/plain")},
+    )
+    assert respuesta.status_code == 400
+
+
+def test_rag_requiere_autenticacion(tmp_path, monkeypatch):
+    monkeypatch.setenv("FEMIX_WEB_DATOS_DIR", str(tmp_path))
+    client = TestClient(app)
+    assert client.get("/usuario/rag").status_code == 401
+
+
 def test_inquilinos_no_comparten_datos(tmp_path, monkeypatch):
     monkeypatch.setenv("FEMIX_WEB_DATOS_DIR", str(tmp_path))
     almacen = AlmacenInquilinos(str(tmp_path))
