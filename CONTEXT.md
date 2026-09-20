@@ -69,8 +69,14 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
   lleva `inquilino_id` obligatorio, así que un fragmento sin dueño no se puede construir. Migración
   automática del formato plano anterior (se mueve, no se copia; nunca pisa un índice ya migrado).
   `datos/{inquilino_id}/` deja el hueco para que `Memoria` y `dominio/personal/` cuelguen de ahí en
-  la Fase 2, pero eso **no** se ha hecho todavía. 163 tests en verde
-  (`python3 -m pytest tests/ -v`).
+  la Fase 2, pero eso **no** se ha hecho todavía.
+- RAG conectado al bot (`src/femix/rag/adaptador.py`, rama `feat/rag-por-inquilino`):
+  `IndiceEmbeddingsBuscador` implementa el puerto `puertos/busqueda.Buscador` sobre
+  `IndiceEmbeddings`, y `Subagente` monta el `AgenteBusqueda` al final de su cadena cuando recibe
+  un `buscador`. Camino completo: `Femix.procesar()` → `necesita_agente()` → `Subagente` →
+  `AgenteBusqueda` → `Buscador` → `datos/{inquilino_id}/rag/indice.json`, y lo recuperado se suma
+  al contexto de `Memoria` en el prompt. Sin `buscador`, comportamiento idéntico al anterior.
+  186 tests en verde (`python3 -m pytest tests/ -v`).
 - Panel web multi-usuario (`src/femix/web/`, rama `feat/panel-web`, base
   `integracion/femix-completa`, encargo en `docs/ENCARGO_PANEL_WEB.md`): FastAPI con
   `rutas/auth.py` (login/logout, `AlmacenInquilinos` y `AlmacenSesiones` en JSON local,
@@ -81,14 +87,23 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
   `X-Admin-Token`). 61 tests nuevos, sin dependencias nuevas más allá de las ya previstas
   (`fastapi`, `jinja2`, `python-multipart`). El alta de inquilinos es manual desde el panel admin,
   no hay auto-registro; editar/borrar inquilino y `/usuario/config` (mencionados en el encargo)
-  quedan pendientes. No conectado a `Femix.procesar()` ni a Telegram.
+  quedan pendientes. El panel web usa su propio `IndiceEmbeddings` (subida/listado de documentos vía
+  `/usuario/rag`) pero no pasa por `IndiceEmbeddingsBuscador`/`Femix.procesar()`; es el mismo índice
+  en disco, así que un documento subido desde el panel ya es visible para el bot en cuanto se
+  conecta un `buscador` para ese inquilino.
 
 ## Qué está a medias o pendiente
 - `inquilino/` no existe todavía como código (solo como concepto de diseño).
-- RAG sigue **sin enchufar** a `Femix.procesar()`: falta el adaptador de `IndiceEmbeddings` al
-  puerto `puertos/busqueda.Buscador`, que es lo que lo conectaría con `AgenteBusqueda`. Los dos
-  lados ya existen y encajan por el puerto; falta escribir el adaptador y pasarle el `buscador` a
-  `Femix`.
+- RAG **encendido** de punta a punta: `bot/fabrica.construir_femix()` enchufa
+  `IndiceEmbeddingsBuscador` y lee `FEMIX_INQUILINO_ID`; CLI (`bot/main.py`) y Telegram
+  (`conectores/telegram/bot.py`) lo usan. Verificado contra Ollama real: el modelo responde citando
+  el documento del índice del inquilino. Falta añadir `FEMIX_INQUILINO_ID` a `.env.example`, que
+  vive en `release/docker-chatbot-base`.
+- La relevancia del RAG es débil mientras el motor de embeddings sea `MotorEmbeddingsHash` (bolsa
+  de palabras por hashing, sin stopwords ni IDF): las palabras vacías compartidas inflan la
+  similitud. El umbral del adaptador solo descarta con fiabilidad lo que no comparte ninguna
+  palabra. Se arregla enchufando un proveedor real por el puerto `MotorEmbeddings`, sin tocar nada
+  más.
 - Migración de lógica de negocio de `hugin` (citas, Postgres, teléfono) no iniciada.
 - Los dos LLM (rápido + complejo) ya están implementados y enchufados, pero sin medir en
   producción: falta decidir qué modelo concreto va en cada carril con la CPU actual (ver la nota de

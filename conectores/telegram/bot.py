@@ -6,10 +6,10 @@ from telegram.ext import Application, MessageHandler, CommandHandler, filters, C
 
 load_dotenv()
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
-from femix.bot.femix import Femix
+from femix.bot.fabrica import construir_femix
 from .voz import manejar_nota_de_voz
 
-femix = Femix()
+femix = construir_femix()
 
 async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     respuesta = femix.procesar(str(update.effective_user.id), update.message.text)

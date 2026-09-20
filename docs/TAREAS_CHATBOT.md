@@ -15,9 +15,14 @@
 - [x] `IndiceEmbeddings` actualizado (+ migración automática del formato plano anterior)
 - [x] Tests de aislamiento por inquilino (ingerir en A, buscar desde B: no encuentra nada)
 - [x] `inquilino_id` validado como nombre de carpeta (sin traversal)
-- [x] 24 tests nuevos (163 total)
+- [x] Adaptador `IndiceEmbeddingsBuscador` al puerto `puertos/busqueda.Buscador`
+- [x] `buscador` enchufado a `Femix.procesar()` vía `Subagente` → `AgenteBusqueda`
+- [x] 47 tests nuevos (186 total)
 - [ ] Merge a `integracion/femix-completa`
 
-**Pendiente para el siguiente bloque:** adaptador de `IndiceEmbeddings` al puerto
-`puertos/busqueda.Buscador`, que es lo que conecta este RAG con `AgenteBusqueda` y por tanto con
-`Femix.procesar()`. Hoy el RAG sigue sin estar enchufado al bot.
+- [x] RAG **encendido** en el bot: `bot/main.py` y `conectores/telegram/bot.py` usan
+      `construir_femix()` (`bot/fabrica.py`), con `FEMIX_INQUILINO_ID`
+- [x] 12 tests más (198 total) + verificación manual contra Ollama real
+
+**Pendiente de despliegue:** añadir `FEMIX_INQUILINO_ID` a `.env.example` (vive en
+`release/docker-chatbot-base`). Sin ella el bot arranca como inquilino `default`.
