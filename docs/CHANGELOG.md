@@ -113,3 +113,42 @@
   `llm/router.py`, `llm/configuracion.py`, `mente/memoria.py`, `mente/entender.py`,
   `bot/comandos.py`, `dominio/`, `conectores/` ni `requirements.txt`. Sin dependencias nuevas, sin
   `TenantContext`.
+
+## feat/rag-por-inquilino
+- Añadido `src/femix/rag/rutas.py`: único sitio que construye rutas de RAG —
+  `directorio_inquilino()`, `directorio_rag()`, `ruta_indice()`
+  (`datos/{inquilino_id}/rag/indice.json`) y `ruta_indice_heredada()` (el plano anterior).
+- `validar_inquilino_id()`: al pasar el `inquilino_id` a ser un **nombre de carpeta**, un id como
+  `../otro`, `a/b` o `..` leería y escribiría fuera del directorio de su inquilino. Se admiten solo
+  letras, dígitos, punto, guion y guion bajo, y se rechazan los ids que son solo puntos. No es
+  cosmético: es la primera capa del aislamiento.
+- `IndiceEmbeddings` pasa de `datos/rag_{inquilino_id}.json` a
+  `datos/{inquilino_id}/rag/indice.json`. El aislamiento deja de depender de una sola comprobación
+  y se sostiene en tres capas: **ruta** (carpeta por inquilino, id validado), **carga** (un
+  fragmento de otro inquilino que aparezca en el fichero se descarta y se cuenta en
+  `fragmentos_descartados`; nunca llega a memoria) y **búsqueda** (se filtra siempre por
+  `inquilino_id` — la regla que `AGENTS.md` impone a Postgres, aplicada al índice). Redundante a
+  propósito: una fuga entre inquilinos no debe depender de que una única comprobación esté bien
+  escrita.
+- `Fragmento` gana `inquilino_id` como primer campo y **sin valor por defecto**: un fragmento sin
+  dueño no se puede construir. Obliga a nombrar el inquilino en los dos `Fragmento` literales de
+  `tests/test_rag.py` — único cambio en tests existentes.
+- Migración automática del formato plano: si existe `datos/rag_{id}.json` y todavía no el nuevo, se
+  adopta moviéndolo (nunca se pisa un índice ya migrado; mover en vez de copiar evita quedarse con
+  dos fuentes de verdad para el mismo inquilino). Los fragmentos heredados, que no llevaban
+  `inquilino_id`, se marcan con el del índice que los carga. Desactivable con `migrar_heredado=False`.
+- `IndiceEmbeddings` expone `inquilino_id`, `directorio`, `ruta`, `total_fragmentos`,
+  `fragmentos_descartados` y `migrado_desde_heredado` — inspeccionable sin tocar privados.
+- `datos/{inquilino_id}/` deja el hueco para que `Memoria` y `dominio/personal/` cuelguen de ahí en
+  la Fase 2 del roadmap. **No se ha hecho en esta rama**: `Memoria` sigue aislando por clave
+  `inquilino:usuario` y `dominio/personal/` sigue usando solo `usuario_id`.
+- 24 tests nuevos (`tests/test_rag_rutas.py`, `tests/test_rag_por_inquilino.py`): estructura en
+  disco, ingerir en A y buscar desde B (no encuentra nada), dos inquilinos con el mismo documento,
+  índice contaminado a mano para probar la defensa en profundidad, traversal rechazado, y los cuatro
+  casos de migración. Suite completa: 163 tests en verde (`python3 -m pytest tests/ -v`).
+- **Pendiente, no hecho aquí:** el adaptador que implementa el puerto `puertos/busqueda.Buscador`
+  sobre `IndiceEmbeddings`, que es lo que conectaría este RAG a `AgenteBusqueda` y por tanto a
+  `Femix.procesar()`. Hoy el RAG sigue sin estar enchufado al bot.
+- No se tocó `rag/fragmentos.py`, `rag/embeddings_local.py`, `rag/contexto.py`,
+  `puertos/embeddings.py`, `agentes/`, `llm/`, `mente/`, `bot/`, `dominio/`, `conectores/` ni
+  `requirements.txt`. Sin dependencias nuevas.

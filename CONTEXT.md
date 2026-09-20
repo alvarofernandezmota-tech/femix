@@ -59,8 +59,25 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
   (`HUGIN_LLM_MODELO_RAPIDO` / `HUGIN_LLM_MODELO_COMPLEJO`). Sin esas variables, un único modelo
   para todo, como hasta ahora. 139 tests en verde (`python3 -m pytest tests/ -v`).
 
+- RAG aislado por inquilino (`src/femix/rag/rutas.py`, `src/femix/rag/indice.py`, rama
+  `feat/rag-por-inquilino`): el índice pasa de `datos/rag_{inquilino_id}.json` a
+  `datos/{inquilino_id}/rag/indice.json`. El aislamiento se sostiene en tres capas y no en una:
+  ruta (carpeta por inquilino, con el `inquilino_id` validado como nombre de carpeta — sin esa
+  validación un id como `../otro` escribiría fuera), carga (los fragmentos de otro inquilino que
+  aparezcan en el fichero se descartan y se cuentan en `fragmentos_descartados`) y búsqueda (se
+  filtra siempre por `inquilino_id`, la misma regla que `AGENTS.md` impone a Postgres). `Fragmento`
+  lleva `inquilino_id` obligatorio, así que un fragmento sin dueño no se puede construir. Migración
+  automática del formato plano anterior (se mueve, no se copia; nunca pisa un índice ya migrado).
+  `datos/{inquilino_id}/` deja el hueco para que `Memoria` y `dominio/personal/` cuelguen de ahí en
+  la Fase 2, pero eso **no** se ha hecho todavía. 163 tests en verde
+  (`python3 -m pytest tests/ -v`).
+
 ## Qué está a medias o pendiente
 - `inquilino/` no existe todavía como código (solo como concepto de diseño).
+- RAG sigue **sin enchufar** a `Femix.procesar()`: falta el adaptador de `IndiceEmbeddings` al
+  puerto `puertos/busqueda.Buscador`, que es lo que lo conectaría con `AgenteBusqueda`. Los dos
+  lados ya existen y encajan por el puerto; falta escribir el adaptador y pasarle el `buscador` a
+  `Femix`.
 - Migración de lógica de negocio de `hugin` (citas, Postgres, teléfono) no iniciada.
 - Los dos LLM (rápido + complejo) ya están implementados y enchufados, pero sin medir en
   producción: falta decidir qué modelo concreto va en cada carril con la CPU actual (ver la nota de
