@@ -1,10 +1,15 @@
-import os
+from .configuracion import ConfiguracionLLM, configuracion_desde_entorno
 from .proveedores import ProveedorOllama, ProveedorOpenAI
 
-def obtener_motor():
-    proveedor = os.environ.get("HUGIN_LLM_PROVEEDOR", "ollama")
-    if proveedor == "ollama":
-        return ProveedorOllama(modelo=os.environ.get("HUGIN_LLM_MODELO", "qwen2.5:3b"))
-    if proveedor == "openai":
-        return ProveedorOpenAI()
-    raise ValueError(f"Proveedor LLM no soportado: {proveedor}")
+def obtener_motor(configuracion: "ConfiguracionLLM | None" = None):
+    config = configuracion or configuracion_desde_entorno()
+    if config.proveedor == "ollama":
+        return ProveedorOllama(
+            modelo=config.modelo,
+            temperatura=config.temperatura,
+            timeout_segundos=config.timeout_segundos,
+            url=config.ollama_url,
+        )
+    if config.proveedor == "openai":
+        return ProveedorOpenAI(api_key=config.openai_api_key)
+    raise ValueError(f"Proveedor LLM no soportado: {config.proveedor}")
