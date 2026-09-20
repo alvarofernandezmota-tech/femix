@@ -9,4 +9,8 @@ COPY src/ ./src/
 
 ENV PYTHONPATH=/app/src
 
+# Exponer puerto del panel web
+EXPOSE 8000
+
+# Comando por defecto: ejecutar el bot
 CMD ["python", "-m", "femix.bot.main"]
