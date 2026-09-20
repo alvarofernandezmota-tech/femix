@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Crear una versión “fija” y portable del chatbot Femix que pueda ejecutarse
+Crear una versión "fija" y portable del chatbot Femix que pueda ejecutarse
 en cualquier entorno con Docker, sin depender de la configuración local.
 
 ## Alcance (release/docker-chatbot-base)
@@ -25,6 +25,7 @@ en cualquier entorno con Docker, sin depender de la configuración local.
 - Tests: 84 passing.
 - Prueba real con Ollama: OK (`Femix conectado a Ollama.`).
 - Ramas de fases 7–10 integradas y limpiadas.
+- **Pendiente**: Corregir `requirements.txt` (numpy==2.5.3 no existe)
 
 ## Fases del proyecto
 
@@ -41,9 +42,12 @@ en cualquier entorno con Docker, sin depender de la configuración local.
 - [x] Documentar plan en `docs/docker.md`
 - [x] Script para limpiar ramas mergeadas
 - [x] Ejecutar limpieza de ramas (fases 7–10 y chore/claude)
-- [ ] Actualizar README con instrucciones Docker
-- [ ] Etiquetar primera release (ej. `v0.1.0-docker-base`)
+- [x] Actualizar README con instrucciones Docker
+- [x] Etiquetar primera release (v0.1.0-docker-base)
+- [x] Crear changelog en `docs/CHANGELOG_DOCKER.md`
+- [ ] **Corregir requirements.txt** (numpy)
 - [ ] Probar ejecución con `docker compose up --build`
+- [ ] Crear release en GitHub
 
 ## Changelog
 
