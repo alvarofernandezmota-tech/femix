@@ -43,10 +43,28 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
   CLI y Telegram los heredan automáticamente (ambos ya llaman a `femix.procesar()`). 51 tests en
   verde (`python3 -m pytest tests/ -v`).
 
+- Agentes unificados (`src/femix/agentes/`, `src/femix/mente/decidir.py`,
+  `src/femix/puertos/busqueda.py`, rama `feat/agentes-unificados`): `Femix.procesar()` es el único
+  punto de entrada y tiene tres caminos, de más barato a más caro — comando directo, LLM rápido, y
+  subagente cuando `mente/decidir.necesita_agente()` lo pide (reglas, sin LLM). `CadenaDeAgentes`
+  ejecuta agentes en orden, corta en el primero que resuelve (`final=True`), acumula el contexto de
+  los que solo aportan (`final=False`) y sobrevive a un agente que falle. De serie va `AgenteTareas`
+  (tareas en lenguaje natural, sin `/tarea`); `AgenteBusqueda` solo si se inyecta un `Buscador`.
+  Si el subagente falla o devuelve vacío responde el LLM de siempre, y `delegar=False` restaura el
+  comportamiento anterior exacto. No es tool calling (Fase 5): el LLM no llama a funciones.
+- Dos LLM, rápido + complejo (`src/femix/llm/modelos.py`, rama `feat/agentes-unificados`):
+  `ConfiguracionModelos` elige el `modelo` sobre una única `ConfiguracionLLM` base con precedencia
+  usuario > tipo de tarea > base, y `SelectorDeModelos` entrega el motor reutilizando una instancia
+  por `(proveedor, modelo)`. El flujo rápido usa el modelo rápido y el subagente el complejo
+  (`HUGIN_LLM_MODELO_RAPIDO` / `HUGIN_LLM_MODELO_COMPLEJO`). Sin esas variables, un único modelo
+  para todo, como hasta ahora. 139 tests en verde (`python3 -m pytest tests/ -v`).
+
 ## Qué está a medias o pendiente
 - `inquilino/` no existe todavía como código (solo como concepto de diseño).
 - Migración de lógica de negocio de `hugin` (citas, Postgres, teléfono) no iniciada.
-- Sin dos LLM (rápido + conversacional) todavía — diseñado, no implementado.
+- Los dos LLM (rápido + complejo) ya están implementados y enchufados, pero sin medir en
+  producción: falta decidir qué modelo concreto va en cada carril con la CPU actual (ver la nota de
+  rendimiento de `docs/ROADMAP.md`).
 - `recordatorios` no tiene scheduler ni notificación proactiva, solo cálculo de vencimiento y listado.
 - Los comandos de dominio personal usan solo `usuario_id` (sin `inquilino_id`) — no hay aislamiento
   por inquilino todavía en `dominio/personal/`, a diferencia de `Memoria`. No es un problema hoy

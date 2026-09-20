@@ -73,3 +73,43 @@
   Suite completa: 84 tests en verde.
 - No se tocó `mente/memoria.py`, `puertos/`, `dominio/`, `rag/`, `conectores/`, `bot/femix.py`,
   `requirements.txt`. Sin `TenantContext`.
+
+## feat/agentes-unificados
+- Añadido `src/femix/llm/modelos.py`: `ConfiguracionModelos` (elige el `modelo` sobre una única
+  `ConfiguracionLLM` base, con precedencia usuario > tipo de tarea > base) +
+  `configuracion_modelos_desde_entorno()` (`HUGIN_LLM_MODELO_RAPIDO`, `HUGIN_LLM_MODELO_COMPLEJO`) +
+  `SelectorDeModelos` (entrega el motor que toca y reutiliza una instancia por
+  `(proveedor, modelo)`). Implementa el patrón de dos LLM que estaba diseñado y no implementado.
+  Sin las variables nuevas, todo sigue usando un único modelo como hasta ahora.
+- Añadido `src/femix/puertos/busqueda.py`: puerto `Buscador` (mismo patrón que `MotorLLM`/
+  `MotorEmbeddings`). Existe para que `agentes/` pueda pedir contexto documental **sin importar
+  `rag/`**: el adaptador sobre `IndiceEmbeddings` se escribe en `feat/rag-por-inquilino` y encaja
+  aquí sin tocar a los agentes.
+- Añadido `src/femix/agentes/`: `Agente` (contrato `puede_atender` + `ejecutar`),
+  `Peticion`/`RespuestaAgente`, `CadenaDeAgentes` (ejecuta en orden, corta en el primero que
+  resuelve con `final=True`, acumula el contexto de los que solo aportan con `final=False`, y
+  sobrevive a un agente que lance excepción: lo anota en `errores` y sigue), `AgenteTareas`
+  (tareas en lenguaje natural sobre `dominio/personal/tareas.py`, sin escribir `/tarea`),
+  `AgenteBusqueda` (aporta contexto vía el puerto `Buscador` y deja responder al LLM) y
+  `Subagente` (recorre la cadena y, si nadie resuelve, responde con el LLM de tarea compleja
+  usando lo que los agentes hayan aportado).
+- Añadido `src/femix/mente/decidir.py`: `necesita_agente()`, reglas explícitas sin LLM, mismo
+  criterio que `entender.clasificar_intencion()` — no se gasta una llamada al modelo para decidir
+  si hay que delegar.
+- `Femix.procesar()` queda como único punto de entrada con tres caminos, de más barato a más caro:
+  comando directo, LLM rápido, y subagente cuando `necesita_agente()` lo pide. La respuesta
+  delegada se registra en `Memoria` igual que cualquier conversación; los comandos siguen sin tocar
+  LLM ni memoria. `Femix` gana `subagente`, `selector_modelos`, `buscador` y `delegar` inyectables.
+- Compatibilidad: si el subagente falla o devuelve vacío responde el LLM de siempre (un agente
+  caído no deja al usuario sin respuesta), y `delegar=False` restaura el comportamiento anterior
+  exacto. Los tests de regresión de `tests/test_femix_integracion.py` siguen en verde sin tocarlos.
+- **No es tool calling (Fase 5).** La delegación la decide `femix` por reglas; el LLM no llama a
+  funciones. La distinción de `docs/ROADMAP.md` entre capa de producción y orquestación de Claude
+  Code se mantiene: `agentes/` es capa de producción dentro de `femix`.
+- 55 tests nuevos (`tests/test_modelos_llm.py`, `tests/test_agentes.py`, `tests/test_decidir.py`,
+  `tests/test_agentes_unificados.py`), todos con fakes deterministas y sin llamadas externas
+  reales. Suite completa: 139 tests en verde (`python3 -m pytest tests/ -v`).
+- No se tocó `src/femix/rag/` (se trabaja en `feat/rag-por-inquilino`), `llm/proveedores.py`,
+  `llm/router.py`, `llm/configuracion.py`, `mente/memoria.py`, `mente/entender.py`,
+  `bot/comandos.py`, `dominio/`, `conectores/` ni `requirements.txt`. Sin dependencias nuevas, sin
+  `TenantContext`.
