@@ -1,0 +1,14 @@
+{
+  "name": "hugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HUGIN - bot conversacional autonomo (LLM + RAG + agentes + memoria)",
+  "main": "dist/llm/index.js",
+  "types": "dist/llm/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}
