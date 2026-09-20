@@ -18,3 +18,8 @@
 
 ## Nota de arquitectura — fase 5
 El tool calling es una capa de producción (vive dentro de `femix`, en cada mensaje de cada inquilino), distinta de la orquestación de agentes de Claude Code (que es una capa de desarrollo, para mantener el propio repo). No confundir ambas al planificar.
+
+## Rendimiento del LLM (hallazgo real, 2026-09-20)
+- Timeouts frecuentes en producción: "El modelo está tardando demasiado" con `qwen2.5:3b` en CPU (sin GPU, 6 núcleos).
+- Diagnosticar: `OLLAMA_KEEP_ALIVE` sin configurar (recarga el modelo en cada petición), gobernador de CPU en modo ahorro (53% factor de escala visto en auditoría).
+- Pendiente: decidir entre optimizar el motor rápido actual o directamente avanzar la fase 1 (segundo LLM) con mejor gestión de recursos para ambos modelos.
