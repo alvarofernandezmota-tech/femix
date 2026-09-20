@@ -6,11 +6,16 @@ import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Cookie, Header, HTTPException, status
+from fastapi import APIRouter, Cookie, Form, Header, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
+from fastapi.templating import Jinja2Templates
 
 DURACION_SESION_HORAS = 24
 
 router = APIRouter(tags=["auth"])
+
+_DIRECTORIO_TEMPLATES = os.path.join(os.path.dirname(__file__), "..", "templates")
+_templates = Jinja2Templates(directory=_DIRECTORIO_TEMPLATES)
 
 
 def directorio_datos_web() -> str:
@@ -167,3 +172,32 @@ def obtener_inquilino_actual(session_id: "str | None" = Cookie(default=None)) ->
 def requerir_admin(x_admin_token: "str | None" = Header(default=None)) -> None:
     if not verificar_token_admin(x_admin_token):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token de administrador inválido")
+
+
+@router.get("/login")
+async def formulario_login(request: Request):
+    return _templates.TemplateResponse(request, "login.html", {})
+
+
+@router.post("/login")
+async def procesar_login(inquilino_id: str = Form(...), password: str = Form(...)):
+    inquilino = AlmacenInquilinos().verificar_credenciales(inquilino_id, password)
+    if inquilino is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas")
+    session_id = AlmacenSesiones().crear(inquilino.id)
+    respuesta = RedirectResponse(url="/usuario/", status_code=status.HTTP_303_SEE_OTHER)
+    respuesta.set_cookie(
+        key="session_id",
+        value=session_id,
+        httponly=True,
+        max_age=DURACION_SESION_HORAS * 3600,
+    )
+    return respuesta
+
+
+@router.post("/logout")
+async def logout(session_id: "str | None" = Cookie(default=None)):
+    AlmacenSesiones().eliminar(session_id)
+    respuesta = RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    respuesta.delete_cookie("session_id")
+    return respuesta

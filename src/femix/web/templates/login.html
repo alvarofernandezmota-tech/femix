@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block titulo %}Iniciar sesión — Femix{% endblock %}
+
+{% block content %}
+<form class="formulario-login" method="post" action="/login">
+    <label for="inquilino_id">Usuario</label>
+    <input type="text" id="inquilino_id" name="inquilino_id" required autofocus>
+
+    <label for="password">Contraseña</label>
+    <input type="password" id="password" name="password" required>
+
+    <button type="submit">Entrar</button>
+</form>
+{% endblock %}

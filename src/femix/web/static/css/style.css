@@ -1,0 +1,66 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: system-ui, sans-serif;
+    background: #f5f5f5;
+    color: #1a1a1a;
+}
+
+.cabecera {
+    background: #1a1a2e;
+    color: #fff;
+    padding: 1rem 1.5rem;
+}
+
+.cabecera h1 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.contenido {
+    max-width: 720px;
+    margin: 2rem auto;
+    padding: 0 1.5rem;
+}
+
+.formulario-login {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 320px;
+    margin: 0 auto;
+}
+
+.formulario-login input {
+    padding: 0.5rem;
+    font-size: 1rem;
+}
+
+.formulario-login button {
+    padding: 0.5rem;
+    margin-top: 0.5rem;
+    cursor: pointer;
+}
+
+.tarjeta {
+    background: #fff;
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.tabla-inquilinos {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.tabla-inquilinos th,
+.tabla-inquilinos td {
+    text-align: left;
+    padding: 0.5rem;
+    border-bottom: 1px solid #ddd;
+}
