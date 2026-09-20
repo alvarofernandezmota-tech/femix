@@ -77,3 +77,21 @@ docker compose logs -f
 git tag -a v0.1.0-docker-base -m "Primera base dockerizada"
 git push origin v0.1.0-docker-base
 ```
+
+## 2026-09-20 - RAG por inquilino + Panel Web
+
+### RAG por inquilino ✅
+- ✅ Estructura `datos/{inquilino_id}/rag/`
+- ✅ `IndiceEmbeddings` con aislamiento por inquilino
+- ✅ Adaptador RAG → Buscador (umbral 0.05)
+- ✅ 186 tests passing
+- ✅ Merge a `integracion/femix-completa`
+
+### Panel Web ✅
+- ✅ Estructura base: `src/femix/web/`
+- ✅ FastAPI + Jinja2
+- ⏳ Pendiente: contenido (rutas, templates, tests)
+
+### Docker
+- ✅ Puerto 8000 expuesto para el panel web
+- ⏳ Pendiente: incluir panel en Docker
