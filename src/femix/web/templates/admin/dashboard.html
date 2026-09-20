@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block titulo %}Panel de administración — Femix{% endblock %}
+
+{% block content %}
+<h2>Administración</h2>
+
+<section class="tarjeta">
+    <h3>Estadísticas globales</h3>
+    <ul>
+        <li>Inquilinos: {{ stats.total_inquilinos }}</li>
+        <li>Tareas: {{ stats.total_tareas }}</li>
+        <li>Entradas de diario: {{ stats.total_entradas_diario }}</li>
+        <li>Recordatorios: {{ stats.total_recordatorios }}</li>
+    </ul>
+</section>
+
+<section class="tarjeta">
+    <h3>Inquilinos</h3>
+    <table class="tabla-inquilinos">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Alta</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for inquilino in inquilinos %}
+            <tr>
+                <td>{{ inquilino.id }}</td>
+                <td>{{ inquilino.nombre }}</td>
+                <td>{{ inquilino.fecha_alta }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3">Sin inquilinos todavía.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}
