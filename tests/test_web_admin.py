@@ -57,6 +57,26 @@ def test_crear_inquilino_duplicado_falla(tmp_path, monkeypatch):
     assert respuesta.status_code == 400
 
 
+def test_crear_inquilino_con_id_vacio_falla(tmp_path, monkeypatch):
+    client = _cliente(tmp_path, monkeypatch)
+    respuesta = client.post(
+        "/admin/inquilinos",
+        json={"id": "", "nombre": "ACME S.L.", "password": "clave-secreta"},
+        headers={"X-Admin-Token": "token-admin"},
+    )
+    assert respuesta.status_code == 400
+
+
+def test_crear_inquilino_con_password_vacio_falla(tmp_path, monkeypatch):
+    client = _cliente(tmp_path, monkeypatch)
+    respuesta = client.post(
+        "/admin/inquilinos",
+        json={"id": "acme", "nombre": "ACME S.L.", "password": ""},
+        headers={"X-Admin-Token": "token-admin"},
+    )
+    assert respuesta.status_code == 400
+
+
 def test_stats_vacio(tmp_path, monkeypatch):
     client = _cliente(tmp_path, monkeypatch)
     respuesta = client.get("/admin/stats", headers={"X-Admin-Token": "token-admin"})

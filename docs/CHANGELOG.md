@@ -152,3 +152,39 @@
 - No se tocó `rag/fragmentos.py`, `rag/embeddings_local.py`, `rag/contexto.py`,
   `puertos/embeddings.py`, `agentes/`, `llm/`, `mente/`, `bot/`, `dominio/`, `conectores/` ni
   `requirements.txt`. Sin dependencias nuevas.
+
+## feat/panel-web
+- Añadido `src/femix/web/rutas/`: `auth.py` (`AlmacenInquilinos`, `AlmacenSesiones`, hashing de
+  contraseñas con PBKDF2-HMAC-SHA256 + sal, dependencias `obtener_inquilino_actual`/`requerir_admin`,
+  y las rutas `GET`/`POST /login` + `POST /logout`), `usuario.py` (dashboard y tareas/diario/
+  recordatorios del inquilino autenticado) y `admin.py` (dashboard, alta y listado de inquilinos,
+  estadísticas globales), todo protegido por router (`dependencies=[Depends(requerir_admin)]` en
+  admin, `Depends(obtener_inquilino_actual)` en usuario). `app.py` monta los tres routers y
+  `/static`. Templates Jinja2 (`base.html`, `login.html`, `usuario/dashboard.html`,
+  `admin/dashboard.html`) y `static/css/style.css`.
+- Persistencia igual que el resto del dominio: JSON local con escritura atómica
+  (`datos/inquilinos.json`, `datos/sesiones.json`), sin dependencias nuevas más allá de las ya
+  previstas en `requirements.txt` (`fastapi`, `jinja2`, `python-multipart`). Se actualizaron las
+  versiones pineadas de `fastapi`/`uvicorn`/`jinja2`/`python-multipart`/`itsdangerous` (las que
+  había el README original ya no soportan la firma actual de
+  `Jinja2Templates.TemplateResponse`) y se eliminó un bloque duplicado.
+- Se trata `inquilino_id` del panel como el `usuario_id` de `dominio/personal/` (`Tareas`, `Diario`,
+  `Recordatorios`): cada inquilino ya obtiene su propio fichero por compartir la misma clave, pero
+  el aislamiento real por inquilino en `dominio/personal/` sigue sin existir como tal — se hereda la
+  limitación descrita en `CONTEXT.md` (Fase 2 del roadmap, pendiente).
+- Añadido `Diario.listar()` (no existía; solo tenía `registrar()`), necesario para el panel.
+- 33 tests nuevos (`tests/test_web_auth.py`, `tests/test_web_login.py`, `tests/test_web_usuario.py`,
+  `tests/test_web_admin.py`, más los añadidos a `tests/test_diario.py`): credenciales inválidas,
+  contraseña nunca en claro, sesión inexistente/expirada, aislamiento de datos entre dos inquilinos,
+  token de admin ausente/incorrecto, alta de inquilino duplicado o con campos vacíos, y estadísticas
+  agregadas con datos reales de varios inquilinos. Suite completa: 196 tests en verde
+  (`python3 -m pytest tests/ -v`).
+- **Pendiente, no hecho aquí:** subida de documentos RAG desde el panel (`POST
+  /usuario/rag/documentos`, mencionado en el README original pero fuera del encargo actual);
+  `docs/ENCARGO_PANEL_WEB.md` (referenciado en el encargo de esta rama) no existe en el repositorio,
+  así que la implementación se basó en `src/femix/web/README.md` y `GUIA_DESARROLLO.md`, ya
+  presentes en la rama. Las sesiones se guardan en JSON local (no aptas para múltiples workers/
+  procesos sin un backend compartido); `itsdangerous` sigue en `requirements.txt` sin usarse
+  (reservado por si se pasa a cookies firmadas).
+- No se tocó `llm/`, `mente/`, `agentes/`, `rag/`, `conectores/`, `bot/` ni
+  `dominio/personal/tareas.py`/`recordatorios.py`.

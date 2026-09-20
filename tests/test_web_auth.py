@@ -58,6 +58,16 @@ def test_sesion_eliminar(tmp_path):
     assert sesiones.obtener_inquilino_id(session_id) is None
 
 
+def test_sesion_expirada_devuelve_none(tmp_path):
+    sesiones = AlmacenSesiones(str(tmp_path))
+    session_id = sesiones.crear("acme")
+    sesiones._sesiones[session_id]["expira"] = "2000-01-01T00:00:00"
+    sesiones._guardar()
+
+    assert sesiones.obtener_inquilino_id(session_id) is None
+    assert session_id not in AlmacenSesiones(str(tmp_path))._sesiones
+
+
 def test_verificar_token_admin(monkeypatch):
     monkeypatch.setenv("FEMIX_WEB_ADMIN_TOKEN", "token-correcto")
     assert verificar_token_admin("token-correcto") is True
