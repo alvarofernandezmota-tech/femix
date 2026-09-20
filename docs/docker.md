@@ -44,3 +44,7 @@ en cualquier entorno con Docker, sin depender de la configuración local.
 - [ ] Actualizar README con instrucciones Docker
 - [ ] Etiquetar primera release (ej. `v0.1.0-docker-base`)
 - [ ] Probar ejecución con `docker compose up --build`
+
+## Changelog
+
+Ver [CHANGELOG_DOCKER.md](CHANGELOG_DOCKER.md) para el historial detallado de cambios.
