@@ -1,7 +1,7 @@
 from ..llm.router import obtener_motor
 from ..mente.memoria import Memoria
 
-class Hugin:
+class Femix:
     def __init__(self, inquilino_id: str = "default", motor=None, memoria=None):
         self._motor = motor or obtener_motor()
         self._memoria = memoria or Memoria()

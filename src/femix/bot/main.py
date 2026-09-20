@@ -1,14 +1,14 @@
-from .hugin import Hugin
+from .femix import Femix
 
 def main():
-    hugin = Hugin()
-    print("HUGIN (femix) — Ctrl+C para salir")
+    femix = Femix()
+    print("FEMIX (femix) — Ctrl+C para salir")
     while True:
         try:
             texto = input("> ")
         except (KeyboardInterrupt, EOFError):
             break
-        print(hugin.procesar("cli", texto))
+        print(femix.procesar("cli", texto))
 
 if __name__ == "__main__":
     main()
