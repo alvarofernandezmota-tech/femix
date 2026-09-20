@@ -71,16 +71,17 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
   `datos/{inquilino_id}/` deja el hueco para que `Memoria` y `dominio/personal/` cuelguen de ahí en
   la Fase 2, pero eso **no** se ha hecho todavía. 163 tests en verde
   (`python3 -m pytest tests/ -v`).
-- Panel web multi-usuario (`src/femix/web/`, rama `feat/panel-web`): FastAPI con `rutas/auth.py`
-  (login/logout, `AlmacenInquilinos` y `AlmacenSesiones` en JSON local, contraseñas con
-  PBKDF2-HMAC-SHA256 + sal, sesión por cookie `session_id`), `rutas/usuario.py` (tareas, diario y
-  recordatorios del inquilino autenticado, reutilizando `dominio/personal/` con el `inquilino_id`
-  como `usuario_id`) y `rutas/admin.py` (alta/listado de inquilinos y estadísticas globales,
-  protegido con header `X-Admin-Token`). 33 tests nuevos, sin dependencias nuevas más allá de las ya
-  previstas (`fastapi`, `jinja2`, `python-multipart`). El alta de inquilinos es manual desde el
-  panel admin, no hay auto-registro. No conectado a `Femix.procesar()` ni a Telegram; RAG por
-  inquilino ya existe (ver punto anterior) pero la subida de documentos desde el panel no está
-  implementada.
+- Panel web multi-usuario (`src/femix/web/`, rama `feat/panel-web`, base
+  `integracion/femix-completa`, encargo en `docs/ENCARGO_PANEL_WEB.md`): FastAPI con
+  `rutas/auth.py` (login/logout, `AlmacenInquilinos` y `AlmacenSesiones` en JSON local,
+  contraseñas con PBKDF2-HMAC-SHA256 + sal, sesión por cookie `session_id`), `rutas/usuario.py`
+  (tareas, diario, recordatorios y subida/listado de documentos RAG del inquilino autenticado,
+  reutilizando `dominio/personal/` y `rag/indice.py` con el `inquilino_id` como `usuario_id`) y
+  `rutas/admin.py` (alta/listado de inquilinos y estadísticas globales, protegido con header
+  `X-Admin-Token`). 61 tests nuevos, sin dependencias nuevas más allá de las ya previstas
+  (`fastapi`, `jinja2`, `python-multipart`). El alta de inquilinos es manual desde el panel admin,
+  no hay auto-registro; editar/borrar inquilino y `/usuario/config` (mencionados en el encargo)
+  quedan pendientes. No conectado a `Femix.procesar()` ni a Telegram.
 
 ## Qué está a medias o pendiente
 - `inquilino/` no existe todavía como código (solo como concepto de diseño).
@@ -97,10 +98,12 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
   por inquilino todavía en `dominio/personal/`, a diferencia de `Memoria`. No es un problema hoy
   (un único inquilino "default" en producción), pero habrá que revisarlo en la Fase 2 del roadmap
   (estructura de inquilino).
-- Panel web (`src/femix/web/`): subida de documentos RAG desde el panel no implementada; sesiones
-  en JSON local, no válidas si se despliega con varios workers/procesos sin un backend de sesión
-  compartido; `docs/ENCARGO_PANEL_WEB.md` no existe en el repositorio (se usó `src/femix/web/
-  README.md` y `GUIA_DESARROLLO.md` como especificación).
+- Panel web (`src/femix/web/`): editar/borrar inquilino y `/usuario/config` (personalización del
+  bot) mencionados en `docs/ENCARGO_PANEL_WEB.md` pero no implementados — configurar el bot por
+  inquilino depende de la Fase 2/3 del roadmap (`inquilino/perfil.py`), que no existe todavía.
+  Sesiones en JSON local, no válidas si se despliega con varios workers/procesos sin un backend de
+  sesión compartido. No existe todavía ningún `Dockerfile`/`docker-compose.yml` en el repositorio
+  (ver `docs/CHANGELOG_DOCKER.md`).
 
 ## Próximo paso concreto
 Crear `inquilino/perfil.py` y `inquilino/capacidades.py` como estructura de datos, antes de conectar

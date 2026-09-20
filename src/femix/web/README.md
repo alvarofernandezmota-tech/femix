@@ -46,9 +46,12 @@ src/femix/web/
 - `POST /usuario/tareas/{indice}/completar` — Completar una tarea
 - `GET /usuario/diario` / `POST /usuario/diario` — Ver / registrar entradas de diario
 - `GET /usuario/recordatorios` / `POST /usuario/recordatorios` — Ver / crear recordatorios
+- `GET /usuario/rag` / `POST /usuario/rag/documentos` — Ver documentos subidos / subir un documento de texto (multipart, campo `archivo`) al índice RAG del inquilino
 
-### Pendiente
-- Subida de documentos RAG (`POST /usuario/rag/documentos`) — todavía no implementado, RAG sigue sin conectar a `Femix.procesar()` (ver `CONTEXT.md`).
+### Pendiente (mencionado en `docs/ENCARGO_PANEL_WEB.md`, no implementado en esta rama)
+- Editar/borrar inquilino desde el panel admin (hoy solo alta y listado).
+- `/usuario/config` (configurar modelo/personalidad del bot): bloqueado por la Fase 2/3 del roadmap — la personalización por inquilino todavía no está conectada al LLM (ver `CONTEXT.md`, `docs/ROADMAP.md`).
+- Borrar documentos RAG desde el panel (`IndiceEmbeddings` no tiene todavía un método para ello).
 
 ## Ejecución
 
@@ -69,7 +72,7 @@ FEMIX_WEB_DATOS_DIR="datos"                # opcional, por defecto "datos"
 
 ## Autenticación
 
-- **Admin**: token en header `X-Admin-Token`, comparado contra `FEMIX_WEB_ADMIN_TOKEN` con `secrets.compare_digest`.
+- **Admin**: token en header `X-Admin-Token`, comparado contra `FEMIX_WEB_ADMIN_TOKEN` con `secrets.compare_digest`. Al ser un header y no una cookie, `/admin/*` no es navegable a pelo desde un navegador sin algo (JS, un cliente HTTP) que lo añada a la petición — pensado para llamadas API/una futura SPA de admin, no para escribir la URL directamente.
 - **Usuario (inquilino)**: sesión por cookie `session_id` (token opaco, 24h de validez), creada en `POST /login` tras verificar `inquilino_id` + `password` contra `AlmacenInquilinos` (contraseñas con PBKDF2-HMAC-SHA256 + sal, nunca en claro).
 - Los inquilinos los da de alta el admin vía `POST /admin/inquilinos`; no hay auto-registro.
 

@@ -179,12 +179,16 @@
   token de admin ausente/incorrecto, alta de inquilino duplicado o con campos vacíos, y estadísticas
   agregadas con datos reales de varios inquilinos. Suite completa: 196 tests en verde
   (`python3 -m pytest tests/ -v`).
-- **Pendiente, no hecho aquí:** subida de documentos RAG desde el panel (`POST
-  /usuario/rag/documentos`, mencionado en el README original pero fuera del encargo actual);
-  `docs/ENCARGO_PANEL_WEB.md` (referenciado en el encargo de esta rama) no existe en el repositorio,
-  así que la implementación se basó en `src/femix/web/README.md` y `GUIA_DESARROLLO.md`, ya
-  presentes en la rama. Las sesiones se guardan en JSON local (no aptas para múltiples workers/
-  procesos sin un backend compartido); `itsdangerous` sigue en `requirements.txt` sin usarse
-  (reservado por si se pasa a cookies firmadas).
+- Las sesiones se guardan en JSON local (no aptas para múltiples workers/procesos sin un backend
+  compartido); `itsdangerous` sigue en `requirements.txt` sin usarse (reservado por si se pasa a
+  cookies firmadas).
 - No se tocó `llm/`, `mente/`, `agentes/`, `rag/`, `conectores/`, `bot/` ni
   `dominio/personal/tareas.py`/`recordatorios.py`.
+- **Corrección posterior:** el PR de esta rama se había abierto contra `main`, pero
+  `docs/ENCARGO_PANEL_WEB.md` (que no se encontró al empezar porque solo existía en
+  `integracion/femix-completa`, que es la base real de `feat/panel-web` según el propio encargo)
+  apareció al mergear esa rama. Se corrigió la base del PR y se mergeó `integracion/femix-completa`
+  (traía el adaptador `rag/adaptador.py` que conecta RAG a `Femix.procesar()`). El encargo real pide
+  además subir documentos RAG desde el panel: añadido `GET/POST /usuario/rag(/documentos)` e
+  `IndiceEmbeddings.listar_documentos()` (no existía). Editar/borrar inquilino y `/usuario/config`
+  quedan pendientes (ver `CONTEXT.md`). 28 tests nuevos más. Suite completa: 224 tests en verde.

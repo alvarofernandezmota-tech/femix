@@ -15,11 +15,15 @@
 - ✅ 163 tests passing
 - ✅ Merge a `integracion/femix-completa`
 
-### Panel Web 🚧
-- ⏳ En progreso (Claude Code Web)
-- ⏳ Panel admin + panel usuario
-- ⏳ FastAPI + Jinja2
+### Panel Web ✅
+- ✅ Login/logout por inquilino (rama `feat/panel-web`)
+- ✅ Panel admin (inquilinos, stats) + panel usuario (tareas, diario, recordatorios, RAG)
+- ✅ FastAPI + Jinja2, 224 tests en verde
+- ⏳ Pendiente: editar/borrar inquilino, `/usuario/config` (bloqueado por la Fase 2/3 del
+  roadmap: personalización por inquilino todavía no conectada al LLM)
 
 ### Docker
 - ✅ Puerto 8000 expuesto para el panel web
-- ⏳ Pendiente: incluir panel en Docker
+- ⏳ Pendiente: no existe todavía ningún `Dockerfile`/`docker-compose.yml` en el repositorio;
+  el panel web ya es servible con `uvicorn src.femix.web.app:app` (ver
+  `src/femix/web/README.md`) en cuanto se cree la imagen
