@@ -80,10 +80,11 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
 
 ## Qué está a medias o pendiente
 - `inquilino/` no existe todavía como código (solo como concepto de diseño).
-- RAG ya está enchufado a `Femix.procesar()` (`rag/adaptador.py` → puerto `Buscador` →
-  `AgenteBusqueda`), pero **apagado en el bot desplegado**: `bot/main.py` y
-  `conectores/telegram/bot.py` construyen `Femix()` sin `buscador`. Encenderlo es pasarles
-  `buscador=IndiceEmbeddingsBuscador(directorio_datos=...)`; con el índice vacío no cambia nada.
+- RAG **encendido** de punta a punta: `bot/fabrica.construir_femix()` enchufa
+  `IndiceEmbeddingsBuscador` y lee `FEMIX_INQUILINO_ID`; CLI (`bot/main.py`) y Telegram
+  (`conectores/telegram/bot.py`) lo usan. Verificado contra Ollama real: el modelo responde citando
+  el documento del índice del inquilino. Falta añadir `FEMIX_INQUILINO_ID` a `.env.example`, que
+  vive en `release/docker-chatbot-base`.
 - La relevancia del RAG es débil mientras el motor de embeddings sea `MotorEmbeddingsHash` (bolsa
   de palabras por hashing, sin stopwords ni IDF): las palabras vacías compartidas inflan la
   similitud. El umbral del adaptador solo descarta con fiabilidad lo que no comparte ninguna

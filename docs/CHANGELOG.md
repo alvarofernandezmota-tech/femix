@@ -179,8 +179,26 @@
   `Memoria`. Sin `buscador`, comportamiento idéntico al anterior.
 - 23 tests nuevos (`tests/test_rag_adaptador.py`, `tests/test_rag_en_femix.py`), los de punta a
   punta con RAG real en vez de un fake del puerto. Suite completa: 186 tests en verde.
-- **Falta el último tramo:** `bot/main.py` y `conectores/telegram/bot.py` siguen construyendo
-  `Femix()` sin `buscador`, así que en el bot desplegado el RAG está conectado pero apagado.
-  Encenderlo es pasar `buscador=IndiceEmbeddingsBuscador(directorio_datos=...)` en esos dos sitios;
-  con el índice vacío no cambia nada (no hay resultados, el agente no aporta y el flujo es el de
-  siempre), así que es seguro, pero se deja como decisión de despliegue.
+- El último tramo (encenderlo en los entry points) se hizo en la sección siguiente.
+
+## RAG encendido en el bot desplegado
+- Añadido `src/femix/bot/fabrica.py`: `construir_femix()` monta el `Femix` de los entry points con
+  `IndiceEmbeddingsBuscador` sobre `datos/` ya enchufado, e `inquilino_desde_entorno()` lee
+  `FEMIX_INQUILINO_ID` (por defecto `"default"`, como hasta ahora).
+- `bot/main.py` (CLI) y `conectores/telegram/bot.py` pasan de `Femix()` a `construir_femix()`: dos
+  líneas cada uno. La fábrica existe para que los dos no dupliquen el cableado y, sobre todo, para
+  que ese cableado se pueda probar sin levantar Telegram ni entrar en el bucle del CLI.
+- `inquilino_desde_entorno()` valida el id **al arrancar**, no en la primera búsqueda: si viniera
+  mal, el adaptador solo lo detectaría al consultar el índice, donde `CadenaDeAgentes` se comería la
+  excepción y el RAG quedaría apagado sin que nadie se enterase. Mejor que el bot no levante.
+- Con el índice vacío el comportamiento es idéntico al anterior (hay test): el buscador no devuelve
+  nada, `AgenteBusqueda` no aporta contexto y el flujo es el de siempre. Encender el RAG no cambia
+  nada hasta que alguien ingiere documentos.
+- 12 tests nuevos (`tests/test_fabrica.py`). Suite completa: 198 tests en verde.
+- Verificado a mano contra Ollama real: con un documento de horarios en el índice de `acme`, el bot
+  responde "El horario de atención es de 9 a 14." citando ese documento; un inquilino distinto no lo
+  ve. Ambos entry points arrancan (CLI por su `main()` con stdin, Telegram importando el módulo).
+- **Para el despliegue:** `FEMIX_INQUILINO_ID` es una variable nueva y conviene añadirla a
+  `.env.example`, que vive en `release/docker-chatbot-base` (no en esta rama). Sin ella el bot sigue
+  arrancando como inquilino `default`. El resto del proyecto usa el prefijo `HUGIN_` en sus
+  variables (`HUGIN_LLM_*`); esta se llama `FEMIX_` por petición explícita.

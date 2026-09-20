@@ -20,7 +20,9 @@
 - [x] 47 tests nuevos (186 total)
 - [ ] Merge a `integracion/femix-completa`
 
-**Último tramo pendiente:** `bot/main.py` y `conectores/telegram/bot.py` siguen construyendo
-`Femix()` sin `buscador`, así que en el bot desplegado el RAG está conectado pero apagado.
-Encenderlo es pasar `buscador=IndiceEmbeddingsBuscador(directorio_datos=...)` en esos dos sitios
-(con el índice vacío no cambia nada, así que es seguro). Se deja como decisión de despliegue.
+- [x] RAG **encendido** en el bot: `bot/main.py` y `conectores/telegram/bot.py` usan
+      `construir_femix()` (`bot/fabrica.py`), con `FEMIX_INQUILINO_ID`
+- [x] 12 tests más (198 total) + verificación manual contra Ollama real
+
+**Pendiente de despliegue:** añadir `FEMIX_INQUILINO_ID` a `.env.example` (vive en
+`release/docker-chatbot-base`). Sin ella el bot arranca como inquilino `default`.
