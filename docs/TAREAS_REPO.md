@@ -82,3 +82,10 @@
 - [TAREAS_CHATBOT.md](TAREAS_CHATBOT.md) - Funcionalidades del bot
 - [docker.md](docker.md) - Plan de dockerización
 - [README.md](../README.md) - Instrucciones de ejecución
+
+### Tarea 3.3: Agentes unificados ✅ COMPLETADO
+- [x] `feat/agentes-unificados` creado
+- [x] Cadena de agentes implementada
+- [x] Subagente integrado en Femix.procesar()
+- [x] Múltiples LLMs configurables
+- [x] 55 tests nuevos (139 total)
