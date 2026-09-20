@@ -1,7 +1,7 @@
-from .femix import Femix
+from .fabrica import construir_femix
 
 def main():
-    femix = Femix()
+    femix = construir_femix()
     print("FEMIX (femix) — Ctrl+C para salir")
     while True:
         try:
