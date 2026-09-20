@@ -1,8 +1,28 @@
 # Encargo para Claude Code — Repositorio femix (HUGIN)
 
+## Nota de corrección (chore/orden-y-dominio, 2026-09-20)
+
+Este documento contenía referencias incorrectas a un paquete `src/hugin/` que **no existe** en el
+código real. El paquete real es `src/femix/`, la clase fachada es `Femix` (no `Hugin`) y su método
+es `Femix.procesar()`. El archivo `bot/comandos.py` que este encargo pedía tocar **tampoco existe**
+todavía — la fachada real vive en `bot/femix.py`. La carpeta `dominio/` no existe en absoluto: hay
+que crearla desde cero, no "rellenarla". Las secciones de abajo se han corregido para reflejar esto;
+el objetivo y el espíritu del encargo original se mantienen.
+
+Alcance de esta corrección (rama `chore/orden-y-dominio`): solo las Fases 1–6 (auditoría, dominio
+personal, clasificador de intención, tests). La integración con `bot/comandos.py` y con Telegram
+(Fase 7) queda pospuesta a una fase posterior — no se toca `Femix.procesar()` ni
+`conectores/telegram/` en esta rama.
+
 ## Nota de nombres (importante, no confundir)
 
-Este encargo es exclusivamente sobre el repositorio `femix`. Dentro de `femix`, el paquete de codigo Python se llama `hugin` (carpeta `src/hugin/`) — es solo el nombre interno del bot, la clase `Hugin` y su fachada `Hugin.procesar()`. **No existe relacion con el repositorio separado `alvarofernandezmota-tech/hugin`**, que es un proyecto distinto y anterior, con una estructura similar pero sin logica real implementada (quedo solo con archivos vacios de un refactor que no se completo). No toques ni consultes ese otro repositorio bajo ningun concepto: todo el trabajo de este encargo va en `femix`.
+Este encargo es exclusivamente sobre el repositorio `femix`. Dentro de `femix`, el paquete de código
+Python se llama `femix` (carpeta `src/femix/`) — la clase fachada es `Femix` y su método principal es
+`Femix.procesar()`. El nombre "HUGIN" es solo el nombre de producto/asistente usado en el prompt del
+sistema y en la documentación de infraestructura, no el nombre del paquete Python. **No existe
+relación con el repositorio separado `alvarofernandezmota-tech/hugin`**, que es un proyecto distinto
+y anterior. No toques ni consultes ese otro repositorio bajo ningún concepto: todo el trabajo de este
+encargo va en `femix`.
 
 ## Contexto
 
@@ -10,86 +30,101 @@ Repositorio: `alvarofernandezmota-tech/femix`
 Rama base a partir de la cual debes trabajar: `feat/esqueleto-llm`
 Rama nueva que debes crear: `chore/orden-y-dominio`
 
-Este es un bot conversacional (HUGIN, nombre interno del paquete `src/hugin/` dentro de `femix`) con arquitectura por capas (puertos y adaptadores). Lee primero estos archivos para entender el proyecto antes de tocar nada:
+Este es un bot conversacional (HUGIN, nombre de producto; paquete Python `src/femix/`) con
+arquitectura por capas (puertos y adaptadores). Lee primero estos archivos para entender el proyecto
+antes de tocar nada:
 
 - `README.md`
 - `docs/INFRAESTRUCTURA.md`
-- Toda la carpeta `src/hugin/`
+- Toda la carpeta `src/femix/`
 - Toda la carpeta `conectores/`
 - Toda la carpeta `tests/`
 
-No asumas nada de la arquitectura sin haberlo leido en el codigo real.
+No asumas nada de la arquitectura sin haberlo leído en el código real.
 
 ## Objetivo general
 
-1. Auditar y ordenar el codigo existente sin romper nada que ya funcione.
-2. Rellenar la logica de negocio que sigue vacia en `dominio/personal/`.
-3. Anadir la capa de comprension de intencion (`mente/entender.py`).
+1. Auditar y ordenar el código existente sin romper nada que ya funcione.
+2. Crear la lógica de negocio en `src/femix/dominio/personal/` (no existe todavía, se crea desde cero).
+3. Añadir la capa de comprensión de intención (`mente/entender.py`).
 4. Cubrir todo lo nuevo con tests automatizados (pytest).
-5. Mantener la documentacion (`README.md`, `docs/INFRAESTRUCTURA.md`) sincronizada con lo que realmente exista en el codigo.
+5. Mantener la documentación (`README.md`, `docs/INFRAESTRUCTURA.md`, `CONTEXT.md`) sincronizada con
+   lo que realmente exista en el código.
 
-## Que SI puedes tocar
+## Qué SÍ puedes tocar
 
-- `src/hugin/dominio/personal/*.py`
-- `src/hugin/mente/*.py`
-- `src/hugin/bot/*.py` (solo para conectar lo nuevo, no reescribir la fachada desde cero)
+- `src/femix/dominio/` (paquete nuevo, no existe)
+- `src/femix/mente/entender.py` (nuevo; no toques `mente/memoria.py`)
 - `tests/*.py`
-- `README.md` y `docs/INFRAESTRUCTURA.md` (solo para reflejar cambios reales, no reescribir todo)
-- `requirements.txt` (si anades una dependencia nueva, anadela ahi)
+- `README.md`, `docs/INFRAESTRUCTURA.md`, `CONTEXT.md` (solo para reflejar cambios reales, no
+  reescribir todo)
 
-## Que NO debes tocar bajo ningun concepto
+## Qué NO debes tocar bajo ningún concepto (en esta rama)
 
 - `.env` (no existe en el repo, y si lo encuentras, no lo leas ni lo modifiques)
-- `~/.config/systemd/` (no forma parte del repo, es infraestructura de la maquina local, ignoralo)
-- Cualquier archivo con tokens, claves API o secretos — si encuentras algo que parezca una credencial hardcodeada, avisalo en el PR pero no la borres ni la muevas sin decirlo explicitamente
-- `conectores/telegram/bot.py` y `conectores/telegram/voz.py` — no cambies su logica de conexion con Telegram, solo puedes tocarlos si necesitas enganchar una funcion nueva de `dominio/` o `mente/`, y siempre de forma minima
+- `~/.config/systemd/` (no forma parte del repo, es infraestructura de la máquina local, ignóralo)
+- Cualquier archivo con tokens, claves API o secretos — si encuentras algo que parezca una credencial
+  hardcodeada, avísalo pero no la borres ni la muevas sin decirlo explícitamente
+- `src/femix/llm/`, `src/femix/puertos/`, `src/femix/mente/memoria.py`
+- `conectores/telegram/bot.py` y `conectores/telegram/voz.py` — no se tocan en esta rama (la
+  integración es una fase posterior, no la Fase 7 de este encargo)
+- `src/femix/bot/femix.py` — no se modifica `Femix.procesar()` todavía
+- `requirements.txt` — solo librería estándar, sin dependencias nuevas
 - El repositorio `alvarofernandezmota-tech/hugin` — es otro proyecto, no lo toques ni lo consultes
 
 ## Tareas concretas, en orden
 
-### 1. Auditoria de orden y limpieza
+### 1. Auditoría de orden y limpieza
 
-- Revisa que no haya archivos `__pycache__`, `.pyc` ni `datos/*.json` versionados en git. Si encuentras alguno, quitalo del indice (`git rm --cached`) y confirma que `.gitignore` los cubre.
-- Revisa que todos los modulos tengan un `__init__.py` donde corresponda segun como importa el resto del codigo.
-- Senala en la descripcion del PR cualquier import roto o modulo huerfano que encuentres (que no rompas nada, solo que lo reportes).
+- Revisa que no haya archivos `__pycache__`, `.pyc` ni `datos/*.json` versionados en git.
+- Revisa que todos los módulos tengan un `__init__.py` donde corresponda.
+- Señala cualquier import roto o módulo huérfano que encuentres (`tests/test_hugin.py` importaba un
+  paquete `hugin` inexistente — corregido en un commit propio, ver más abajo).
 
-### 2. Rellenar `src/hugin/dominio/personal/`
+### 2. Crear `src/femix/dominio/personal/`
 
-Implementa logica minima real (no placeholders vacios) en:
+Implementa lógica mínima real (no placeholders vacíos):
 
-- `hoy.py`: funcion `resumen_del_dia(usuario_id: str) -> str` que por ahora puede devolver un resumen simple basado en la fecha actual (usa la libreria estandar `datetime`, no inventes dependencias externas).
-- `tareas.py`: funciones `crear(usuario_id: str, descripcion: str) -> str`, `listar(usuario_id: str) -> list[str]`, `completar(usuario_id: str, indice: int) -> str`. Persiste en un archivo JSON simple dentro de `datos/tareas_<usuario_id>.json`, siguiendo el mismo patron que ya existe en `mente/memoria.py` (leelo primero para copiar el estilo de guardado en disco).
-- `diario.py`: funcion `registrar(usuario_id: str, texto: str) -> str` que anade una entrada con fecha/hora a un archivo `datos/diario_<usuario_id>.json`.
-- `recordatorios.py`: funciones `crear(usuario_id: str, texto: str, cuando: str) -> str` y `listar_pendientes(usuario_id: str) -> list[dict]`. Por ahora no necesitas un scheduler real, solo guardar y listar.
+- `reloj.py`: abstracción testeable del reloj (`Reloj` + `RelojSistema`), para que el resto de módulos
+  no dependan directamente de `datetime.now()` en los tests.
+- `hoy.py`: función `resumen_del_dia(usuario_id: str, reloj: Reloj | None = None) -> str`.
+- `tareas.py`: crear/listar/completar/consultar, con almacenamiento local inyectable (directorio de
+  datos como parámetro, no una ruta fija), siguiendo el estilo de guardado en disco de
+  `mente/memoria.py`.
+- `diario.py`: registrar una entrada con fecha/hora, mismo criterio de almacenamiento inyectable.
+- `recordatorios.py`: crear/listar pendientes, cálculo de vencimiento separado de cualquier
+  notificación futura (no hay scheduler todavía).
 
-Todas estas funciones deben poder importarse desde `bot/comandos.py` sin romper el import existente.
+Estos módulos quedan como casos de uso independientes en esta rama — **no** se conectan a
+`bot/comandos.py` (no existe) ni a Telegram todavía; esa integración es una fase posterior.
 
-### 3. Implementar `src/hugin/mente/entender.py`
+### 3. Implementar `src/femix/mente/entender.py`
 
-Crea una funcion `clasificar_intencion(texto: str) -> str` que devuelva una de estas categorias, usando reglas simples (sin LLM todavia):
+Crea una función `clasificar_intencion(texto: str) -> str` que devuelva una de estas categorías,
+usando reglas simples (sin LLM todavía):
 
 - `"comando"` si el texto empieza por `/`
-- `"pregunta"` si el texto termina en `?` o empieza por palabras como "que", "como", "cuando", "donde", "por que"
+- `"pregunta"` si el texto termina en `?` o empieza por palabras como "qué", "cómo", "cuándo", "dónde",
+  "por qué"
 - `"charla"` para cualquier otro caso
 
-Esto es intencionalmente simple por ahora — no uses el LLM para esta clasificacion, es solo una primera capa de reglas.
+Esto es intencionalmente simple por ahora — no uses el LLM para esta clasificación, es solo una
+primera capa de reglas.
 
 ### 4. Tests
 
-Para cada funcion nueva de `dominio/personal/` y para `entender.py`, anade tests en `tests/` siguiendo el mismo estilo que ya existe en `tests/test_hugin.py` (usa datos temporales, limpia los archivos JSON de prueba en un `teardown`, no dejes basura en `datos/`).
+Para cada función nueva de `dominio/personal/` y para `entender.py`, añade tests en `tests/` (datos
+temporales, aislamiento entre usuarios, sin llamadas externas reales, limpieza en `teardown`).
 
-Ejecuta `python -m pytest tests/ -v` al final y asegurate de que todo pasa en verde antes de abrir el PR.
+Ejecuta `python -m pytest tests/ -v` después de cada commit relevante.
 
-### 5. Documentacion
+### 5. Documentación
 
-Actualiza `README.md` y `docs/INFRAESTRUCTURA.md` unicamente en las partes que ahora son ciertas gracias a tu trabajo (por ejemplo, si antes decia que `dominio/personal/` estaba vacio, corrigelo). No reescribas secciones que no has tocado.
+Actualiza `CONTEXT.md`, y solo las partes de `README.md`/`docs/INFRAESTRUCTURA.md` que ahora sean
+ciertas gracias a este trabajo. No reescribas secciones que no se han tocado.
 
 ## Entregable
 
-Abre un pull request de `chore/orden-y-dominio` contra `feat/esqueleto-llm` (NO contra `main`). En la descripcion del PR, incluye:
-
-- Lista de archivos que rellenaste con logica real
-- Resultado del `pytest -v` (cuantos tests pasan)
-- Cualquier problema, import roto, o duda que hayas encontrado y no hayas resuelto tu mismo
-
-No fusiones el PR automaticamente — dejalo abierto para revision manual.
+Cuando se confirme explícitamente: abrir un pull request de `chore/orden-y-dominio` contra
+`feat/esqueleto-llm` (NO contra `main`), sin fusionarlo automáticamente. No se hace push ni se abre PR
+sin confirmación explícita previa.
