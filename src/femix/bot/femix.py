@@ -1,4 +1,3 @@
-from ..agentes.agente_busqueda import AgenteBusqueda
 from ..agentes.agente_tareas import AgenteTareas
 from ..agentes.cadena import CadenaDeAgentes
 from ..agentes.peticion import Peticion
@@ -39,15 +38,16 @@ class Femix:
             self._subagente = self._subagente_por_defecto(motor, buscador)
 
     def _subagente_por_defecto(self, motor, buscador) -> Subagente:
-        """Cadena mínima: primero quien puede resolver y cortar, después quien solo aporta.
+        """Cadena mínima: los agentes que resuelven; el de búsqueda lo monta el subagente.
 
-        Sin `buscador` no hay agente de búsqueda: el puerto lo enchufa quien tenga índice.
+        `buscador` se pasa tal cual: quien decide dónde encaja `AgenteBusqueda` en la cadena
+        es `Subagente`, para no construirlo en dos sitios. Sin `buscador` no hay búsqueda —
+        el puerto lo enchufa quien tenga índice (ver `rag/adaptador.py`).
+
         Si nos inyectaron un motor concreto, el respaldo del subagente usa ese mismo motor.
         """
-        agentes = [AgenteTareas(directorio_datos=self._directorio_datos)]
-        if buscador is not None:
-            agentes.append(AgenteBusqueda(buscador))
-        return Subagente(CadenaDeAgentes(agentes), motor=motor, selector=self._selector)
+        cadena = CadenaDeAgentes([AgenteTareas(directorio_datos=self._directorio_datos)])
+        return Subagente(cadena, motor=motor, selector=self._selector, buscador=buscador)
 
     def procesar(self, usuario_id: str, texto: str) -> str:
         intencion = clasificar_intencion(texto)
