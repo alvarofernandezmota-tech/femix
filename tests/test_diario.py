@@ -51,3 +51,17 @@ def test_usuarios_distintos_no_comparten_diario(tmp_path):
     d2 = Diario("usuario2", directorio_datos=str(tmp_path), reloj=RelojFalso(fijo))
     d1.registrar("entrada de usuario1")
     assert d2._entradas == []
+
+def test_listar_devuelve_entradas_en_orden(tmp_path):
+    fijo = datetime(2020, 1, 1, 12, 0, 0)
+    d = Diario("usuario1", directorio_datos=str(tmp_path), reloj=RelojFalso(fijo))
+    d.registrar("primera entrada")
+    d.registrar("segunda entrada")
+    assert d.listar() == [
+        {"fecha_hora": fijo.isoformat(), "texto": "primera entrada"},
+        {"fecha_hora": fijo.isoformat(), "texto": "segunda entrada"},
+    ]
+
+def test_listar_vacio_sin_entradas(tmp_path):
+    d = Diario("usuario1", directorio_datos=str(tmp_path), reloj=RelojFalso(datetime(2020, 1, 1)))
+    assert d.listar() == []

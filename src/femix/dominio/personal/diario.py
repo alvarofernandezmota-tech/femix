@@ -46,3 +46,6 @@ class Diario:
         self._entradas.append(EntradaDiario(fecha_hora, texto))
         self._guardar()
         return f"Entrada registrada el {fecha_hora}: {texto}"
+
+    def listar(self) -> list[dict]:
+        return [asdict(e) for e in self._entradas]
