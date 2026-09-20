@@ -131,14 +131,14 @@ def test_inquilino_id_vacio_lanza(tmp_path):
 # --- construir_contexto ---
 
 def test_construir_contexto_incluye_fuente():
-    frag = Fragmento(documento_id="d1", fuente="manual.txt", indice=0, texto="contenido relevante", vector=[])
+    frag = Fragmento(inquilino_id="inquilino1", documento_id="d1", fuente="manual.txt", indice=0, texto="contenido relevante", vector=[])
     resultado = ResultadoBusqueda(fragmento=frag, puntuacion=0.9)
     contexto = construir_contexto([resultado])
     assert "manual.txt" in contexto
     assert "contenido relevante" in contexto
 
 def test_construir_contexto_respeta_limite():
-    frag = Fragmento(documento_id="d1", fuente="x.txt", indice=0, texto="a" * 1000, vector=[])
+    frag = Fragmento(inquilino_id="inquilino1", documento_id="d1", fuente="x.txt", indice=0, texto="a" * 1000, vector=[])
     resultado = ResultadoBusqueda(fragmento=frag, puntuacion=1.0)
     contexto = construir_contexto([resultado], limite_caracteres=50)
     assert len(contexto) <= 50

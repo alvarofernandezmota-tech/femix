@@ -9,6 +9,9 @@ class Documento:
 
 @dataclass
 class Fragmento:
+    # `inquilino_id` va primero y sin valor por defecto a propósito: un fragmento sin dueño
+    # no se puede construir, así que no puede colarse en el índice de otro inquilino.
+    inquilino_id: str
     documento_id: str
     fuente: str
     indice: int
