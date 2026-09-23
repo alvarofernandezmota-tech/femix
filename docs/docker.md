@@ -13,7 +13,30 @@ docker compose up -d --build
 docker compose logs -f femix-bot
 ```
 
-Debe aparecer `FEMIX conectado a Telegram (texto + voz). Ctrl+C para detener.`
+Debe aparecer `Bot de <inquilino> en marcha: @<tu_bot> (texto + voz; N permitidos)`.
+
+## Un bot por inquilino
+
+El contenedor `femix-bot` lleva **todos** los bots, uno por inquilino, en el mismo proceso. Cada
+uno con su `Femix`: sus tareas, diario, memoria y RAG en `datos/{inquilino_id}/`, sus capacidades
+(memoria, voz, documentos) y sus permitidos. Salen de dos sitios:
+
+- **El `.env`**: `TELEGRAM_BOT_TOKEN` + `FEMIX_INQUILINO_ID` + `FEMIX_TELEGRAM_PERMITIDOS`. Al
+  arrancar se guardan en el perfil de ese inquilino (se crea si no existe) y **mandan** sobre él:
+  el panel los enseña pero no los cambia. Es opcional; sin token en el `.env` solo arrancan los
+  bots de los perfiles.
+- **Los perfiles** (`datos/{inquilino_id}/perfil.json`, desde el panel): cada inquilino activo con
+  token tiene su bot.
+
+Cada 30 s el proceso relee los perfiles y arranca, para o rearranca lo que haya cambiado (alta,
+baja, token nuevo, capacidades) sin tocar al resto; los permitidos se aplican en caliente. Si
+Telegram rechaza un token, ese bot no se reintenta hasta que cambie su configuración. Dos
+inquilinos no pueden tener el mismo token (se tumbarían mutuamente con `Conflict`). El estado de
+cada bot queda en `datos/.estado_bots.json`, que es lo que enseña el panel.
+
+La primera vez que arranca esta versión, los ficheros sueltos de antes (`datos/tareas_<id>.json`,
+`diario_`, `recordatorios_`, y las conversaciones de `datos/memoria.json`) pasan a la carpeta del
+inquilino del `.env`. No se pisa nada que ya exista y el `memoria.json` antiguo se deja como está.
 
 ## Quién puede usar el bot
 
@@ -129,7 +152,7 @@ se sube desde el panel al RAG de un inquilino lo ve el bot si su `FEMIX_INQUILIN
 
 | Volumen | Ruta en el contenedor | Qué guarda |
 |---|---|---|
-| `femix-datos` | `/app/datos` | Índices RAG, tareas, diario, recordatorios, inquilinos y sesiones del panel |
+| `femix-datos` | `/app/datos` | Por inquilino (`datos/{id}/`): perfil (con el token del bot), índice RAG, tareas, diario, recordatorios y memoria. Sueltos: acceso y sesiones del panel, estado de los bots |
 | `femix-cache` | `/home/femix/.cache` | Modelo de Whisper (notas de voz), para no descargarlo en cada arranque |
 | `./documentos` (bind, solo lectura) | `/app/documentos` | Documentos a ingerir en el RAG |
 
@@ -147,7 +170,9 @@ docker run --rm -v femix_femix-datos:/datos -v "$PWD":/copia alpine tar czf /cop
 | "Algo falló generando la respuesta: 404" | `HUGIN_LLM_MODELO` no está en `ollama list`, o `OLLAMA_URL` apunta a `/v1` |
 | "El modelo está tardando demasiado" | CPU sin GPU; ver la nota de rendimiento en `docs/ROADMAP.md` (`OLLAMA_KEEP_ALIVE`) |
 | El bot contesta "Este bot es privado" | Tu ID no está en `FEMIX_TELEGRAM_PERMITIDOS` (ver arriba) |
-| El contenedor no arranca: `KeyError: 'TELEGRAM_BOT_TOKEN'` | Falta en `.env` |
+| No arranca ningún bot, y en los logs no sale ninguno | Ni `TELEGRAM_BOT_TOKEN` en `.env` ni perfiles activos con token |
+| `Bot de X: Telegram rechaza el token` | Token mal copiado o revocado en @BotFather; se reintenta al cambiarlo |
+| `Bot de X no se arranca: su token ya lo usa el bot de Y` | Dos inquilinos con el mismo token |
 | El contenedor no arranca: `FEMIX_TELEGRAM_PERMITIDOS: ... no es un ID` | Hay algo que no es un número (un `@usuario`, por ejemplo) |
 | El contenedor no arranca: `inquilino_id inválido` | `FEMIX_INQUILINO_ID` con caracteres no permitidos |
 | La primera nota de voz tarda mucho | Descarga del modelo de Whisper; las siguientes usan la caché |

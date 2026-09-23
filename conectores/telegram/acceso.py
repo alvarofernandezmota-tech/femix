@@ -44,8 +44,8 @@ async def comprobar_acceso(update: object, context: ContextTypes.DEFAULT_TYPE):
         if usuario is not None:
             # Solo id y @usuario: el nombre visible lo escribe cualquiera y puede traer saltos de línea.
             _log.warning(
-                "Acceso denegado a usuario=%s (@%s). Para autorizarlo, añade su ID a los permitidos.",
-                usuario.id, usuario.username or "-",
+                "Acceso denegado a usuario=%s (@%s) en el bot de %s. Para autorizarlo, añade su ID a los permitidos.",
+                usuario.id, usuario.username or "-", context.bot_data.get("inquilino_id", "?"),
             )
             mensaje = update.effective_message
             chat = update.effective_chat

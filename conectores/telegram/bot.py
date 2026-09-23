@@ -1,5 +1,7 @@
+import asyncio
 import logging
 import os
+import signal
 import sys
 from dotenv import load_dotenv
 from telegram import Update
@@ -10,18 +12,28 @@ ESPERA_TELEGRAM = 30.0
 
 load_dotenv()
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
-from femix.bot.fabrica import DIRECTORIO_DATOS, construir_femix, inquilino_desde_entorno
+from femix.bot.fabrica import DIRECTORIO_DATOS, inquilino_desde_entorno
 from femix.inquilino.migracion import migrar_datos_heredados
-from .acceso import VARIABLE_PERMITIDOS, comprobar_acceso, leer_permitidos
+from femix.inquilino.perfil import AlmacenPerfiles
+from .acceso import comprobar_acceso
+from .flota import FlotaDeBots, bot_del_entorno, sincronizar_entorno
 from .voz import manejar_nota_de_voz
+
+SIN_VOZ = "Este bot no tiene activadas las notas de voz. Escríbeme, por favor."
 
 async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     femix = context.bot_data["femix"]
-    respuesta = femix.procesar(str(update.effective_user.id), update.message.text)
+    # El LLM tarda segundos: en un hilo, para no parar a los bots de otros inquilinos, que
+    # comparten este bucle de eventos. Cada bot atiende sus mensajes de uno en uno, así que un
+    # mismo Femix nunca corre en dos hilos a la vez.
+    respuesta = await asyncio.to_thread(femix.procesar, str(update.effective_user.id), update.message.text)
     await update.message.reply_text(respuesta)
 
 async def manejar_voz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await manejar_nota_de_voz(update, context, context.bot_data["femix"])
+
+async def voz_desactivada(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(SIN_VOZ)
 
 async def comando_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Hola, soy FEMIX. Escribeme o mandame una nota de voz.")
@@ -29,12 +41,13 @@ async def comando_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def registrar_error(update: object, context: ContextTypes.DEFAULT_TYPE):
     # BadRequest hereda de NetworkError en python-telegram-bot, pero no es un problema de red:
     # es Telegram rechazando la petición (p. ej. un mensaje vacío), y conviene verlo entero.
+    inquilino_id = context.bot_data.get("inquilino_id", "?")
     if isinstance(context.error, NetworkError) and not isinstance(context.error, BadRequest):
-        logging.warning("Telegram no respondió a tiempo: %s", context.error)
+        logging.warning("Bot de %s: Telegram no respondió a tiempo: %s", inquilino_id, context.error)
         return
-    logging.error("Error atendiendo un mensaje", exc_info=context.error)
+    logging.error("Bot de %s: error atendiendo un mensaje", inquilino_id, exc_info=context.error)
 
-def construir_aplicacion(token: str, femix, permitidos=frozenset()) -> Application:
+def construir_aplicacion(token: str, femix, permitidos=frozenset(), voz: bool = True) -> Application:
     # Los 5 s por defecto de python-telegram-bot no bastan en una línea lenta: el bot recibía el
     # mensaje y la respuesta se perdía con ConnectTimeout al enviarla.
     app = (
@@ -52,7 +65,7 @@ def construir_aplicacion(token: str, femix, permitidos=frozenset()) -> Applicati
     # Grupo -1: antes que cualquier otro handler. Sin permiso no se llega ni a /start.
     app.add_handler(TypeHandler(Update, comprobar_acceso), group=-1)
     app.add_handler(CommandHandler("start", comando_start))
-    app.add_handler(MessageHandler(filters.VOICE, manejar_voz))
+    app.add_handler(MessageHandler(filters.VOICE, manejar_voz if voz else voz_desactivada))
     # filters.TEXT incluye los comandos (/tarea, /hoy...), que resuelve Femix.procesar. Con
     # `~filters.COMMAND` se descartaban sin respuesta. /start lo atiende antes su propio handler.
     app.add_handler(MessageHandler(filters.TEXT, manejar_mensaje))
@@ -65,20 +78,31 @@ def configurar_logs():
         datefmt="%Y-%m-%d %H:%M:%S",
     )
     # httpx escribe una línea por cada consulta a Telegram (cada pocos segundos): tapa los mensajes.
+    # Y cada línea lleva la URL de la API, que incluye el token del bot: no bajar esto a INFO (ni
+    # python-telegram-bot a DEBUG) en producción.
     logging.getLogger("httpx").setLevel(logging.WARNING)
+
+async def _principal(flota) -> None:
+    parar = asyncio.Event()
+    bucle = asyncio.get_running_loop()
+    # `docker stop` manda SIGTERM: parar los bots con orden (terminan el mensaje en curso).
+    for senal in (signal.SIGINT, signal.SIGTERM):
+        bucle.add_signal_handler(senal, parar.set)
+    await flota.ejecutar(parar)
 
 def main():
     configurar_logs()
-    permitidos = leer_permitidos(os.environ.get(VARIABLE_PERMITIDOS))
-    if not permitidos:
-        logging.warning(
-            "%s está vacío: el bot no atenderá a nadie. Escríbele y mira aquí qué ID se deniega.",
-            VARIABLE_PERMITIDOS,
-        )
-    migrar_datos_heredados(DIRECTORIO_DATOS, inquilino_desde_entorno())
-    app = construir_aplicacion(os.environ["TELEGRAM_BOT_TOKEN"], construir_femix(), permitidos)
-    print("FEMIX conectado a Telegram (texto + voz). Ctrl+C para detener.")
-    app.run_polling()
+    entorno = bot_del_entorno()
+    migrar_datos_heredados(DIRECTORIO_DATOS, entorno.inquilino_id if entorno else inquilino_desde_entorno())
+    if entorno is None:
+        logging.info("Sin TELEGRAM_BOT_TOKEN en el entorno: solo los bots de los perfiles de inquilino.")
+    else:
+        try:
+            sincronizar_entorno(AlmacenPerfiles(DIRECTORIO_DATOS), entorno)
+        except (ValueError, KeyError) as exc:
+            logging.error("No se pudo guardar el bot del .env en el perfil de %s: %s", entorno.inquilino_id, exc)
+    logging.info("FEMIX: arrancando los bots de Telegram. Ctrl+C para detener.")
+    asyncio.run(_principal(FlotaDeBots(DIRECTORIO_DATOS, entorno)))
 
 if __name__ == "__main__":
     main()
