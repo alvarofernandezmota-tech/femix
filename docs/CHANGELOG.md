@@ -267,3 +267,39 @@
     limpieza del fichero temporal en `Diario._guardar()`/`AlmacenInquilinos._guardar()`/
     `AlmacenSesiones._guardar()` (forzando el fallo de escritura con `monkeypatch`).
   - 12 tests nuevos. Suite completa: 248 tests en verde.
+
+## Unificación de ramas + Docker completo + RAG operativo (2026-09-23)
+- **Ramas unificadas:** `release/docker-chatbot-base` (Dockerfile, compose, `.env.example`, script de
+  limpieza de ramas) se había creado antes de RAG por inquilino, los agentes y el panel web, y quedó
+  desconectada. Mergeada en `feat/panel-web`, que ya contenía todo `integracion/femix-completa`:
+  una sola rama con todo. Sin conflictos de código; solo de prosa en `docs/CHANGELOG_DOCKER.md`,
+  `docs/TAREAS_CHATBOT.md` y `docs/TAREAS_REPO.md`, resueltos conservando ambos lados.
+  `requirements.txt` trajo el fix de `numpy==2.5.3` (versión inexistente que rompía el build).
+- **Por qué el bot en Docker no llegaba a Ollama:** Ollama en `madre` escucha solo en
+  `127.0.0.1:11434`; desde la red bridge, `localhost` es el propio contenedor y
+  `host.docker.internal` (que en Linux ni resuelve sin `extra_hosts`) apunta a la IP del bridge, que
+  Ollama rechaza. `docker-compose.yml` pasa a `network_mode: host`. Alternativa documentada en
+  `docs/docker.md`.
+- **Otros fallos del Docker anterior:** el `CMD` arrancaba el CLI (lee de stdin → sale sin TTY →
+  reinicio en bucle) en vez de `conectores.telegram.bot`; `conectores/` no se copiaba a la imagen;
+  `.env.example` pedía `DISCORD_TOKEN` (el código lee `TELEGRAM_BOT_TOKEN`); `datos/` no persistía.
+  Corregido todo, más usuario sin privilegios, `PYTHONUNBUFFERED`, `.dockerignore`, volumen para la
+  caché de Whisper, y el panel web como servicio opcional (perfil `web`, está en pruebas).
+- **`fix(llm)`:** con `HUGIN_LLM_PROVEEDOR=openai` el router ignoraba `HUGIN_LLM_MODELO` y pedía
+  siempre `gpt-4o-mini`; contra Ollama por `/v1` (`OPENAI_BASE_URL`, como está `madre`) eso da
+  *model not found*. Afectaba también a los modelos rápido/complejo.
+- **RAG operativo sin el panel:** `python -m femix.bot.ingerir <ficheros|directorios>` carga `.txt`/`.md`
+  en el índice del mismo `FEMIX_INQUILINO_ID` y directorio que lee el bot; relanzarlo no duplica.
+  En Docker: `docker compose run --rm femix-bot python -m femix.bot.ingerir /app/documentos`.
+- `docs/PRODUCCION_MADRE.md` listaba variables que el código no lee (`FEMIX_MODELO_BASE`,
+  `FEMIX_MODELO_RAPIDO`, `FEMIX_MODELO_PENSAMIENTO`, `FEMIX_USUARIO_ID`): con ellas el bot usaba en
+  silencio los valores por defecto. Corregido con los nombres reales (`HUGIN_LLM_MODELO*`).
+  README: eliminada la sección de Docker duplicada y desactualizada.
+- **Verificación:** Docker Hub bloqueado desde el entorno de desarrollo, así que la imagen no se
+  llegó a construir. Sí: `docker compose config` válido, `pip install -r requirements.txt` limpio en
+  Python 3.11, y prueba de extremo a extremo con el layout exacto de la imagen y un Ollama falso en
+  `127.0.0.1:11434` (ingesta → pregunta → el contexto RAG llega en la petición a
+  `localhost:11434/api/chat` con el modelo configurado). Pendiente: `docker compose up` real en
+  `madre`.
+- 7 tests nuevos (`tests/test_ingerir.py`, `tests/test_configuracion_llm.py`). Suite completa: 255
+  tests en verde.

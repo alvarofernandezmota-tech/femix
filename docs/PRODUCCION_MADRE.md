@@ -3,53 +3,84 @@
 ## Estado
 
 - ✅ Bot corriendo en `madre`
-- ✅ RAG por inquilino (186 tests)
+- ✅ RAG por inquilino, conectado al bot
 - ✅ Multi-usuario + Multi-inquilino
+- ✅ Dockerizado (bot de Telegram en Docker, Ollama en el host) — ver `docs/docker.md`
 
 ## Configuración
 
 ### Variables de entorno
 
+Solo estas las lee el código (en Docker van en `.env`; ver `.env.example`):
+
 ```bash
-export FEMIX_INQUILINO_ID="tu_inquilino"
-export FEMIX_USUARIO_ID="tu_usuario"
-export FEMIX_MODELO_BASE="mistral"
-export FEMIX_MODELO_RAPIDO="llama3.2"
-export FEMIX_MODELO_PENSAMIENTO="qwen3.5"
-export OPENAI_API_KEY="tu_api_key"
-export OPENAI_BASE_URL="http://localhost:11434/v1"
+TELEGRAM_BOT_TOKEN="..."                 # conectores/telegram/bot.py
+FEMIX_INQUILINO_ID="tu_inquilino"        # índice RAG que usa el bot
+HUGIN_LLM_PROVEEDOR="ollama"             # ollama | openai
+HUGIN_LLM_MODELO="mistral"               # modelo base
+HUGIN_LLM_MODELO_RAPIDO="llama3.2"       # opcional: respuestas rápidas
+HUGIN_LLM_MODELO_COMPLEJO="qwen3.5"      # opcional: subagente / tareas complejas
+OLLAMA_URL="http://localhost:11434/api/chat"
 ```
 
+Si se usa Ollama por su API compatible con OpenAI en vez de la nativa:
+
+```bash
+HUGIN_LLM_PROVEEDOR="openai"
+OPENAI_BASE_URL="http://localhost:11434/v1"
+OPENAI_API_KEY="ollama"
+```
+
+> Hasta el 2026-09-23 este documento listaba `FEMIX_MODELO_BASE`, `FEMIX_MODELO_RAPIDO`,
+> `FEMIX_MODELO_PENSAMIENTO` y `FEMIX_USUARIO_ID`. **El código no las lee**: los modelos se
+> configuran con `HUGIN_LLM_MODELO*` (arriba) y el usuario es el id de Telegram de quien escribe.
+> Con aquellas variables el bot usaba en silencio los valores por defecto.
+
 ### Datos
+
+```
 datos/
 ├── {inquilino_id}/
-│ ├── tareas/
-│ ├── diario/
-│ ├── recordatorios/
-│ └── rag/
-│ └── indice.json
-└── memoria/
-└── {usuario_id}.json
+│   └── rag/
+│       └── indice.json
+├── memoria.json                    # historial de conversación (clave inquilino:usuario)
+├── tareas_{usuario_id}.json        # dominio personal (aún sin carpeta por inquilino, Fase 2)
+├── diario_{usuario_id}.json
+├── recordatorios_{usuario_id}.json
+├── inquilinos.json                 # panel web
+└── sesiones.json                   # panel web
+```
 
-text
+En Docker, todo esto vive en el volumen `femix-datos`.
 
 ## Ejecución
+
+Con Docker (recomendado):
+
+```bash
+cd ~/GitHub/personal/femix
+docker compose up -d --build
+docker compose logs -f femix-bot
+```
+
+Sin Docker:
 
 ```bash
 cd ~/GitHub/personal/femix
 source .venv/bin/activate
-python src/femix/cli.py
+python -m conectores.telegram.bot     # bot de Telegram
+PYTHONPATH=src python -m femix.bot.main   # CLI
 ```
 
 ## Tests
 
 ```bash
 python -m pytest tests/ -v
-# 186 passed
 ```
 
 ## Próximos pasos
 
-- [ ] Panel web (FastAPI + Jinja2)
-- [ ] Docker con panel web + bot
+- [x] Panel web (FastAPI + Jinja2) — en pruebas
+- [x] Docker con panel web + bot
+- [ ] Probar `docker compose up -d --build` en madre contra el Ollama real
 - [ ] Release v0.2.0

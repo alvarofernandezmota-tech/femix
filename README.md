@@ -30,116 +30,25 @@ HUGIN es un bot conversacional autónomo que combina un modelo de lenguaje (LLM)
 
 ## Ejecutar con Docker
 
-### Requisitos
-
-- Docker y Docker Compose instalados.
-- Un token de Discord para el bot.
-- (Opcional) Ollama corriendo en el host si usas el proveedor Ollama.
-
-### Configuración
-
-1. Copia el archivo de ejemplo y edítalo:
-
-   ```bash
-   cp .env.example .env
-   # Edita .env con tu DISCORD_TOKEN y configuración LLM
-   ```
-
-2. Ajusta las variables según tu caso:
-
-   - Para Ollama en el mismo host:
-     ```ini
-     HUGIN_LLM_PROVEEDOR=ollama
-     HUGIN_LLM_MODELO=qwen2.5:3b
-     OLLAMA_URL=http://host.docker.internal:11434/api/chat
-     ```
-   - Para OpenAI:
-     ```ini
-     HUGIN_LLM_PROVEEDOR=openai
-     HUGIN_LLM_MODELO=gpt-4o-mini
-     OPENAI_API_KEY=tu_openai_api_key
-     ```
-
-### Ejecución
-
-Construye y levanta el contenedor:
+Pensado para `madre`: el bot de Telegram en Docker y Ollama en el host (fuera de Docker).
 
 ```bash
-docker compose up --build
+cp .env.example .env        # rellena TELEGRAM_BOT_TOKEN y revisa HUGIN_LLM_MODELO
+docker compose up -d --build
+docker compose logs -f femix-bot
 ```
 
-Para ejecutar en segundo plano:
+Cargar documentos en el RAG del bot (`.txt`/`.md` en `./documentos/`):
 
 ```bash
-docker compose up -d
+docker compose run --rm femix-bot python -m femix.bot.ingerir /app/documentos
 ```
 
-Ver logs en tiempo real:
+Panel web (en pruebas, opcional):
 
 ```bash
-docker compose logs -f
+docker compose --profile web up -d
 ```
 
-### Detener el bot
-
-```bash
-docker compose down
-```
-
-## Ejecutar con Docker
-
-### Requisitos
-
-- Docker y Docker Compose instalados.
-- Un token de Discord para el bot.
-- (Opcional) Ollama corriendo en el host si usas el proveedor Ollama.
-
-### Configuración
-
-1. Copia el archivo de ejemplo y edítalo:
-
-   ```bash
-   cp .env.example .env
-   # Edita .env con tu DISCORD_TOKEN y configuración LLM
-   ```
-
-2. Ajusta las variables según tu caso:
-
-   - Para Ollama en el mismo host:
-     ```ini
-     HUGIN_LLM_PROVEEDOR=ollama
-     HUGIN_LLM_MODELO=qwen2.5:3b
-     OLLAMA_URL=http://host.docker.internal:11434/api/chat
-     ```
-   - Para OpenAI:
-     ```ini
-     HUGIN_LLM_PROVEEDOR=openai
-     HUGIN_LLM_MODELO=gpt-4o-mini
-     OPENAI_API_KEY=tu_openai_api_key
-     ```
-
-### Ejecución
-
-Construye y levanta el contenedor:
-
-```bash
-docker compose up --build
-```
-
-Para ejecutar en segundo plano:
-
-```bash
-docker compose up -d
-```
-
-Ver logs en tiempo real:
-
-```bash
-docker compose logs -f
-```
-
-### Detener el bot
-
-```bash
-docker compose down
-```
+Por qué `network_mode: host`, cómo comprobar que llega a Ollama, alternativas y problemas
+frecuentes: [docs/docker.md](docs/docker.md).

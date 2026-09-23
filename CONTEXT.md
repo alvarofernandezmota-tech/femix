@@ -103,8 +103,8 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
 - RAG **encendido** de punta a punta: `bot/fabrica.construir_femix()` enchufa
   `IndiceEmbeddingsBuscador` y lee `FEMIX_INQUILINO_ID`; CLI (`bot/main.py`) y Telegram
   (`conectores/telegram/bot.py`) lo usan. Verificado contra Ollama real: el modelo responde citando
-  el documento del índice del inquilino. Falta añadir `FEMIX_INQUILINO_ID` a `.env.example`, que
-  vive en `release/docker-chatbot-base`.
+  el documento del índice del inquilino. Documentos se cargan con `python -m femix.bot.ingerir`
+  (mismo inquilino y directorio que lee el bot) o desde el panel web.
 - La relevancia del RAG es débil mientras el motor de embeddings sea `MotorEmbeddingsHash` (bolsa
   de palabras por hashing, sin stopwords ni IDF): las palabras vacías compartidas inflan la
   similitud. El umbral del adaptador solo descarta con fiabilidad lo que no comparte ninguna
@@ -123,8 +123,12 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
   bot) mencionados en `docs/ENCARGO_PANEL_WEB.md` pero no implementados — configurar el bot por
   inquilino depende de la Fase 2/3 del roadmap (`inquilino/perfil.py`), que no existe todavía.
   Sesiones en JSON local, no válidas si se despliega con varios workers/procesos sin un backend de
-  sesión compartido. No existe todavía ningún `Dockerfile`/`docker-compose.yml` en el repositorio
-  (ver `docs/CHANGELOG_DOCKER.md`).
+  sesión compartido. El panel web está en pruebas: en Docker va tras el perfil `web`, no arranca
+  por defecto.
+- Docker (`Dockerfile`, `docker-compose.yml`, `docs/docker.md`): bot de Telegram en contenedor con
+  `network_mode: host` para llegar al Ollama de `madre` (que escucha solo en `127.0.0.1`), `datos/`
+  y caché de Whisper en volúmenes. La imagen **no se ha construido todavía** (Docker Hub bloqueado
+  desde el entorno donde se preparó); falta `docker compose up -d --build` real en `madre`.
 
 ## Próximo paso concreto
 Crear `inquilino/perfil.py` y `inquilino/capacidades.py` como estructura de datos, antes de conectar
