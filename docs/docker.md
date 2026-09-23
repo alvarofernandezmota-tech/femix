@@ -134,17 +134,36 @@ docker run --rm -v femix_femix-datos:/datos -v "$PWD":/copia alpine tar czf /cop
 
 ## Estado de la verificación
 
-Verificado en la sesión del 2026-09-23 (sin acceso a Docker Hub desde el entorno de desarrollo,
-así que **no se llegó a construir la imagen**):
+**Verificado en `madre` el 2026-09-23**, con la rama `feat/panel-web`:
 
-- `docker compose config` válido; el perfil `web` añade `femix-web` y por defecto solo arranca
-  `femix-bot`.
-- `pip install -r requirements.txt` en un Python 3.11 limpio (el mismo paso del `Dockerfile`):
-  instala sin errores.
-- Con el mismo layout de la imagen (`src/` + `conectores/`, `PYTHONPATH=src`) y un Ollama falso en
-  `127.0.0.1:11434` (lo que ve el contenedor con la red del host): la ingesta escribe en
-  `datos/{inquilino}/rag/`, el bot llama a `localhost:11434/api/chat` con el modelo configurado, y
-  el contexto RAG llega en la petición. `python -m conectores.telegram.bot` arranca y solo se para
-  al contactar con Telegram. El comando de `femix-web` sirve `/health`, `/login` y `/admin/stats`.
+- `docker compose up -d --build`: la imagen se construye (18 min la primera vez con la línea de
+  `madre`, ~30 s las siguientes gracias a la caché de capas).
+- Desde el contenedor, `OLLAMA_URL` lista `qwen2.5:3b` y `qwen2.5:7b`: `network_mode: host` llega al
+  Ollama del host sin tocar su configuración.
+- `python -m femix.bot.ingerir /app/documentos` escribe en `datos/varo/rag/indice.json`.
+- El bot contesta por Telegram. Hicieron falta tres arreglos que solo salían con la red real:
+  - Dos bots con el mismo token (`hugin-telegram.service` nativo y el contenedor) daban
+    `Conflict: terminated by other getUpdates request`. Se desactivó el servicio nativo.
+  - `ConnectTimeout` al enviar la respuesta: los 5 s por defecto de `python-telegram-bot` no
+    bastaban; ahora 30 s.
+  - Una respuesta vacía del modelo la rechazaba Telegram (`Message text is empty`); ahora el bot
+    avisa de que no ha podido generar respuesta.
+- IPv6 no tiene salida en `madre` (`Network is unreachable`) e IPv4 conecta con Telegram en ~0,07 s:
+  no afecta, pero explica por qué conviene no depender de IPv6.
 
-Pendiente: `docker compose up -d --build` real en `madre` contra el Ollama de verdad.
+Antes de eso, desde el entorno de desarrollo (sin acceso a Docker Hub): `docker compose config`
+válido, `pip install -r requirements.txt` limpio en Python 3.11, y prueba de extremo a extremo con
+el layout de la imagen y un Ollama falso.
+
+## Logs
+
+`docker compose logs -f femix-bot` muestra una línea por mensaje:
+
+```
+2026-09-23 17:02:11 INFO femix.bot.femix: inquilino=varo usuario=123 camino=rápido 6.4s | entrada: hola | salida: ¡Hola! Soy FEMIX…
+```
+
+`camino` dice por dónde fue: `comando` (sin IA), `rápido` (modelo rápido), `agente` (subagente con el
+modelo complejo) o `agente→rápido` (el subagente no resolvió y contestó el rápido). Entrada y salida
+se recortan a 120 caracteres; aun así, **los logs contienen texto de las conversaciones**, y Docker
+los guarda en disco en `madre`.

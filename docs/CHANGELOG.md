@@ -303,3 +303,18 @@
   `madre`.
 - 7 tests nuevos (`tests/test_ingerir.py`, `tests/test_configuracion_llm.py`). Suite completa: 255
   tests en verde.
+
+## Verificación en madre (2026-09-23)
+- Docker probado de verdad en `madre`: imagen construida, contenedor alcanza el Ollama del host,
+  ingesta RAG del inquilino `varo`, y el bot contesta por Telegram. `hugin-telegram.service`
+  (el bot nativo) desactivado: con el contenedor, dos procesos con el mismo token daban `Conflict`.
+- `fix(telegram)`: 30 s de margen con Telegram (antes 5 s, las respuestas se perdían con
+  `ConnectTimeout` en la línea de `madre`) y errores de red en una línea de log.
+- `fix(bot)`: una respuesta vacía del modelo ya no llega vacía a Telegram (la rechazaba con
+  `Message text is empty`); `BadRequest` ya no se etiqueta como fallo de red.
+- `feat(bot)`: una línea de log por mensaje (inquilino, usuario, camino, segundos, entrada y salida
+  recortadas) y aviso con traza cuando el subagente falla (antes se tragaba la excepción).
+- Los comandos (`/tarea`, `/hoy`, `/diario`, `/recordatorio`) **no funcionaban en Telegram** desde
+  que existe el conector (`75be47d`): `filters.TEXT & ~filters.COMMAND` los descartaba. Arreglado.
+  `bot.py` ya no construye `Femix` al importarse (`construir_aplicacion`), y tiene tests.
+- 264 tests en verde con las dependencias de la imagen (260 + 1 saltado sin `python-telegram-bot`).

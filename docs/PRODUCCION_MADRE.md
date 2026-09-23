@@ -82,5 +82,5 @@ python -m pytest tests/ -v
 
 - [x] Panel web (FastAPI + Jinja2) — en pruebas
 - [x] Docker con panel web + bot
-- [ ] Probar `docker compose up -d --build` en madre contra el Ollama real
+- [x] Probar `docker compose up -d --build` en madre contra el Ollama real (2026-09-23)
 - [ ] Release v0.2.0

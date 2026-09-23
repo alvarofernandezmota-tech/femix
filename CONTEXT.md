@@ -1,6 +1,6 @@
 # CONTEXT.md — femix
 
-Última actualización: 2026-09-20
+Última actualización: 2026-09-23
 
 ## Fase actual del roadmap
 Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En marcha.
@@ -40,8 +40,9 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
   `/hoy`, `/tarea crear|listar|completar|consultar`, `/diario`, `/recordatorio crear|listar`.
   `Femix.procesar()` los detecta vía `entender.clasificar_intencion()` y los despacha sin llamar
   al LLM ni registrar nada en `Memoria` — `Memoria` sigue reservada solo para conversación libre.
-  CLI y Telegram los heredan automáticamente (ambos ya llaman a `femix.procesar()`). 51 tests en
-  verde (`python3 -m pytest tests/ -v`).
+  CLI y Telegram los heredan (ambos llaman a `femix.procesar()`); en Telegram no llegaban hasta el
+  2026-09-23 porque el filtro `~filters.COMMAND` descartaba todo lo que empieza por `/`. 51 tests
+  en verde (`python3 -m pytest tests/ -v`).
 
 - Agentes unificados (`src/femix/agentes/`, `src/femix/mente/decidir.py`,
   `src/femix/puertos/busqueda.py`, rama `feat/agentes-unificados`): `Femix.procesar()` es el único
@@ -127,8 +128,11 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
   por defecto.
 - Docker (`Dockerfile`, `docker-compose.yml`, `docs/docker.md`): bot de Telegram en contenedor con
   `network_mode: host` para llegar al Ollama de `madre` (que escucha solo en `127.0.0.1`), `datos/`
-  y caché de Whisper en volúmenes. La imagen **no se ha construido todavía** (Docker Hub bloqueado
-  desde el entorno donde se preparó); falta `docker compose up -d --build` real en `madre`.
+  y caché de Whisper en volúmenes. **Verificado en `madre` el 2026-09-23**: imagen construida, el
+  contenedor llega a Ollama (`qwen2.5:3b` y `7b`), ingesta RAG del inquilino `varo` y el bot contesta
+  por Telegram. El servicio nativo `hugin-telegram` quedó desactivado (dos bots con el mismo token
+  daban `Conflict`). Cada mensaje deja una línea en `docker compose logs femix-bot` (camino,
+  segundos, entrada y salida recortadas).
 
 ## Próximo paso concreto
 Crear `inquilino/perfil.py` y `inquilino/capacidades.py` como estructura de datos, antes de conectar

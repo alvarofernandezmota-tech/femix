@@ -16,13 +16,13 @@
 
 ### Tarea 1.2: Corregir Dockerfile
 - [x] Corregir `requirements.txt` (numpy>=2.0,<2.5)
-- [ ] Probar `docker compose up --build` en `madre`
-- [ ] Verificar que el bot arranca y conecta con Ollama del host
+- [x] Probar `docker compose up --build` en `madre` (2026-09-23)
+- [x] Verificar que el bot arranca y conecta con Ollama del host
 
 ### Tarea 1.3: Docker con RAG ✅ COMPLETADO (2026-09-23)
 - [x] Volumen persistente para `datos/` (índice RAG + dominio + panel)
 - [x] `FEMIX_INQUILINO_ID` en `.env.example`
-- [ ] Probar RAG desde contenedor contra Ollama real
+- [x] Ingesta desde el contenedor (`femix.bot.ingerir`) en `madre`, inquilino `varo`
 
 ---
 

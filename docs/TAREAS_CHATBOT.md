@@ -35,7 +35,7 @@
 
 - [x] `release/docker-chatbot-base` unificada con `feat/panel-web` (Dockerfile, compose, `.env.example`)
 - [x] `numpy==2.5.3` (inexistente) corregido
-- [x] Ollama en el host alcanzable desde el contenedor también en Linux nativo
-      (`extra_hosts: host.docker.internal:host-gateway`)
+- [x] Ollama en el host alcanzable desde el contenedor (`network_mode: host`: Ollama en `madre`
+      solo escucha en `127.0.0.1`)
 - [x] `datos/` como volumen persistente (índice RAG y datos de dominio sobreviven a reinicios)
-- [ ] Probar `docker compose up --build` de verdad en `madre`
+- [x] Probar `docker compose up --build` de verdad en `madre` (2026-09-23: contesta por Telegram)
