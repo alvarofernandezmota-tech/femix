@@ -1,9 +1,10 @@
 from ..inquilino.migracion import migrar_datos_heredados
-from .fabrica import DIRECTORIO_DATOS, construir_femix, inquilino_desde_entorno
+from .fabrica import DIRECTORIO_DATOS, capacidades_del_perfil, construir_femix, inquilino_desde_entorno, inquilino_explicito
 
 def main():
-    migrar_datos_heredados(DIRECTORIO_DATOS, inquilino_desde_entorno())
-    femix = construir_femix()
+    migrar_datos_heredados(DIRECTORIO_DATOS, inquilino_explicito())
+    inquilino_id = inquilino_desde_entorno()
+    femix = construir_femix(inquilino_id=inquilino_id, capacidades=capacidades_del_perfil(DIRECTORIO_DATOS, inquilino_id))
     print("FEMIX (femix) — Ctrl+C para salir")
     while True:
         try:

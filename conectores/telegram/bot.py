@@ -13,7 +13,7 @@ ESPERA_TELEGRAM = 30.0
 
 load_dotenv()
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
-from femix.bot.fabrica import DIRECTORIO_DATOS, inquilino_desde_entorno
+from femix.bot.fabrica import DIRECTORIO_DATOS, inquilino_explicito
 from femix.inquilino.migracion import migrar_datos_heredados
 from femix.inquilino.perfil import AlmacenPerfiles
 from .acceso import comprobar_acceso
@@ -114,12 +114,14 @@ async def _principal(flota) -> None:
 
 def main():
     configurar_logs()
-    entorno = bot_del_entorno()
+    # Antes que nada que pueda fallar al leer el .env (p. ej. un permitido mal escrito): si el bot
+    # no arranca, que al menos los datos antiguos ya estén donde los busca el panel.
     try:
-        migrar_datos_heredados(DIRECTORIO_DATOS, entorno.inquilino_id if entorno else inquilino_desde_entorno())
+        migrar_datos_heredados(DIRECTORIO_DATOS, inquilino_explicito())
     except Exception:
         # No mover los ficheros antiguos no puede dejar sin bots a todos los inquilinos.
         logging.exception("No se pudieron migrar los datos antiguos; se sigue sin migrar")
+    entorno = bot_del_entorno()
     if entorno is None:
         logging.info("Sin TELEGRAM_BOT_TOKEN en el entorno: solo los bots de los perfiles de inquilino.")
     else:

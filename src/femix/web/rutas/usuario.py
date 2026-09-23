@@ -8,10 +8,9 @@ from pydantic import BaseModel, field_validator
 from femix.dominio.personal.diario import Diario
 from femix.dominio.personal.recordatorios import Recordatorios
 from femix.dominio.personal.tareas import Tareas
-from femix.rag.indice import IndiceEmbeddings
 from femix.rag.rutas import directorio_inquilino
 
-from ..documentos import ingerir_subida
+from ..documentos import ingerir_subida, listar_documentos
 from .auth import Inquilino, directorio_datos_web, obtener_inquilino_actual
 
 router = APIRouter(prefix="/usuario", tags=["usuario"])
@@ -111,8 +110,7 @@ async def crear_recordatorio(
 
 @router.get("/rag")
 async def listar_documentos_rag(inquilino: Inquilino = Depends(obtener_inquilino_actual)):
-    indice = IndiceEmbeddings(inquilino.id, directorio_datos_web())
-    return {"documentos": indice.listar_documentos()}
+    return {"documentos": await listar_documentos(inquilino.id, directorio_datos_web())}
 
 
 @router.post("/rag/documentos", status_code=status.HTTP_201_CREATED)

@@ -542,3 +542,40 @@ def test_main_arranca_aunque_el_perfil_del_env_este_roto(tmp_path, monkeypatch):
     monkeypatch.setattr(bot, "configurar_logs", lambda: None)
     bot.main()
     assert flotas and flotas[0]._entorno.inquilino_id == "varo"
+
+
+def test_el_bot_del_env_no_arranca_si_su_perfil_es_ilegible(tmp_path):
+    flota, _, almacen = _flota(tmp_path, BotDelEntorno("varo", TOKEN_VARO, frozenset({7})))
+    almacen.crear(_perfil("acme", TOKEN_ACME))
+    (tmp_path / "varo").mkdir()
+    (tmp_path / "varo" / "perfil.json").write_text("{roto")
+    asyncio.run(flota.reconciliar())
+    assert set(flota.en_marcha) == {"acme"}
+    assert "ilegible" in _estado(tmp_path)["bots"]["varo"]["detalle"]
+
+
+def test_el_bot_del_env_no_arranca_si_activo_no_es_true():
+    raro = _perfil("varo", activo="false")
+    deseado, problemas = configuracion_deseada([raro], BotDelEntorno("varo", TOKEN_VARO, frozenset({7})))
+    assert deseado == {} and "baja" in problemas["varo"]
+
+
+def test_capacidades_de_versiones_futuras_no_encienden_las_demas():
+    futuro = _perfil("varo", capacidades=["voz", "busqueda_web"])
+    deseado, _ = configuracion_deseada([futuro], BotDelEntorno("varo", TOKEN_VARO, frozenset({7})))
+    assert deseado["varo"].capacidades == ("voz",)
+
+
+def test_main_migra_antes_de_leer_los_permitidos(tmp_path, monkeypatch):
+    # Con un permitido mal escrito el bot no arranca, pero los datos antiguos ya están donde los
+    # busca el panel.
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", TOKEN_VARO)
+    monkeypatch.setenv("FEMIX_INQUILINO_ID", "varo")
+    monkeypatch.setenv("FEMIX_TELEGRAM_PERMITIDOS", "@varo")
+    (tmp_path / "datos").mkdir()
+    (tmp_path / "datos" / "tareas_7.json").write_text("[]")
+    monkeypatch.setattr(bot, "configurar_logs", lambda: None)
+    with pytest.raises(ValueError):
+        bot.main()
+    assert (tmp_path / "datos" / "varo" / "tareas_7.json").exists()

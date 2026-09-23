@@ -25,9 +25,10 @@ DIAS = ("lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"
 LONGITUD_MAXIMA_NOMBRE = 100
 LONGITUD_MAXIMA_DESCRIPCION = 2000
 
-_PATRON_HORA = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+# [0-9] y fullmatch: `\d` acepta dígitos de otras escrituras ("٠٩:٠٠") y `$` un salto de línea.
+_PATRON_HORA = re.compile(r"([01][0-9]|2[0-3]):[0-5][0-9]")
 # Forma de los tokens de @BotFather: `<id del bot>:<secreto>`. Basta para cazar un pegado a medias.
-_PATRON_TOKEN = re.compile(r"^\d{5,}:[A-Za-z0-9_-]{30,}$")
+_PATRON_TOKEN = re.compile(r"[0-9]{5,}:[A-Za-z0-9_-]{30,}")
 
 _log = logging.getLogger(__name__)
 
@@ -66,6 +67,9 @@ class PerfilInquilino:
         for campo in ("horario", "capacidades", "telegram_permitidos"):
             if not isinstance(getattr(self, campo), (list, tuple)):
                 raise ValueError(f"{campo} tiene que ser una lista")
+        # "false" (texto) contaría como activo: solo vale un booleano de verdad.
+        if not isinstance(self.activo, bool):
+            raise ValueError("activo tiene que ser true o false")
         nombre = (self.nombre or "").strip()
         if not nombre:
             raise ValueError("El nombre no puede estar vacío")
@@ -77,7 +81,7 @@ class PerfilInquilino:
         if len(descripcion) > LONGITUD_MAXIMA_DESCRIPCION:
             raise ValueError(f"La descripción no puede pasar de {LONGITUD_MAXIMA_DESCRIPCION} caracteres")
         token = (self.telegram_token or "").strip()
-        if token and not _PATRON_TOKEN.match(token):
+        if token and not _PATRON_TOKEN.fullmatch(token):
             raise ValueError("El token de Telegram no tiene la forma de los de @BotFather (número:clave)")
         return replace(
             self,
@@ -101,7 +105,7 @@ class PerfilInquilino:
         conocidos = {f.name for f in fields(cls)}
         limpio = {k: v for k, v in datos.items() if k in conocidos}
         try:
-            limpio["horario"] = [f if isinstance(f, Franja) else Franja(**f) for f in limpio.get("horario") or []]
+            limpio["horario"] = [_franja(f) for f in limpio.get("horario") or []]
             return cls(**limpio)
         except TypeError as exc:
             raise ValueError(f"Perfil mal formado: {exc}") from None
@@ -114,18 +118,23 @@ class PerfilInquilino:
         return datos
 
 
+def _franja(franja) -> Franja:
+    """Una franja desde JSON. Como con el perfil, los campos que no conoce se ignoran."""
+    if isinstance(franja, Franja):
+        return franja
+    if not isinstance(franja, dict):
+        raise ValueError(f"Franja mal formada: {franja!r} (dia, desde, hasta)")
+    return Franja(dia=franja.get("dia"), desde=franja.get("desde"), hasta=franja.get("hasta"))
+
+
 def _validar_horario(horario) -> list:
     franjas = []
     for franja in horario:
-        if isinstance(franja, dict):
-            try:
-                franja = Franja(**franja)
-            except TypeError:
-                raise ValueError(f"Franja mal formada: {franja!r} (dia, desde, hasta)") from None
+        franja = _franja(franja)
         if franja.dia not in DIAS:
             raise ValueError(f"Día {franja.dia!r} no válido ({', '.join(DIAS)})")
         for hora in (franja.desde, franja.hasta):
-            if not isinstance(hora, str) or not _PATRON_HORA.match(hora):
+            if not isinstance(hora, str) or not _PATRON_HORA.fullmatch(hora):
                 raise ValueError(f"Hora {hora!r} no válida (HH:MM, de 00:00 a 23:59)")
         if franja.desde >= franja.hasta:
             raise ValueError(f"{franja.dia}: la franja {franja.desde}-{franja.hasta} acaba antes de empezar")
@@ -145,7 +154,8 @@ def leer_ids_telegram(texto: "str | None") -> list:
     ignorarlo dejaría fuera en silencio a alguien que se cree autorizado."""
     ids = []
     for trozo in (texto or "").replace(",", " ").split():
-        if not trozo.isdigit():
+        # isascii: int() también acepta "٣" (dígito árabe) y lo convierte en 3.
+        if not (trozo.isascii() and trozo.isdigit()):
             raise ValueError(f"{trozo!r} no es un ID de Telegram (tiene que ser un número)")
         ids.append(int(trozo))
     return ids
@@ -159,6 +169,14 @@ def _validar_permitidos(permitidos) -> list:
             raise ValueError(f"{usuario!r} no es un ID de usuario de Telegram")
         validos.add(usuario)
     return sorted(validos)
+
+
+class PerfilIlegible(ValueError):
+    """El inquilino tiene `perfil.json`, pero no se puede leer o no es un perfil."""
+
+
+class InquilinoYaExiste(ValueError):
+    pass
 
 
 class AlmacenPerfiles:
@@ -176,17 +194,28 @@ class AlmacenPerfiles:
         return os.path.join(directorio_inquilino(self._directorio, inquilino_id), NOMBRE_PERFIL)
 
     def obtener(self, inquilino_id: str) -> "PerfilInquilino | None":
+        """El perfil, `None` si no tiene, o `PerfilIlegible` si lo tiene pero no se puede leer."""
         ruta = self.ruta(inquilino_id)
         if not os.path.exists(ruta):
             return None
-        with open(ruta, "r", encoding="utf-8") as f:
-            return PerfilInquilino.de_dict(json.load(f))
+        try:
+            with open(ruta, "r", encoding="utf-8") as f:
+                perfil = PerfilInquilino.de_dict(json.load(f))
+        except Exception as exc:
+            # Lo que sea (JSON roto, `null`, tipos raros): quien llama decide qué hacer con él.
+            raise PerfilIlegible(f"El perfil de '{inquilino_id}' no se puede leer: {exc}") from None
+        if perfil.inquilino_id != inquilino_id:
+            raise PerfilIlegible(f"El perfil de la carpeta '{inquilino_id}' dice ser de {perfil.inquilino_id!r}")
+        return perfil
 
-    def listar(self) -> list:
-        """Todos los perfiles legibles, por id. Uno roto se salta y se avisa, no tumba al resto."""
+    def listar_con_errores(self) -> "tuple[list, dict]":
+        """Los perfiles legibles, por id, y `{id: motivo}` de los que no se pueden leer.
+
+        Uno roto se aparta y se avisa: no puede dejar sin bots (ni sin panel) al resto.
+        """
         if not os.path.isdir(self._directorio):
-            return []
-        perfiles = []
+            return [], {}
+        perfiles, errores = [], {}
         for nombre in sorted(os.listdir(self._directorio)):
             try:
                 validar_inquilino_id(nombre)
@@ -195,32 +224,56 @@ class AlmacenPerfiles:
             if not os.path.isfile(os.path.join(self._directorio, nombre, NOMBRE_PERFIL)):
                 continue
             try:
-                perfil = self.obtener(nombre)
-            except Exception as exc:
-                # Lo que sea (JSON roto, `null`, tipos raros): uno mal no deja sin bots al resto.
-                _log.warning("Perfil ilegible de %s, se ignora: %s", nombre, exc)
-                continue
-            if perfil.inquilino_id != nombre:
-                _log.warning("El perfil de la carpeta %s dice ser de %s, se ignora", nombre, perfil.inquilino_id)
-                continue
-            perfiles.append(perfil)
-        return perfiles
+                perfiles.append(self.obtener(nombre))
+            except PerfilIlegible as exc:
+                _log.warning("%s; se ignora", exc)
+                errores[nombre] = str(exc)
+        return perfiles, errores
+
+    def listar(self) -> list:
+        return self.listar_con_errores()[0]
 
     def crear(self, perfil: PerfilInquilino) -> PerfilInquilino:
         perfil = replace(perfil.validado(), activo=True, fecha_alta=_ahora(), fecha_baja=None)
         with bloqueo(self._directorio, "perfiles"):
-            if self.obtener(perfil.inquilino_id) is not None:
-                raise ValueError(f"El inquilino '{perfil.inquilino_id}' ya existe")
+            if os.path.exists(self.ruta(perfil.inquilino_id)):
+                raise InquilinoYaExiste(f"El inquilino '{perfil.inquilino_id}' ya existe")
             self._comprobar_token_libre(perfil)
             escribir_json_atomico(self.ruta(perfil.inquilino_id), perfil.a_dict())
         return perfil
 
-    def actualizar(self, perfil: PerfilInquilino) -> PerfilInquilino:
-        """Cambia los datos del perfil. El alta, la baja y la fecha de alta no se tocan aquí."""
-        perfil = perfil.validado()
+    def modificar(self, inquilino_id: str, cambio) -> PerfilInquilino:
+        """`cambio(perfil_actual) -> perfil_nuevo`, leyendo y escribiendo dentro del bloqueo.
+
+        Leer fuera y escribir dentro perdía lo que otro proceso (el panel, el bot al arrancar)
+        guardara entre medias. El alta, la baja y la fecha de alta no se tocan aquí.
+        """
         with bloqueo(self._directorio, "perfiles"):
-            actual = self._obtener_existente(perfil.inquilino_id)
-            perfil = replace(perfil, activo=actual.activo, fecha_alta=actual.fecha_alta, fecha_baja=actual.fecha_baja)
+            actual = self._obtener_existente(inquilino_id)
+            perfil = cambio(actual).validado()
+            perfil = replace(
+                perfil, inquilino_id=actual.inquilino_id, activo=actual.activo,
+                fecha_alta=actual.fecha_alta, fecha_baja=actual.fecha_baja,
+            )
+            self._comprobar_token_libre(perfil)
+            escribir_json_atomico(self.ruta(inquilino_id), perfil.a_dict())
+        return perfil
+
+    def actualizar(self, perfil: PerfilInquilino) -> PerfilInquilino:
+        """Sustituye los datos del perfil por los de `perfil` (conservando alta, baja y fechas)."""
+        perfil.validado()
+        return self.modificar(perfil.inquilino_id, lambda actual: perfil)
+
+    def reparar(self, perfil: PerfilInquilino) -> PerfilInquilino:
+        """Escribe un perfil nuevo encima de uno ilegible. Si el actual se puede leer, no toca nada."""
+        perfil = replace(perfil.validado(), activo=True, fecha_alta=_ahora(), fecha_baja=None)
+        with bloqueo(self._directorio, "perfiles"):
+            try:
+                self.obtener(perfil.inquilino_id)
+            except PerfilIlegible:
+                pass
+            else:
+                raise ValueError(f"El perfil de '{perfil.inquilino_id}' se puede leer: no hay nada que reparar")
             self._comprobar_token_libre(perfil)
             escribir_json_atomico(self.ruta(perfil.inquilino_id), perfil.a_dict())
         return perfil

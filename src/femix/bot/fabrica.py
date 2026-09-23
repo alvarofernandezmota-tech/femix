@@ -19,6 +19,23 @@ def inquilino_desde_entorno(defecto: str = "default") -> str:
     """
     return validar_inquilino_id(os.environ.get(VARIABLE_INQUILINO) or defecto)
 
+def inquilino_explicito() -> "str | None":
+    """`FEMIX_INQUILINO_ID` validado, o None si no está definido (sin caer en "default").
+
+    Para la migración de datos antiguos: sin la variable no se sabe de qué inquilino eran.
+    """
+    valor = os.environ.get(VARIABLE_INQUILINO)
+    return validar_inquilino_id(valor) if valor else None
+
+def capacidades_del_perfil(directorio_datos: str, inquilino_id: str) -> tuple:
+    """Las capacidades del perfil del inquilino; las de siempre si no tiene perfil o no se lee."""
+    from ..inquilino.perfil import AlmacenPerfiles
+    try:
+        perfil = AlmacenPerfiles(directorio_datos).obtener(inquilino_id)
+        return tuple(perfil.validado().capacidades) if perfil is not None else POR_DEFECTO
+    except ValueError:
+        return POR_DEFECTO
+
 def construir_femix(
     directorio_datos: str = DIRECTORIO_DATOS,
     inquilino_id: "str | None" = None,

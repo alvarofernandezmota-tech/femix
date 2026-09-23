@@ -11,6 +11,7 @@ import os
 import re
 import secrets
 import unicodedata
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Cookie, Depends, File, Form, Header, HTTPException, Request, UploadFile, status
@@ -19,11 +20,12 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from femix.inquilino.capacidades import CATALOGO
-from femix.inquilino.perfil import DIAS, TIPOS, AlmacenPerfiles, Franja, PerfilInquilino, leer_ids_telegram
-from femix.rag.indice import IndiceEmbeddings
+from femix.inquilino.perfil import (
+    DIAS, TIPOS, AlmacenPerfiles, Franja, PerfilIlegible, PerfilInquilino, leer_ids_telegram,
+)
 from femix.rag.rutas import directorio_inquilino, validar_inquilino_id
 
-from ..documentos import ingerir_subida
+from ..documentos import ingerir_subida, listar_documentos
 from .auth import (
     AlmacenInquilinos,
     AlmacenSesiones,
@@ -182,34 +184,41 @@ def _contar_registros(inquilino_id: str, directorio: str, prefijo: str) -> int:
     total = 0
     for nombre in os.listdir(carpeta):
         if nombre.startswith(f"{prefijo}_") and nombre.endswith(".json"):
-            with open(os.path.join(carpeta, nombre), "r", encoding="utf-8") as f:
-                total += len(json.load(f))
+            try:
+                with open(os.path.join(carpeta, nombre), "r", encoding="utf-8") as f:
+                    total += len(json.load(f))
+            except (OSError, ValueError, TypeError):
+                continue  # un fichero roto no tumba las estadísticas de todos
     return total
 
 
-def _documentos(inquilino_id: str, directorio: str) -> list:
-    return IndiceEmbeddings(inquilino_id, directorio).listar_documentos()
 
 
 def _inquilinos(directorio: str) -> list:
     """Todos: los que tienen perfil y los que solo tienen acceso al panel (anteriores a los perfiles)."""
-    perfiles = {p.inquilino_id: p for p in AlmacenPerfiles(directorio).listar()}
-    accesos = {i.id: i for i in AlmacenInquilinos(directorio).listar()}
+    lista, ilegibles = AlmacenPerfiles(directorio).listar_con_errores()
+    perfiles = {p.inquilino_id: p for p in lista}
+    # Altas muy antiguas del panel pueden tener ids que hoy no son válidos: no son carpetas posibles.
+    accesos = {i.id: i for i in AlmacenInquilinos(directorio).listar() if _id_es_valido(i.id)}
     estado = _leer_estado_bots(directorio)
     entorno = _inquilino_del_entorno(estado)
     filas = []
-    for inquilino_id in sorted(set(perfiles) | set(accesos)):
+    for inquilino_id in sorted(set(perfiles) | set(accesos) | set(ilegibles)):
         perfil, acceso = perfiles.get(inquilino_id), accesos.get(inquilino_id)
+        if inquilino_id in ilegibles:
+            bot = {"clase": "error", "texto": "Perfil ilegible: ábrelo para rehacerlo"}
+        else:
+            bot = _estado_bot(inquilino_id, perfil, estado, entorno)
         filas.append({
             "id": inquilino_id,
-            "nombre": perfil.nombre if perfil else acceso.nombre,
+            "nombre": perfil.nombre if perfil else (acceso.nombre if acceso else inquilino_id),
             "tipo": perfil.tipo if perfil else None,
             "activo": perfil.activo if perfil else True,
-            "fecha_alta": perfil.fecha_alta if perfil else acceso.fecha_alta,
+            "fecha_alta": perfil.fecha_alta if perfil else (acceso.fecha_alta if acceso else ""),
             "tiene_perfil": perfil is not None,
             "acceso_panel": acceso is not None,
             "del_entorno": inquilino_id == entorno,
-            "bot": _estado_bot(inquilino_id, perfil, estado, entorno),
+            "bot": bot,
         })
     return filas
 
@@ -225,7 +234,7 @@ def _calcular_stats(directorio: str, filas: list) -> dict:
 
 # --- Formularios: horario y demás -----------------------------------------------------------
 
-_PATRON_FRANJA = re.compile(r"^(\S+)\s+(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$")
+_PATRON_FRANJA = re.compile(r"(\S+)\s+([0-9]{1,2}:[0-9]{2})\s*-\s*([0-9]{1,2}:[0-9]{2})")
 
 
 def _sin_tildes(texto: str) -> str:
@@ -239,7 +248,7 @@ def leer_horario(texto: str) -> list:
         linea = linea.strip()
         if not linea:
             continue
-        coincidencia = _PATRON_FRANJA.match(linea)
+        coincidencia = _PATRON_FRANJA.fullmatch(linea)
         if not coincidencia:
             raise ValueError(f"Horario, línea {numero}: {linea!r} no es 'día HH:MM-HH:MM'")
         dia, desde, hasta = coincidencia.groups()
@@ -251,25 +260,34 @@ def escribir_horario(franjas) -> str:
     return "\n".join(f"{f.dia} {f.desde}-{f.hasta}" for f in franjas)
 
 
-def _contexto_detalle(inquilino_id: str, sesion: dict, **extra) -> dict:
+def _leer_perfil(inquilino_id: str) -> "tuple[PerfilInquilino | None, str | None]":
+    """(perfil, None), (None, None) si no tiene, o (None, motivo) si lo tiene pero está ilegible."""
+    try:
+        return AlmacenPerfiles(directorio_datos_web()).obtener(inquilino_id), None
+    except PerfilIlegible as exc:
+        return None, str(exc)
+
+
+def _contexto_detalle(inquilino_id: str, sesion: dict, documentos=(), **extra) -> dict:
     directorio = directorio_datos_web()
-    perfil = AlmacenPerfiles(directorio).obtener(inquilino_id)
+    perfil, ilegible = _leer_perfil(inquilino_id)
     acceso = AlmacenInquilinos(directorio).obtener(inquilino_id)
-    if perfil is None and acceso is None:
+    if perfil is None and acceso is None and ilegible is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ese inquilino no existe")
     estado = _leer_estado_bots(directorio)
     entorno = _inquilino_del_entorno(estado)
     return {
         "inquilino_id": inquilino_id,
-        "nombre": perfil.nombre if perfil else acceso.nombre,
+        "nombre": perfil.nombre if perfil else (acceso.nombre if acceso else inquilino_id),
         "perfil": perfil,
+        "perfil_ilegible": ilegible,
         "horario_texto": escribir_horario(perfil.horario) if perfil else "",
         "permitidos_texto": ", ".join(str(i) for i in perfil.telegram_permitidos) if perfil else "",
         "acceso_panel": acceso is not None,
         "del_entorno": inquilino_id == entorno,
-        "bot": _estado_bot(inquilino_id, perfil, estado, entorno),
+        "bot": {"clase": "error", "texto": "Perfil ilegible"} if ilegible else _estado_bot(inquilino_id, perfil, estado, entorno),
         "proceso": _proceso_de_bots(estado),
-        "documentos": _documentos(inquilino_id, directorio),
+        "documentos": documentos,
         "catalogo": list(CATALOGO.values()),
         "tipos": TIPOS,
         "dias": DIAS,
@@ -278,13 +296,22 @@ def _contexto_detalle(inquilino_id: str, sesion: dict, **extra) -> dict:
     }
 
 
-def _detalle(request: Request, inquilino_id: str, sesion: dict, codigo: int = 200, **extra):
-    contexto = _contexto_detalle(inquilino_id, sesion, **extra)
+async def _detalle(request: Request, inquilino_id: str, sesion: dict, codigo: int = 200, **extra):
+    contexto = _contexto_detalle(inquilino_id, sesion, **extra)  # 404 antes de abrir el índice
+    contexto["documentos"] = await listar_documentos(inquilino_id, directorio_datos_web())
     return _templates.TemplateResponse(request, "admin/inquilino.html", contexto, status_code=codigo)
 
 
 def _volver(inquilino_id: str, aviso: str) -> RedirectResponse:
     return RedirectResponse(url=f"/admin/inquilinos/{inquilino_id}?hecho={aviso}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+def _id_es_valido(inquilino_id) -> bool:
+    try:
+        validar_inquilino_id(inquilino_id)
+        return True
+    except ValueError:
+        return False
 
 
 def _id_valido(inquilino_id: str) -> str:
@@ -343,9 +370,9 @@ async def crear_inquilino_formulario(
 @router.get("/inquilinos/{inquilino_id}")
 async def detalle_inquilino(request: Request, inquilino_id: str, sesion: dict = Depends(requerir_admin)):
     if "text/html" not in request.headers.get("accept", ""):
-        return _json_inquilino(_id_valido(inquilino_id))
+        return await _json_inquilino(_id_valido(inquilino_id))
     aviso = AVISOS.get(request.query_params.get("hecho", ""))
-    return _detalle(request, _id_valido(inquilino_id), sesion, aviso=aviso)
+    return await _detalle(request, _id_valido(inquilino_id), sesion, aviso=aviso)
 
 
 @router.post("/inquilinos/{inquilino_id}/perfil")
@@ -365,44 +392,57 @@ async def guardar_perfil(
     inquilino_id = _id_valido(inquilino_id)
     contexto = _contexto_detalle(inquilino_id, sesion)  # 404 si no existe
     almacen = AlmacenPerfiles(directorio_datos_web())
-    actual = contexto["perfil"]
+    del_entorno = contexto["del_entorno"]
+
+    def con_telegram(base: PerfilInquilino, actual: "PerfilInquilino | None") -> PerfilInquilino:
+        """Token y permitidos según el formulario, a partir del perfil leído *dentro* del bloqueo."""
+        token_actual = actual.telegram_token if actual else ""
+        if del_entorno:
+            # Los manda el .env: lo que venga del formulario no cuenta.
+            return replace(base, telegram_token=token_actual,
+                           telegram_permitidos=actual.telegram_permitidos if actual else [])
+        token = "" if quitar_token else (telegram_token.strip() or token_actual)
+        return replace(base, telegram_token=token, telegram_permitidos=leer_ids_telegram(permitidos))
+
     try:
-        datos = dict(
+        base = PerfilInquilino(
             inquilino_id=inquilino_id, nombre=nombre, tipo=tipo, descripcion=descripcion,
             horario=leer_horario(horario), capacidades=capacidades,
         )
-        if contexto["del_entorno"]:
-            # Token y permitidos los manda el .env: lo que venga del formulario no cuenta.
-            datos["telegram_token"] = actual.telegram_token if actual else ""
-            datos["telegram_permitidos"] = actual.telegram_permitidos if actual else []
+        if contexto["perfil_ilegible"]:
+            almacen.reparar(con_telegram(base, None))
+        elif contexto["perfil"] is None:
+            almacen.crear(con_telegram(base, None))
         else:
-            token = "" if quitar_token else (telegram_token.strip() or (actual.telegram_token if actual else ""))
-            datos["telegram_token"] = token
-            datos["telegram_permitidos"] = leer_ids_telegram(permitidos)
-        if actual is None:
-            almacen.crear(PerfilInquilino(**datos))
-        else:
-            almacen.actualizar(PerfilInquilino(**datos))
+            almacen.modificar(inquilino_id, lambda actual: con_telegram(base, actual))
     except ValueError as exc:
-        return _detalle(request, inquilino_id, sesion, codigo=status.HTTP_400_BAD_REQUEST, error=str(exc))
+        return await _detalle(request, inquilino_id, sesion, codigo=status.HTTP_400_BAD_REQUEST, error=str(exc))
     return _volver(inquilino_id, "perfil")
 
 
 @router.post("/inquilinos/{inquilino_id}/baja")
-async def dar_de_baja(inquilino_id: str):
+async def dar_de_baja(request: Request, inquilino_id: str, sesion: dict = Depends(requerir_admin)):
+    inquilino_id = _id_valido(inquilino_id)
     try:
-        AlmacenPerfiles(directorio_datos_web()).dar_de_baja(_id_valido(inquilino_id))
+        AlmacenPerfiles(directorio_datos_web()).dar_de_baja(inquilino_id)
     except KeyError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ese inquilino no tiene perfil")
+    except ValueError as exc:
+        return await _detalle(request, inquilino_id, sesion, codigo=status.HTTP_400_BAD_REQUEST, error=str(exc))
+    # Si no, al reactivarlo volverían a valer las sesiones que tenía abiertas.
+    AlmacenSesiones(directorio_datos_web()).eliminar_de(inquilino_id)
     return _volver(inquilino_id, "baja")
 
 
 @router.post("/inquilinos/{inquilino_id}/alta")
-async def reactivar(inquilino_id: str):
+async def reactivar(request: Request, inquilino_id: str, sesion: dict = Depends(requerir_admin)):
+    inquilino_id = _id_valido(inquilino_id)
     try:
-        AlmacenPerfiles(directorio_datos_web()).reactivar(_id_valido(inquilino_id))
+        AlmacenPerfiles(directorio_datos_web()).reactivar(inquilino_id)
     except KeyError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ese inquilino no tiene perfil")
+    except ValueError as exc:
+        return await _detalle(request, inquilino_id, sesion, codigo=status.HTTP_400_BAD_REQUEST, error=str(exc))
     return _volver(inquilino_id, "alta")
 
 
@@ -415,7 +455,7 @@ async def subir_documento(
     try:
         await ingerir_subida(inquilino_id, archivo, directorio_datos_web())
     except HTTPException as exc:
-        return _detalle(request, inquilino_id, sesion, codigo=exc.status_code, error=exc.detail)
+        return await _detalle(request, inquilino_id, sesion, codigo=exc.status_code, error=exc.detail)
     return _volver(inquilino_id, "documento")
 
 
@@ -428,7 +468,7 @@ async def cambiar_password(
     try:
         AlmacenInquilinos(directorio_datos_web()).establecer_password(inquilino_id, contexto["nombre"], password)
     except ValueError as exc:
-        return _detalle(request, inquilino_id, sesion, codigo=status.HTTP_400_BAD_REQUEST, error=str(exc))
+        return await _detalle(request, inquilino_id, sesion, codigo=status.HTTP_400_BAD_REQUEST, error=str(exc))
     return _volver(inquilino_id, "password")
 
 
@@ -447,7 +487,7 @@ def _crear_inquilino(inquilino_id: str, nombre: str, tipo: str, password: str) -
     directorio = directorio_datos_web()
     perfiles, accesos = AlmacenPerfiles(directorio), AlmacenInquilinos(directorio)
     perfil = PerfilInquilino(inquilino_id=inquilino_id, nombre=nombre, tipo=tipo).validado()
-    if perfiles.obtener(perfil.inquilino_id) is not None or accesos.obtener(perfil.inquilino_id) is not None:
+    if os.path.exists(perfiles.ruta(perfil.inquilino_id)) or accesos.obtener(perfil.inquilino_id) is not None:
         raise ValueError(f"El inquilino '{perfil.inquilino_id}' ya existe")
     perfil = perfiles.crear(perfil)
     if password:
@@ -455,13 +495,13 @@ def _crear_inquilino(inquilino_id: str, nombre: str, tipo: str, password: str) -
     return perfil
 
 
-def _json_inquilino(inquilino_id: str) -> dict:
+async def _json_inquilino(inquilino_id: str) -> dict:
     directorio = directorio_datos_web()
     fila = next((f for f in _inquilinos(directorio) if f["id"] == inquilino_id), None)
     if fila is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ese inquilino no existe")
-    perfil = AlmacenPerfiles(directorio).obtener(inquilino_id)
-    return {**fila, "perfil": perfil.a_publico() if perfil else None, "documentos": _documentos(inquilino_id, directorio)}
+    perfil, _ = _leer_perfil(inquilino_id)
+    return {**fila, "perfil": perfil.a_publico() if perfil else None, "documentos": await listar_documentos(inquilino_id, directorio)}
 
 
 @router.get("/inquilinos")

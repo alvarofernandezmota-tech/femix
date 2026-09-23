@@ -180,6 +180,15 @@ class AlmacenSesiones:
         sesion = self.obtener(session_id)
         return sesion["inquilino_id"] if sesion is not None else None
 
+    def eliminar_de(self, inquilino_id: str):
+        """Cierra todas las sesiones de un inquilino (al darlo de baja)."""
+        with _bloqueo(self._directorio, self._nombre):
+            self._sesiones = self._cargar()
+            quedan = {k: v for k, v in self._sesiones.items() if v.get("inquilino_id") != inquilino_id}
+            if len(quedan) != len(self._sesiones):
+                self._sesiones = quedan
+                self._guardar()
+
     def eliminar(self, session_id: "str | None"):
         if not session_id:
             return
@@ -212,17 +221,29 @@ def verificar_token_admin(token: "str | None") -> bool:
 
 
 def inquilino_de_baja(inquilino_id: str) -> bool:
-    perfil = AlmacenPerfiles(directorio_datos_web()).obtener(inquilino_id)
+    try:
+        perfil = AlmacenPerfiles(directorio_datos_web()).obtener(inquilino_id)
+    except ValueError:
+        # Perfil ilegible: no se sabe si está de baja, así que no entra (hasta que el dueño lo arregle).
+        return True
     return perfil is not None and not perfil.activo
 
 
+def huella_password(password_hash: str) -> str:
+    """Va en la sesión: si el dueño cambia la contraseña, las sesiones abiertas dejan de valer."""
+    return hashlib.sha256(password_hash.encode("utf-8")).hexdigest()[:16]
+
+
 def obtener_inquilino_actual(session_id: "str | None" = Cookie(default=None)) -> Inquilino:
-    inquilino_id = AlmacenSesiones().obtener_inquilino_id(session_id)
-    if inquilino_id is None:
+    sesion = AlmacenSesiones().obtener(session_id)
+    if sesion is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
+    inquilino_id = sesion["inquilino_id"]
     inquilino = AlmacenInquilinos().obtener(inquilino_id)
     if inquilino is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inquilino no encontrado")
+    if not secrets.compare_digest(sesion.get("huella", ""), huella_password(inquilino.password_hash)):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sesión caducada")
     if inquilino_de_baja(inquilino_id):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inquilino de baja")
     return inquilino
@@ -238,7 +259,7 @@ async def procesar_login(inquilino_id: str = Form(...), password: str = Form(...
     inquilino = AlmacenInquilinos().verificar_credenciales(inquilino_id, password)
     if inquilino is None or inquilino_de_baja(inquilino.id):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas")
-    session_id = AlmacenSesiones().crear(inquilino.id)
+    session_id = AlmacenSesiones().crear(inquilino.id, huella=huella_password(inquilino.password_hash))
     respuesta = RedirectResponse(url="/usuario/", status_code=status.HTTP_303_SEE_OTHER)
     respuesta.set_cookie(
         key="session_id",

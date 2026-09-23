@@ -19,8 +19,8 @@ from telegram.error import InvalidToken
 
 from femix.bot.fabrica import construir_femix, inquilino_desde_entorno
 from femix.infraestructura.ficheros import escribir_json_atomico
-from femix.inquilino.capacidades import POR_DEFECTO, VOZ, validar_capacidades
-from femix.inquilino.perfil import AlmacenPerfiles, PerfilInquilino
+from femix.inquilino.capacidades import CATALOGO, POR_DEFECTO, VOZ
+from femix.inquilino.perfil import AlmacenPerfiles, InquilinoYaExiste, PerfilInquilino
 
 from .acceso import VARIABLE_PERMITIDOS, leer_permitidos
 
@@ -64,20 +64,30 @@ def bot_del_entorno() -> "BotDelEntorno | None":
 def sincronizar_entorno(almacen: AlmacenPerfiles, entorno: BotDelEntorno) -> None:
     """Deja en el perfil del inquilino del `.env` su token y sus permitidos (y crea el perfil si
     no lo tiene), para que el panel enseñe lo que de verdad está funcionando."""
-    perfil = almacen.obtener(entorno.inquilino_id)
     permitidos = sorted(entorno.permitidos)
-    if perfil is None:
-        almacen.crear(PerfilInquilino(
-            inquilino_id=entorno.inquilino_id, nombre=entorno.inquilino_id,
-            telegram_token=entorno.token, telegram_permitidos=permitidos,
-        ))
-    elif perfil.telegram_token != entorno.token or perfil.telegram_permitidos != permitidos:
-        almacen.actualizar(replace(perfil, telegram_token=entorno.token, telegram_permitidos=permitidos))
+    if almacen.obtener(entorno.inquilino_id) is None:
+        try:
+            almacen.crear(PerfilInquilino(
+                inquilino_id=entorno.inquilino_id, nombre=entorno.inquilino_id,
+                telegram_token=entorno.token, telegram_permitidos=permitidos,
+            ))
+            return
+        except InquilinoYaExiste:
+            pass  # lo acaba de crear el panel: se actualiza abajo
+    # Dentro del bloqueo: lo que el panel guarde a la vez (capacidades, horario) no se pierde.
+    almacen.modificar(
+        entorno.inquilino_id,
+        lambda actual: replace(actual, telegram_token=entorno.token, telegram_permitidos=permitidos),
+    )
 
 
-def configuracion_deseada(perfiles, entorno: "BotDelEntorno | None") -> "tuple[dict, dict]":
-    """Qué bots tienen que estar en marcha, y por qué no está alguno que podría estarlo."""
-    deseado, problemas = {}, {}
+def configuracion_deseada(perfiles, entorno: "BotDelEntorno | None", ilegibles=None) -> "tuple[dict, dict]":
+    """Qué bots tienen que estar en marcha, y por qué no está alguno que podría estarlo.
+
+    `ilegibles`: `{inquilino_id: motivo}` de los que tienen `perfil.json` pero no se puede leer.
+    """
+    ilegibles = ilegibles or {}
+    deseado, problemas = {}, {i: f"perfil ilegible: {motivo}" for i, motivo in ilegibles.items()}
     validos = {}
     crudos = {p.inquilino_id: p for p in perfiles}
     for perfil in perfiles:
@@ -89,7 +99,10 @@ def configuracion_deseada(perfiles, entorno: "BotDelEntorno | None") -> "tuple[d
     if entorno is not None:
         perfil = validos.get(entorno.inquilino_id)
         crudo = crudos.get(entorno.inquilino_id)
-        if crudo is not None and crudo.activo is False:
+        if entorno.inquilino_id in ilegibles:
+            # Podría estar de baja o tener cosas apagadas: sin poder leerlo, no se arranca.
+            problemas[entorno.inquilino_id] += " (el bot del .env no arranca hasta que se arregle)"
+        elif crudo is not None and crudo.activo is not True:
             problemas[entorno.inquilino_id] = "está de baja (aunque tenga token en el .env)"
         else:
             if perfil is not None:
@@ -125,18 +138,19 @@ def configuracion_deseada(perfiles, entorno: "BotDelEntorno | None") -> "tuple[d
 
 
 def _capacidades_rescatables(perfil: "PerfilInquilino | None") -> tuple:
+    """De un perfil que no valida, las capacidades que sí son válidas; nunca más de las que pide."""
     if perfil is None:
         return POR_DEFECTO
-    try:
-        return tuple(validar_capacidades(perfil.capacidades))
-    except (ValueError, TypeError):
-        return POR_DEFECTO
+    pedidas = perfil.capacidades if isinstance(perfil.capacidades, (list, tuple)) else []
+    validas = {c for c in pedidas if isinstance(c, str) and c in CATALOGO and CATALOGO[c].disponible}
+    return tuple(n for n in CATALOGO if n in validas)
 
 
 @dataclass
 class _BotEnMarcha:
     config: ConfigBot
-    app: object
+    # El repr de una Application de python-telegram-bot incluye el token del bot.
+    app: object = field(repr=False)
     usuario: str
     desde: str
 
@@ -230,7 +244,8 @@ class FlotaDeBots:
         return {i: b.config for i, b in self._bots.items()}
 
     async def reconciliar(self) -> None:
-        deseado, problemas = configuracion_deseada(self._almacen.listar(), self._entorno)
+        perfiles, ilegibles = self._almacen.listar_con_errores()
+        deseado, problemas = configuracion_deseada(perfiles, self._entorno, ilegibles)
         self._avisar_problemas(problemas)
 
         por_parar = {}

@@ -268,6 +268,9 @@ def test_la_baja_para_el_bot_cierra_su_panel_y_no_borra_nada(entorno):
 
     cliente.post("/admin/inquilinos/acme/alta", data={"csrf": csrf})
     assert AlmacenPerfiles(str(entorno)).obtener("acme").activo is True
+    # La sesión de antes de la baja no resucita: hay que volver a entrar. Y sus datos siguen ahí.
+    assert inquilino.get("/usuario/tareas").status_code == 401
+    inquilino.post("/login", data={"inquilino_id": "acme", "password": "clave-de-acme"})
     assert inquilino.get("/usuario/tareas").json()["tareas"] == ["0. [ ] algo"]
 
 
@@ -345,3 +348,80 @@ def test_el_panel_avisa_si_el_proceso_de_bots_no_da_señales(entorno):
     assert "no ha dado señales" in cliente.get("/admin/", headers=HTML).text
     _escribir_estado(entorno, hace_segundos=600)
     assert "no da señales desde" in cliente.get("/admin/", headers=HTML).text
+
+
+def test_cambiar_la_contraseña_echa_las_sesiones_abiertas(entorno):
+    cliente, csrf = _entrar(entorno)
+    _crear(cliente, csrf, password="vieja")
+    inquilino = TestClient(app, base_url="https://testserver")
+    inquilino.post("/login", data={"inquilino_id": "acme", "password": "vieja"})
+    assert inquilino.get("/usuario/tareas").status_code == 200
+    cliente.post("/admin/inquilinos/acme/password", data={"csrf": csrf, "password": "nueva"})
+    assert inquilino.get("/usuario/tareas").status_code == 401
+
+
+def test_un_perfil_ilegible_se_ve_y_se_puede_rehacer_desde_el_panel(entorno):
+    cliente, csrf = _entrar(entorno)
+    _crear(cliente, csrf, password="clave-de-acme")
+    (entorno / "acme" / "perfil.json").write_text("{roto")
+
+    assert "Perfil ilegible" in cliente.get("/admin/", headers=HTML).text
+    assert cliente.get("/admin/inquilinos").status_code == 200
+    ficha = cliente.get("/admin/inquilinos/acme", headers=HTML)
+    assert ficha.status_code == 200 and "no se puede leer" in ficha.text
+    # Su panel no se abre mientras (no se sabe si está de baja), pero sin 500.
+    inquilino = TestClient(app, base_url="https://testserver")
+    assert inquilino.post("/login", data={"inquilino_id": "acme", "password": "clave-de-acme"}).status_code == 401
+
+    assert _guardar_perfil(cliente, csrf, nombre="ACME rehecho").status_code == 303
+    assert AlmacenPerfiles(str(entorno)).obtener("acme").nombre == "ACME rehecho"
+
+
+def test_un_id_antiguo_no_valido_no_tumba_el_panel(entorno):
+    (entorno / "inquilinos.json").write_text(json.dumps(
+        [{"id": "Ana García", "nombre": "Ana", "password_hash": "x", "fecha_alta": ""}]
+    ))
+    cliente, _ = _entrar(entorno)
+    assert cliente.get("/admin/", headers=HTML).status_code == 200
+    assert cliente.get("/admin/stats").status_code == 200
+
+
+def test_el_nombre_no_rompe_la_confirmacion_de_la_baja(entorno):
+    # Con el nombre metido a pelo en confirm('...'), un apóstrofo real ("D'Ana") rompía el JS y la
+    # baja se enviaba sin preguntar; y un nombre hecho a propósito ejecutaba código.
+    cliente, csrf = _entrar(entorno)
+    _crear(cliente, csrf, nombre="Peluquería D'Ana")
+    ficha = cliente.get("/admin/inquilinos/acme", headers=HTML).text
+    atributo = re.search(r"onsubmit='([^']*)'", ficha).group(1)
+    assert atributo.startswith('return confirm("')
+    assert "D\\u0027Ana" in atributo
+
+
+# --- Tope de tamaño antes de autenticar -------------------------------------------------------
+
+def test_una_peticion_enorme_se_corta_antes_de_leerla(entorno):
+    anonimo = TestClient(app, base_url="https://testserver")
+    grande = b"a" * (6 * 1024 * 1024 + 1)
+    respuesta = anonimo.post("/admin/inquilinos/acme/documentos",
+                             files={"archivo": ("x.txt", grande, "text/plain")})
+    assert respuesta.status_code == 413
+
+
+def test_una_peticion_enorme_por_trozos_tambien_se_corta(entorno):
+    anonimo = TestClient(app, base_url="https://testserver")
+
+    def trozos():
+        for _ in range(7):
+            yield b"a" * (1024 * 1024)
+
+    respuesta = anonimo.post("/admin/login", content=trozos(),
+                             headers={"Content-Type": "application/x-www-form-urlencoded"})
+    assert respuesta.status_code == 413
+
+
+def test_el_panel_migra_los_datos_antiguos_al_arrancar(entorno, monkeypatch):
+    monkeypatch.setenv("FEMIX_INQUILINO_ID", "varo")
+    (entorno / "tareas_7.json").write_text("[]")
+    with TestClient(app, base_url="https://testserver"):
+        pass
+    assert (entorno / "varo" / "tareas_7.json").exists()

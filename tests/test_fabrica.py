@@ -147,3 +147,16 @@ def test_sin_capacidad_de_documentos_no_busca_en_el_indice(tmp_path):
     femix, motor = _femix(tmp_path, inquilino_id="acme", capacidades=("memoria_largo_plazo",))
     femix.procesar("usuario1", PREGUNTA)
     assert "nueve a catorce" not in motor.llamadas[0][0]
+
+
+def test_el_cli_usa_las_capacidades_del_perfil(tmp_path, monkeypatch):
+    from femix.bot import main as cli
+    from femix.inquilino.perfil import AlmacenPerfiles, PerfilInquilino
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FEMIX_INQUILINO_ID", "acme")
+    AlmacenPerfiles("datos").crear(PerfilInquilino(inquilino_id="acme", nombre="A", capacidades=["voz"]))
+    construidos = []
+    monkeypatch.setattr(cli, "construir_femix", lambda **kw: construidos.append(kw) or None)
+    monkeypatch.setattr("builtins.input", lambda _: (_ for _ in ()).throw(EOFError()))
+    cli.main()
+    assert construidos[0]["capacidades"] == ("voz",)

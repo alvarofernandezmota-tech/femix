@@ -60,7 +60,11 @@ def test_perfil_minimo_valido_con_valores_por_defecto():
     ({"horario": [Franja("lunes", "9:00", "10:00")]}, "Hora"),
     ({"horario": [Franja("lunes", "09:00", "24:00")]}, "Hora"),
     ({"horario": [Franja("lunes", "09:00", "14:00"), Franja("lunes", "13:00", "18:00")]}, "solapan"),
-    ({"horario": [{"dia": "lunes"}]}, "mal formada"),
+    ({"horario": [{"dia": "lunes"}]}, "Hora None"),
+    ({"horario": ["lunes 09:00-14:00"]}, "mal formada"),
+    ({"activo": "false"}, "activo"),
+    ({"horario": [Franja("lunes", "0٩:00", "14:00")]}, "Hora"),
+    ({"horario": [Franja("lunes", "09:00", "14:00\n")]}, "Hora"),
 ])
 def test_perfil_invalido(cambios, mensaje):
     datos = {"inquilino_id": "varo", "nombre": "Varo", **cambios}
@@ -186,3 +190,52 @@ def test_listar_salta_un_perfil_roto_sin_tumbar_el_resto(tmp_path):
 
 def test_listar_sin_directorio(tmp_path):
     assert AlmacenPerfiles(str(tmp_path / "no-existe")).listar() == []
+
+
+def test_ids_de_telegram_solo_con_digitos_ascii():
+    from femix.inquilino.perfil import leer_ids_telegram
+    assert leer_ids_telegram("7, 8") == [7, 8]
+    with pytest.raises(ValueError):
+        leer_ids_telegram("٣")  # int("٣") == 3
+
+
+def test_una_franja_con_campos_de_mas_se_lee_igual():
+    datos = {**_perfil().validado().a_dict(), "horario": [{"dia": "lunes", "desde": "09:00", "hasta": "14:00", "nota": "x"}]}
+    assert PerfilInquilino.de_dict(datos).validado().horario == [Franja("lunes", "09:00", "14:00")]
+
+
+@pytest.mark.parametrize("contenido", ["null", "[]", "{roto", '{"inquilino_id": "varo"}'])
+def test_obtener_un_perfil_ilegible_lo_dice_y_listar_lo_aparta(tmp_path, contenido):
+    from femix.inquilino.perfil import PerfilIlegible
+    almacen = AlmacenPerfiles(str(tmp_path))
+    almacen.crear(_perfil("acme", nombre="A"))
+    (tmp_path / "varo").mkdir()
+    (tmp_path / "varo" / "perfil.json").write_text(contenido)
+    with pytest.raises(PerfilIlegible):
+        almacen.obtener("varo")
+    perfiles, errores = almacen.listar_con_errores()
+    assert [p.inquilino_id for p in perfiles] == ["acme"] and list(errores) == ["varo"]
+
+
+def test_reparar_solo_sobre_un_perfil_ilegible(tmp_path):
+    almacen = AlmacenPerfiles(str(tmp_path))
+    almacen.crear(_perfil())
+    with pytest.raises(ValueError, match="nada que reparar"):
+        almacen.reparar(_perfil(nombre="Otro"))
+    (tmp_path / "varo" / "perfil.json").write_text("{roto")
+    assert almacen.reparar(_perfil(nombre="Rehecho")).nombre == "Rehecho"
+    assert almacen.obtener("varo").nombre == "Rehecho"
+
+
+def test_modificar_lee_dentro_del_bloqueo(tmp_path):
+    almacen = AlmacenPerfiles(str(tmp_path))
+    almacen.crear(_perfil(descripcion="original"))
+    vistos = []
+
+    def cambio(actual):
+        vistos.append(actual.descripcion)
+        return PerfilInquilino(**{**actual.a_dict(), "horario": actual.horario, "nombre": "Cambiado"})
+
+    almacen.modificar("varo", cambio)
+    perfil = almacen.obtener("varo")
+    assert vistos == ["original"] and perfil.nombre == "Cambiado" and perfil.descripcion == "original"
