@@ -1,3 +1,8 @@
+# Tareas del Chatbot - Femix
+
+> El plan original de esta fecha (bloques "Integración del nuevo modelo", "Mejorar RAG con
+> contexto por inquilino" y "Pruebas y validación") quedó superado por el trabajo ya hecho y
+> listado abajo. Ver `docs/CHANGELOG.md` para el detalle de cada bloque.
 
 ---
 
@@ -18,11 +23,19 @@
 - [x] Adaptador `IndiceEmbeddingsBuscador` al puerto `puertos/busqueda.Buscador`
 - [x] `buscador` enchufado a `Femix.procesar()` vía `Subagente` → `AgenteBusqueda`
 - [x] 47 tests nuevos (186 total)
-- [ ] Merge a `integracion/femix-completa`
+- [x] Merge a `integracion/femix-completa`
 
 - [x] RAG **encendido** en el bot: `bot/main.py` y `conectores/telegram/bot.py` usan
       `construir_femix()` (`bot/fabrica.py`), con `FEMIX_INQUILINO_ID`
 - [x] 12 tests más (198 total) + verificación manual contra Ollama real
+- [x] `FEMIX_INQUILINO_ID` añadido a `.env.example` al unificar `release/docker-chatbot-base`
+      con el resto (2026-09-23).
 
-**Pendiente de despliegue:** añadir `FEMIX_INQUILINO_ID` a `.env.example` (vive en
-`release/docker-chatbot-base`). Sin ella el bot arranca como inquilino `default`.
+## ✅ Bloque 3: Docker - COMPLETADO (2026-09-23)
+
+- [x] `release/docker-chatbot-base` unificada con `feat/panel-web` (Dockerfile, compose, `.env.example`)
+- [x] `numpy==2.5.3` (inexistente) corregido
+- [x] Ollama en el host alcanzable desde el contenedor también en Linux nativo
+      (`extra_hosts: host.docker.internal:host-gateway`)
+- [x] `datos/` como volumen persistente (índice RAG y datos de dominio sobreviven a reinicios)
+- [ ] Probar `docker compose up --build` de verdad en `madre`
