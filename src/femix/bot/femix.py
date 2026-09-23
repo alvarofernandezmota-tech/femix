@@ -8,6 +8,8 @@ from ..mente.entender import clasificar_intencion
 from ..mente.memoria import Memoria
 from .comandos import ejecutar_comando
 
+RESPUESTA_VACIA = "No he conseguido generar una respuesta. ¿Puedes decirlo de otra forma?"
+
 class Femix:
     """El bot: un único punto de entrada (`procesar`) para comandos, charla y agentes.
 
@@ -55,6 +57,10 @@ class Femix:
             return ejecutar_comando(usuario_id, texto, directorio_datos=self._directorio_datos)
         contexto = self._memoria.contexto(self._inquilino_id, usuario_id)
         respuesta = self._responder(usuario_id, texto, contexto, intencion)
+        # Un modelo local puede devolver la cadena vacía. Telegram rechaza un mensaje vacío
+        # ("Message text is empty") y el usuario se quedaría sin nada; mejor decírselo.
+        if not respuesta or not respuesta.strip():
+            respuesta = RESPUESTA_VACIA
         self._memoria.registrar(self._inquilino_id, usuario_id, texto, respuesta)
         return respuesta
 

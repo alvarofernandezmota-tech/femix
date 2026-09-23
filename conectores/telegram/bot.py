@@ -3,7 +3,7 @@ import os
 import sys
 from dotenv import load_dotenv
 from telegram import Update
-from telegram.error import NetworkError
+from telegram.error import BadRequest, NetworkError
 from telegram.ext import Application, MessageHandler, CommandHandler, filters, ContextTypes
 
 ESPERA_TELEGRAM = 30.0
@@ -26,7 +26,9 @@ async def comando_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Hola, soy FEMIX. Escribeme o mandame una nota de voz.")
 
 async def registrar_error(update: object, context: ContextTypes.DEFAULT_TYPE):
-    if isinstance(context.error, NetworkError):
+    # BadRequest hereda de NetworkError en python-telegram-bot, pero no es un problema de red:
+    # es Telegram rechazando la petición (p. ej. un mensaje vacío), y conviene verlo entero.
+    if isinstance(context.error, NetworkError) and not isinstance(context.error, BadRequest):
         logging.warning("Telegram no respondió a tiempo: %s", context.error)
         return
     logging.error("Error atendiendo un mensaje", exc_info=context.error)

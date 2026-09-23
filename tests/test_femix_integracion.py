@@ -50,3 +50,15 @@ def test_usuario_correcto_llega_al_comando(tmp_path):
     listado_usuario2 = femix.procesar("usuario2", "/tarea listar")
     assert "tarea de usuario1" in listado_usuario1
     assert listado_usuario2 == "No tienes tareas."
+
+class MotorVacio(MotorFalso):
+    def generar(self, contexto: str, entrada: str) -> str:
+        self.llamadas.append((contexto, entrada))
+        return ""
+
+def test_respuesta_vacia_del_motor_no_llega_vacia_al_usuario(tmp_path):
+    # Telegram rechaza un mensaje vacío ("Message text is empty"): el usuario se quedaría sin nada.
+    femix, motor, memoria = _femix(tmp_path, motor=MotorVacio())
+    respuesta = femix.procesar("usuario1", "hola")
+    assert respuesta.strip()
+    assert len(motor.llamadas) == 1
