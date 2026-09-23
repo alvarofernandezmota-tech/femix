@@ -14,6 +14,7 @@ from telegram import Bot, Update
 from telegram.ext import CommandHandler, MessageHandler
 
 from conectores.telegram import bot
+from conectores.telegram.acceso import AVISO_DENEGADO
 
 
 class FemixFalso:
@@ -81,3 +82,76 @@ def test_manejar_mensaje_responde_con_lo_que_devuelve_femix():
 def test_importar_el_modulo_no_construye_femix():
     # Antes `femix = construir_femix()` corría al importar: cargaba modelos y creaba datos/.
     assert not hasattr(bot, "femix")
+
+
+# --- Control de acceso ---------------------------------------------------------------------
+
+def _update_de(usuario_id, texto=None, voz=False, chat_tipo="private"):
+    mensaje = {
+        "message_id": 1, "date": 0,
+        "chat": {"id": usuario_id, "type": chat_tipo},
+        "from": {"id": usuario_id, "is_bot": False, "first_name": "X", "username": "alguien"},
+    }
+    if voz:
+        mensaje["voice"] = {"file_id": "v", "file_unique_id": "v", "duration": 1}
+    else:
+        mensaje["text"] = texto
+        if texto.startswith("/"):
+            mensaje["entities"] = [{"type": "bot_command", "offset": 0, "length": len(texto.split()[0])}]
+    return Update.de_json({"update_id": 1, "message": mensaje}, Bot("123:falso"))
+
+
+def _procesar(updates, permitidos, fallo_al_responder=None):
+    """Pasa los updates por la aplicación real (handlers, grupos y error handler incluidos)."""
+    app = bot.construir_aplicacion("123:falso", FemixFalso(), permitidos)
+    responder = mock.AsyncMock(side_effect=fallo_al_responder)
+    voz = mock.AsyncMock()
+
+    async def correr():
+        with mock.patch.object(type(app.bot), "initialize", mock.AsyncMock()), \
+             mock.patch.object(type(app.bot), "shutdown", mock.AsyncMock()), \
+             mock.patch("telegram.Message.reply_text", responder), \
+             mock.patch.object(bot, "manejar_nota_de_voz", voz):
+            await app.initialize()
+            for update in updates:
+                await app.process_update(update)
+            await app.shutdown()
+
+    asyncio.run(correr())
+    return app.bot_data["femix"], responder, voz
+
+
+def test_un_usuario_permitido_llega_a_femix():
+    femix, responder, _ = _procesar([_update_de(7, "hola")], permitidos={7})
+    assert femix.llamadas == [("7", "hola")]
+    responder.assert_awaited_once_with("eco: hola")
+
+
+def test_sin_permitidos_no_se_atiende_a_nadie():
+    femix, _, _ = _procesar([_update_de(7, "hola")], permitidos=frozenset())
+    assert femix.llamadas == []
+
+
+def test_un_desconocido_no_llega_ni_a_texto_ni_comandos_ni_voz(caplog):
+    updates = [_update_de(8, "hola"), _update_de(8, "/tarea listar"), _update_de(8, "/start"), _update_de(8, voz=True)]
+    with caplog.at_level("WARNING", logger="conectores.telegram.acceso"):
+        femix, responder, voz = _procesar(updates, permitidos={7})
+    assert femix.llamadas == []
+    voz.assert_not_awaited()
+    # Se le dice su ID (para que el dueño lo pueda autorizar) y nada más: ni el saludo de /start.
+    assert [c.args for c in responder.await_args_list] == [(AVISO_DENEGADO.format(id=8),)] * 4
+    assert sum("usuario=8" in r.getMessage() for r in caplog.records) == 4
+
+
+def test_en_un_grupo_se_deniega_sin_contestar():
+    femix, responder, _ = _procesar([_update_de(8, "hola", chat_tipo="group")], permitidos={7})
+    assert femix.llamadas == []
+    responder.assert_not_awaited()
+
+
+def test_si_falla_el_aviso_al_denegado_el_mensaje_sigue_sin_llegar_a_femix():
+    # Con cualquier excepción que no sea ApplicationHandlerStop, python-telegram-bot llama al
+    # error handler y sigue con los grupos siguientes: el mensaje llegaría a Femix.
+    from telegram.error import NetworkError
+    femix, _, _ = _procesar([_update_de(8, "hola")], permitidos={7}, fallo_al_responder=NetworkError("caído"))
+    assert femix.llamadas == []

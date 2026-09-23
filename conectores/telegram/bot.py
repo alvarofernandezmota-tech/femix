@@ -4,13 +4,14 @@ import sys
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.error import BadRequest, NetworkError
-from telegram.ext import Application, MessageHandler, CommandHandler, filters, ContextTypes
+from telegram.ext import Application, MessageHandler, CommandHandler, TypeHandler, filters, ContextTypes
 
 ESPERA_TELEGRAM = 30.0
 
 load_dotenv()
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 from femix.bot.fabrica import construir_femix
+from .acceso import VARIABLE_PERMITIDOS, comprobar_acceso, leer_permitidos
 from .voz import manejar_nota_de_voz
 
 async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -32,7 +33,7 @@ async def registrar_error(update: object, context: ContextTypes.DEFAULT_TYPE):
         return
     logging.error("Error atendiendo un mensaje", exc_info=context.error)
 
-def construir_aplicacion(token: str, femix) -> Application:
+def construir_aplicacion(token: str, femix, permitidos=frozenset()) -> Application:
     # Los 5 s por defecto de python-telegram-bot no bastan en una línea lenta: el bot recibía el
     # mensaje y la respuesta se perdía con ConnectTimeout al enviarla.
     app = (
@@ -45,7 +46,10 @@ def construir_aplicacion(token: str, femix) -> Application:
         .build()
     )
     app.bot_data["femix"] = femix
+    app.bot_data["permitidos"] = frozenset(permitidos)
     app.add_error_handler(registrar_error)
+    # Grupo -1: antes que cualquier otro handler. Sin permiso no se llega ni a /start.
+    app.add_handler(TypeHandler(Update, comprobar_acceso), group=-1)
     app.add_handler(CommandHandler("start", comando_start))
     app.add_handler(MessageHandler(filters.VOICE, manejar_voz))
     # filters.TEXT incluye los comandos (/tarea, /hoy...), que resuelve Femix.procesar. Con
@@ -64,7 +68,13 @@ def configurar_logs():
 
 def main():
     configurar_logs()
-    app = construir_aplicacion(os.environ["TELEGRAM_BOT_TOKEN"], construir_femix())
+    permitidos = leer_permitidos(os.environ.get(VARIABLE_PERMITIDOS))
+    if not permitidos:
+        logging.warning(
+            "%s está vacío: el bot no atenderá a nadie. Escríbele y mira aquí qué ID se deniega.",
+            VARIABLE_PERMITIDOS,
+        )
+    app = construir_aplicacion(os.environ["TELEGRAM_BOT_TOKEN"], construir_femix(), permitidos)
     print("FEMIX conectado a Telegram (texto + voz). Ctrl+C para detener.")
     app.run_polling()
 

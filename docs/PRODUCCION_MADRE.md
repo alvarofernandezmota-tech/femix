@@ -15,6 +15,7 @@ Solo estas las lee el código (en Docker van en `.env`; ver `.env.example`):
 
 ```bash
 TELEGRAM_BOT_TOKEN="..."                 # conectores/telegram/bot.py
+FEMIX_TELEGRAM_PERMITIDOS="123456"       # IDs de Telegram que pueden usar el bot (vacío = nadie)
 FEMIX_INQUILINO_ID="tu_inquilino"        # índice RAG que usa el bot
 HUGIN_LLM_PROVEEDOR="ollama"             # ollama | openai
 HUGIN_LLM_MODELO="mistral"               # modelo base

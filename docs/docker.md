@@ -7,13 +7,31 @@ Docker. El panel web va en la misma imagen, opcional, porque está en pruebas.
 
 ```bash
 cp .env.example .env
-# Edita .env: TELEGRAM_BOT_TOKEN, FEMIX_INQUILINO_ID y HUGIN_LLM_MODELO (uno que tengas en
-# `ollama list`).
+# Edita .env: TELEGRAM_BOT_TOKEN, FEMIX_TELEGRAM_PERMITIDOS, FEMIX_INQUILINO_ID y
+# HUGIN_LLM_MODELO (uno que tengas en `ollama list`).
 docker compose up -d --build
 docker compose logs -f femix-bot
 ```
 
 Debe aparecer `FEMIX conectado a Telegram (texto + voz). Ctrl+C para detener.`
+
+## Quién puede usar el bot
+
+El bot está **cerrado por defecto**: solo atiende a los IDs de Telegram de
+`FEMIX_TELEGRAM_PERMITIDOS` (números separados por comas). Cualquiera que dé con el nombre del bot
+le puede escribir, y detrás están el RAG, las tareas y el diario del inquilino.
+
+Para autorizarte la primera vez:
+
+1. Escríbele al bot. Te contesta *"Este bot es privado. Tu ID de Telegram es 123456…"*, y en
+   `docker compose logs femix-bot` sale `Acceso denegado a usuario=123456 (@tu_usuario)`.
+2. Pon ese número en `.env`: `FEMIX_TELEGRAM_PERMITIDOS=123456` (varios: `123456,789012`).
+3. `docker compose up -d` (recrea el contenedor con el `.env` nuevo; `restart` no lo relee).
+
+El filtro corre antes que cualquier otro handler: un desconocido no llega ni a `/start`, ni a los
+comandos, ni a Whisper con una nota de voz. En grupos no contesta nada, solo lo registra. Un ID mal
+escrito (p. ej. `@varo`) impide arrancar, para no dejar fuera en silencio a alguien que creías
+autorizado.
 
 ## Cómo llega el contenedor a Ollama
 
@@ -128,7 +146,9 @@ docker run --rm -v femix_femix-datos:/datos -v "$PWD":/copia alpine tar czf /cop
 | El bot responde "No puedo conectar con Ollama" | Sin `network_mode: host` y Ollama en `127.0.0.1` (ver arriba), u Ollama parado (`systemctl status ollama`) |
 | "Algo falló generando la respuesta: 404" | `HUGIN_LLM_MODELO` no está en `ollama list`, o `OLLAMA_URL` apunta a `/v1` |
 | "El modelo está tardando demasiado" | CPU sin GPU; ver la nota de rendimiento en `docs/ROADMAP.md` (`OLLAMA_KEEP_ALIVE`) |
+| El bot contesta "Este bot es privado" | Tu ID no está en `FEMIX_TELEGRAM_PERMITIDOS` (ver arriba) |
 | El contenedor no arranca: `KeyError: 'TELEGRAM_BOT_TOKEN'` | Falta en `.env` |
+| El contenedor no arranca: `FEMIX_TELEGRAM_PERMITIDOS: ... no es un ID` | Hay algo que no es un número (un `@usuario`, por ejemplo) |
 | El contenedor no arranca: `inquilino_id inválido` | `FEMIX_INQUILINO_ID` con caracteres no permitidos |
 | La primera nota de voz tarda mucho | Descarga del modelo de Whisper; las siguientes usan la caché |
 

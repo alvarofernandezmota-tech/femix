@@ -33,7 +33,7 @@ HUGIN es un bot conversacional autónomo que combina un modelo de lenguaje (LLM)
 Pensado para `madre`: el bot de Telegram en Docker y Ollama en el host (fuera de Docker).
 
 ```bash
-cp .env.example .env        # rellena TELEGRAM_BOT_TOKEN y revisa HUGIN_LLM_MODELO
+cp .env.example .env        # rellena TELEGRAM_BOT_TOKEN y FEMIX_TELEGRAM_PERMITIDOS, revisa HUGIN_LLM_MODELO
 docker compose up -d --build
 docker compose logs -f femix-bot
 ```
