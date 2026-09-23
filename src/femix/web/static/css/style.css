@@ -64,3 +64,81 @@ body {
     padding: 0.5rem;
     border-bottom: 1px solid #ddd;
 }
+
+.barra {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.formulario {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.formulario label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.formulario input,
+.formulario select,
+.formulario textarea {
+    padding: 0.4rem;
+    font: inherit;
+}
+
+.formulario fieldset {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.formulario .casilla {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.formulario button {
+    align-self: flex-start;
+    padding: 0.4rem 1rem;
+    cursor: pointer;
+}
+
+.secundario {
+    color: #666;
+    font-size: 0.9em;
+}
+
+.aviso {
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+}
+
+.aviso-ok {
+    background: #e6f4ea;
+}
+
+.aviso-error {
+    background: #fdecea;
+}
+
+.estado {
+    padding: 0.1rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.estado-ok { background: #e6f4ea; }
+.estado-error { background: #fdecea; }
+.estado-pendiente { background: #fff4e5; }
+.estado-parado { background: #eee; }
+
+.de-baja td {
+    opacity: 0.6;
+}

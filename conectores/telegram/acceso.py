@@ -9,6 +9,8 @@ import logging
 from telegram import Update
 from telegram.ext import ApplicationHandlerStop, ContextTypes
 
+from femix.inquilino.perfil import leer_ids_telegram
+
 VARIABLE_PERMITIDOS = "FEMIX_TELEGRAM_PERMITIDOS"
 AVISO_DENEGADO = "Este bot es privado. Tu ID de Telegram es {id}: pásaselo a quien lo gestiona si necesitas acceso."
 
@@ -20,15 +22,10 @@ def leer_permitidos(texto: "str | None") -> frozenset:
 
     Mejor no arrancar que arrancar ignorando en silencio un ID que el dueño cree haber autorizado.
     """
-    permitidos = set()
-    for trozo in (texto or "").replace(",", " ").split():
-        try:
-            permitidos.add(int(trozo))
-        except ValueError:
-            raise ValueError(
-                f"{VARIABLE_PERMITIDOS}: {trozo!r} no es un ID de Telegram (tiene que ser un número)"
-            ) from None
-    return frozenset(permitidos)
+    try:
+        return frozenset(leer_ids_telegram(texto))
+    except ValueError as exc:
+        raise ValueError(f"{VARIABLE_PERMITIDOS}: {exc}") from None
 
 
 async def comprobar_acceso(update: object, context: ContextTypes.DEFAULT_TYPE):

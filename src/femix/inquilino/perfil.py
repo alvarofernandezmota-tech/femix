@@ -135,6 +135,17 @@ def _validar_horario(horario) -> list:
     return franjas
 
 
+def leer_ids_telegram(texto: "str | None") -> list:
+    """`"123, 456 789"` → `[123, 456, 789]`. Algo que no sea un número es un error, no se ignora:
+    ignorarlo dejaría fuera en silencio a alguien que se cree autorizado."""
+    ids = []
+    for trozo in (texto or "").replace(",", " ").split():
+        if not trozo.isdigit():
+            raise ValueError(f"{trozo!r} no es un ID de Telegram (tiene que ser un número)")
+        ids.append(int(trozo))
+    return ids
+
+
 def _validar_permitidos(permitidos) -> list:
     validos = set()
     for usuario in permitidos:

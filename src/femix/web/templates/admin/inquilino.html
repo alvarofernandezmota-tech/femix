@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ nombre }} — Femix{% endblock %}
+
+{% block content %}
+<p><a href="/admin/">← Todos los inquilinos</a></p>
+<h2>{{ nombre }} <small class="secundario">{{ inquilino_id }}</small></h2>
+
+{% if aviso %}<p class="aviso aviso-ok">{{ aviso }}</p>{% endif %}
+{% if error %}<p class="aviso aviso-error">{{ error }}</p>{% endif %}
+{% if not proceso.vivo %}<p class="aviso aviso-error">{{ proceso.texto }}</p>{% endif %}
+
+<section class="tarjeta">
+    <h3>Bot</h3>
+    <p><span class="estado estado-{{ bot.clase }}">{{ bot.texto }}</span></p>
+    {% if perfil %}
+        {% if perfil.activo %}
+        <form method="post" action="/admin/inquilinos/{{ inquilino_id }}/baja"
+              onsubmit="return confirm('¿Dar de baja a {{ nombre }}? Se para su bot y pierde el acceso a su panel. No se borra nada.');">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit">Dar de baja</button>
+        </form>
+        {% else %}
+        <p class="secundario">De baja desde {{ perfil.fecha_baja }}. Sus datos siguen intactos.</p>
+        <form method="post" action="/admin/inquilinos/{{ inquilino_id }}/alta">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit">Reactivar</button>
+        </form>
+        {% endif %}
+    {% endif %}
+</section>
+
+<section class="tarjeta">
+    <h3>Perfil</h3>
+    {% if not perfil %}<p class="aviso aviso-error">Este inquilino aún no tiene perfil (es anterior a los perfiles). Guárdalo para crearlo.</p>{% endif %}
+    <form method="post" action="/admin/inquilinos/{{ inquilino_id }}/perfil" class="formulario">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Nombre <input name="nombre" required maxlength="100" value="{{ perfil.nombre if perfil else nombre }}"></label>
+        <label>Tipo
+            <select name="tipo">
+                {% for tipo in tipos %}
+                <option value="{{ tipo }}" {% if perfil and perfil.tipo == tipo %}selected{% endif %}>{{ tipo }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Descripción <small>(qué hace; todavía no llega al bot: eso es la Fase 3)</small>
+            <textarea name="descripcion" rows="3" maxlength="2000">{{ perfil.descripcion if perfil else "" }}</textarea>
+        </label>
+        <label>Horario <small>(una franja por línea: <code>lunes 09:00-14:00</code>)</small>
+            <textarea name="horario" rows="4" placeholder="lunes 09:00-14:00&#10;lunes 16:00-20:00">{{ horario_texto }}</textarea>
+        </label>
+
+        <fieldset>
+            <legend>Capacidades</legend>
+            {% for capacidad in catalogo %}
+            <label class="casilla {{ '' if capacidad.disponible else 'secundario' }}">
+                <input type="checkbox" name="capacidades" value="{{ capacidad.nombre }}"
+                       {% if not capacidad.disponible %}disabled{% endif %}
+                       {% if capacidad.disponible and (not perfil or capacidad.nombre in perfil.capacidades) %}checked{% endif %}>
+                <strong>{{ capacidad.nombre }}</strong> — {{ capacidad.descripcion }}{% if not capacidad.disponible %} (pendiente){% endif %}
+            </label>
+            {% endfor %}
+        </fieldset>
+
+        <fieldset>
+            <legend>Telegram</legend>
+            {% if del_entorno %}
+            <p class="secundario">
+                El token y los permitidos de este bot vienen del <code>.env</code>
+                (<code>TELEGRAM_BOT_TOKEN</code>, <code>FEMIX_TELEGRAM_PERMITIDOS</code>) y mandan sobre el perfil.
+                Para gestionarlos desde aquí, quítalos del <code>.env</code> y reinicia <code>femix-bot</code>.
+            </p>
+            <p>Token: {{ "configurado" if perfil and perfil.telegram_token else "sin token" }} ·
+               Permitidos: {{ permitidos_texto or "nadie" }}</p>
+            {% else %}
+            <label>Token de @BotFather
+                <input type="password" name="telegram_token" autocomplete="off"
+                       placeholder="{{ 'configurado — déjalo vacío para no cambiarlo' if perfil and perfil.telegram_token else '123456789:ABC…' }}">
+            </label>
+            {% if perfil and perfil.telegram_token %}
+            <label class="casilla"><input type="checkbox" name="quitar_token" value="1"> Quitar el token (apaga el bot)</label>
+            {% endif %}
+            <label>IDs de Telegram permitidos <small>(separados por comas; vacío = nadie)</small>
+                <input name="permitidos" value="{{ permitidos_texto }}" placeholder="123456789, 987654321">
+            </label>
+            {% endif %}
+        </fieldset>
+
+        <button type="submit">Guardar perfil</button>
+    </form>
+</section>
+
+<section class="tarjeta">
+    <h3>Documentos (RAG)</h3>
+    <ul>
+        {% for documento in documentos %}
+        <li>{{ documento.fuente }} <span class="secundario">({{ documento.fragmentos }} fragmentos)</span></li>
+        {% else %}
+        <li>Sin documentos.</li>
+        {% endfor %}
+    </ul>
+    <form method="post" action="/admin/inquilinos/{{ inquilino_id }}/documentos" enctype="multipart/form-data" class="formulario">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="file" name="archivo" accept=".txt,.md,text/plain,text/markdown" required>
+        <button type="submit">Añadir documento</button>
+    </form>
+</section>
+
+<section class="tarjeta">
+    <h3>Acceso a su panel</h3>
+    <p class="secundario">{{ "Tiene contraseña para entrar en /login." if acceso_panel else "No tiene acceso a su panel." }}</p>
+    <form method="post" action="/admin/inquilinos/{{ inquilino_id }}/password" class="formulario">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>{{ "Nueva contraseña" if acceso_panel else "Contraseña" }}
+            <input type="password" name="password" autocomplete="new-password" required>
+        </label>
+        <button type="submit">Guardar contraseña</button>
+    </form>
+</section>
+{% endblock %}

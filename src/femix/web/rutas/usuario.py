@@ -1,5 +1,4 @@
 import os
-import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
@@ -9,10 +8,10 @@ from pydantic import BaseModel, field_validator
 from femix.dominio.personal.diario import Diario
 from femix.dominio.personal.recordatorios import Recordatorios
 from femix.dominio.personal.tareas import Tareas
-from femix.rag.documentos import Documento
 from femix.rag.indice import IndiceEmbeddings
 from femix.rag.rutas import directorio_inquilino
 
+from ..documentos import ingerir_subida
 from .auth import Inquilino, directorio_datos_web, obtener_inquilino_actual
 
 router = APIRouter(prefix="/usuario", tags=["usuario"])
@@ -120,14 +119,4 @@ async def listar_documentos_rag(inquilino: Inquilino = Depends(obtener_inquilino
 async def subir_documento_rag(
     archivo: UploadFile = File(...), inquilino: Inquilino = Depends(obtener_inquilino_actual)
 ):
-    texto = (await archivo.read()).decode("utf-8", errors="ignore")
-    if not texto.strip():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El documento está vacío")
-    documento = Documento(
-        id=str(uuid.uuid4()),
-        inquilino_id=inquilino.id,
-        fuente=archivo.filename or "documento.txt",
-        texto=texto,
-    )
-    fragmentos = IndiceEmbeddings(inquilino.id, directorio_datos_web()).ingerir(documento)
-    return {"documento_id": documento.id, "fuente": documento.fuente, "fragmentos": fragmentos}
+    return await ingerir_subida(inquilino.id, archivo, directorio_datos_web())

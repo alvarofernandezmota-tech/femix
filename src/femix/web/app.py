@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from .rutas.admin import router as admin_router
+from .rutas.admin import router_acceso as admin_acceso_router
 from .rutas.auth import router as auth_router
 from .rutas.usuario import router as usuario_router
 
@@ -17,6 +18,8 @@ if os.path.isdir(_DIRECTORIO_STATIC):
 
 app.include_router(auth_router)
 app.include_router(usuario_router)
+# Antes que el panel: /admin/login no puede exigir sesión de administrador.
+app.include_router(admin_acceso_router)
 app.include_router(admin_router)
 
 

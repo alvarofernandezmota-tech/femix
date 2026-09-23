@@ -5,12 +5,13 @@ import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Cookie, Form, Header, HTTPException, Request, status
+from fastapi import APIRouter, Cookie, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from femix.infraestructura.ficheros import bloqueo as _bloqueo
 from femix.infraestructura.ficheros import escribir_json_atomico
+from femix.inquilino.perfil import AlmacenPerfiles
 from femix.rag.rutas import validar_inquilino_id
 
 DURACION_SESION_HORAS = 24
@@ -97,6 +98,24 @@ class AlmacenInquilinos:
     def listar(self) -> list[Inquilino]:
         return list(self._inquilinos.values())
 
+    def establecer_password(self, inquilino_id: str, nombre: str, password: str) -> Inquilino:
+        """Da acceso al panel a un inquilino, o le cambia la contraseña si ya lo tenía."""
+        inquilino_id = validar_inquilino_id(inquilino_id)
+        if not password:
+            raise ValueError("password no puede estar vacío")
+        with _bloqueo(self._directorio, "inquilinos"):
+            self._inquilinos = self._cargar()
+            actual = self._inquilinos.get(inquilino_id)
+            inquilino = Inquilino(
+                id=inquilino_id,
+                nombre=nombre or inquilino_id,
+                password_hash=_hash_password(password),
+                fecha_alta=actual.fecha_alta if actual else datetime.utcnow().isoformat(),
+            )
+            self._inquilinos[inquilino_id] = inquilino
+            self._guardar()
+        return inquilino
+
     def verificar_credenciales(self, inquilino_id: str, password: str) -> "Inquilino | None":
         inquilino = self.obtener(inquilino_id)
         referencia = inquilino.password_hash if inquilino is not None else _HASH_DUMMY
@@ -107,9 +126,16 @@ class AlmacenInquilinos:
 
 
 class AlmacenSesiones:
-    def __init__(self, directorio_datos: "str | None" = None):
+    def __init__(
+        self,
+        directorio_datos: "str | None" = None,
+        nombre: str = "sesiones",
+        duracion_horas: int = DURACION_SESION_HORAS,
+    ):
         self._directorio = directorio_datos or directorio_datos_web()
-        self._ruta = os.path.join(self._directorio, "sesiones.json")
+        self._nombre = nombre
+        self._duracion = timedelta(hours=duracion_horas)
+        self._ruta = os.path.join(self._directorio, f"{nombre}.json")
         os.makedirs(self._directorio, exist_ok=True)
         self._sesiones: dict = self._cargar()
 
@@ -122,44 +148,72 @@ class AlmacenSesiones:
     def _guardar(self):
         escribir_json_atomico(self._ruta, self._sesiones)
 
-    def crear(self, inquilino_id: str) -> str:
+    def crear(self, inquilino_id: str, **extra) -> str:
         session_id = secrets.token_urlsafe(32)
-        expira = (datetime.utcnow() + timedelta(hours=DURACION_SESION_HORAS)).isoformat()
-        with _bloqueo(self._directorio, "sesiones"):
+        ahora = datetime.utcnow()
+        expira = (ahora + self._duracion).isoformat()
+        with _bloqueo(self._directorio, self._nombre):
             self._sesiones = self._cargar()
-            self._sesiones[session_id] = {"inquilino_id": inquilino_id, "expira": expira}
+            # De paso se barren las caducadas: si no, el fichero solo crece.
+            self._sesiones = {
+                k: v for k, v in self._sesiones.items() if datetime.fromisoformat(v["expira"]) >= ahora
+            }
+            self._sesiones[session_id] = {**extra, "inquilino_id": inquilino_id, "expira": expira}
             self._guardar()
         return session_id
 
-    def obtener_inquilino_id(self, session_id: "str | None") -> "str | None":
+    def obtener(self, session_id: "str | None") -> "dict | None":
         if not session_id:
             return None
         sesion = self._sesiones.get(session_id)
         if sesion is None:
             return None
         if datetime.fromisoformat(sesion["expira"]) < datetime.utcnow():
-            with _bloqueo(self._directorio, "sesiones"):
+            with _bloqueo(self._directorio, self._nombre):
                 self._sesiones = self._cargar()
                 self._sesiones.pop(session_id, None)
                 self._guardar()
             return None
-        return sesion["inquilino_id"]
+        return sesion
+
+    def obtener_inquilino_id(self, session_id: "str | None") -> "str | None":
+        sesion = self.obtener(session_id)
+        return sesion["inquilino_id"] if sesion is not None else None
 
     def eliminar(self, session_id: "str | None"):
         if not session_id:
             return
-        with _bloqueo(self._directorio, "sesiones"):
+        with _bloqueo(self._directorio, self._nombre):
             self._sesiones = self._cargar()
             if session_id in self._sesiones:
                 del self._sesiones[session_id]
                 self._guardar()
 
 
+# El valor de ejemplo de `.env.example`: si alguien copia el fichero sin cambiarlo, el panel del
+# dueño no puede quedar abierto con una clave que está publicada en el repositorio.
+TOKEN_ADMIN_DE_EJEMPLO = "cambia-esto-por-un-token-largo-y-aleatorio"
+LONGITUD_MINIMA_TOKEN_ADMIN = 24
+
+
+def token_admin_configurado() -> "str | None":
+    """`FEMIX_WEB_ADMIN_TOKEN`, o None si falta, es el de ejemplo o es demasiado corto."""
+    token = os.environ.get("FEMIX_WEB_ADMIN_TOKEN") or ""
+    if token == TOKEN_ADMIN_DE_EJEMPLO or len(token) < LONGITUD_MINIMA_TOKEN_ADMIN:
+        return None
+    return token
+
+
 def verificar_token_admin(token: "str | None") -> bool:
-    token_esperado = os.environ.get("FEMIX_WEB_ADMIN_TOKEN")
+    token_esperado = token_admin_configurado()
     if not token_esperado or not token:
         return False
-    return secrets.compare_digest(token, token_esperado)
+    return secrets.compare_digest(token.encode("utf-8"), token_esperado.encode("utf-8"))
+
+
+def inquilino_de_baja(inquilino_id: str) -> bool:
+    perfil = AlmacenPerfiles(directorio_datos_web()).obtener(inquilino_id)
+    return perfil is not None and not perfil.activo
 
 
 def obtener_inquilino_actual(session_id: "str | None" = Cookie(default=None)) -> Inquilino:
@@ -169,12 +223,9 @@ def obtener_inquilino_actual(session_id: "str | None" = Cookie(default=None)) ->
     inquilino = AlmacenInquilinos().obtener(inquilino_id)
     if inquilino is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inquilino no encontrado")
+    if inquilino_de_baja(inquilino_id):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inquilino de baja")
     return inquilino
-
-
-def requerir_admin(x_admin_token: "str | None" = Header(default=None)) -> None:
-    if not verificar_token_admin(x_admin_token):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token de administrador inválido")
 
 
 @router.get("/login")
@@ -185,7 +236,7 @@ async def formulario_login(request: Request):
 @router.post("/login")
 async def procesar_login(inquilino_id: str = Form(...), password: str = Form(...)):
     inquilino = AlmacenInquilinos().verificar_credenciales(inquilino_id, password)
-    if inquilino is None:
+    if inquilino is None or inquilino_de_baja(inquilino.id):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas")
     session_id = AlmacenSesiones().crear(inquilino.id)
     respuesta = RedirectResponse(url="/usuario/", status_code=status.HTTP_303_SEE_OTHER)

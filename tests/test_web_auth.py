@@ -110,10 +110,19 @@ def test_sesion_expirada_devuelve_none(tmp_path):
 
 
 def test_verificar_token_admin(monkeypatch):
-    monkeypatch.setenv("FEMIX_WEB_ADMIN_TOKEN", "token-correcto")
-    assert verificar_token_admin("token-correcto") is True
+    monkeypatch.setenv("FEMIX_WEB_ADMIN_TOKEN", "token-correcto-largo-de-verdad-0123")
+    assert verificar_token_admin("token-correcto-largo-de-verdad-0123") is True
     assert verificar_token_admin("token-incorrecto") is False
     assert verificar_token_admin(None) is False
+
+
+def test_el_token_admin_de_ejemplo_o_corto_no_abre_nada(monkeypatch):
+    # El de .env.example está publicado en el repositorio: si alguien lo copia sin cambiarlo, el
+    # panel del dueño tiene que quedar cerrado, no abierto con una clave conocida.
+    monkeypatch.setenv("FEMIX_WEB_ADMIN_TOKEN", "cambia-esto-por-un-token-largo-y-aleatorio")
+    assert verificar_token_admin("cambia-esto-por-un-token-largo-y-aleatorio") is False
+    monkeypatch.setenv("FEMIX_WEB_ADMIN_TOKEN", "corto")
+    assert verificar_token_admin("corto") is False
 
 
 def test_almacen_inquilinos_guardar_limpia_temporal_si_falla(tmp_path, monkeypatch):

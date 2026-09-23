@@ -1,41 +1,70 @@
 {% extends "base.html" %}
 
-{% block titulo %}Panel de administración — Femix{% endblock %}
+{% block titulo %}Panel del dueño — Femix{% endblock %}
 
 {% block content %}
-<h2>Administración</h2>
+<div class="barra">
+    <h2>Inquilinos y sus bots</h2>
+    <form method="post" action="/admin/logout">
+        <button type="submit">Salir</button>
+    </form>
+</div>
+
+<p class="aviso {{ 'aviso-ok' if proceso.vivo else 'aviso-error' }}">{{ proceso.texto }}</p>
+{% if error %}<p class="aviso aviso-error">{{ error }}</p>{% endif %}
 
 <section class="tarjeta">
-    <h3>Estadísticas globales</h3>
-    <ul>
-        <li>Inquilinos: {{ stats.total_inquilinos }}</li>
-        <li>Tareas: {{ stats.total_tareas }}</li>
-        <li>Entradas de diario: {{ stats.total_entradas_diario }}</li>
-        <li>Recordatorios: {{ stats.total_recordatorios }}</li>
-    </ul>
-</section>
-
-<section class="tarjeta">
-    <h3>Inquilinos</h3>
     <table class="tabla-inquilinos">
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Nombre</th>
-                <th>Alta</th>
+                <th>Inquilino</th>
+                <th>Tipo</th>
+                <th>Bot</th>
             </tr>
         </thead>
         <tbody>
             {% for inquilino in inquilinos %}
-            <tr>
-                <td>{{ inquilino.id }}</td>
-                <td>{{ inquilino.nombre }}</td>
-                <td>{{ inquilino.fecha_alta }}</td>
+            <tr class="{{ '' if inquilino.activo else 'de-baja' }}">
+                <td>
+                    <a href="/admin/inquilinos/{{ inquilino.id }}">{{ inquilino.nombre }}</a>
+                    <div class="secundario">{{ inquilino.id }}{% if inquilino.del_entorno %} · bot del .env{% endif %}{% if not inquilino.tiene_perfil %} · sin perfil{% endif %}</div>
+                </td>
+                <td>{{ inquilino.tipo or "—" }}</td>
+                <td><span class="estado estado-{{ inquilino.bot.clase }}">{{ inquilino.bot.texto }}</span></td>
             </tr>
             {% else %}
             <tr><td colspan="3">Sin inquilinos todavía.</td></tr>
             {% endfor %}
         </tbody>
     </table>
+</section>
+
+<section class="tarjeta">
+    <h3>Nuevo inquilino</h3>
+    <form method="post" action="/admin/inquilinos/nuevo" class="formulario">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Identificador <input name="inquilino_id" required pattern="[A-Za-z0-9._\-]+" placeholder="peluqueria-ana"></label>
+        <label>Nombre <input name="nombre" required maxlength="100" placeholder="Peluquería Ana"></label>
+        <label>Tipo
+            <select name="tipo">
+                {% for tipo in tipos %}<option value="{{ tipo }}">{{ tipo }}</option>{% endfor %}
+            </select>
+        </label>
+        <label>Contraseña de su panel <small>(opcional; sin ella no puede entrar al suyo)</small>
+            <input type="password" name="password" autocomplete="new-password">
+        </label>
+        <button type="submit">Crear</button>
+    </form>
+    <p class="secundario">El token del bot, los permitidos, el horario y las capacidades se ponen en su ficha, después.</p>
+</section>
+
+<section class="tarjeta">
+    <h3>Totales</h3>
+    <ul>
+        <li>Inquilinos: {{ stats.total_inquilinos }}</li>
+        <li>Tareas: {{ stats.total_tareas }}</li>
+        <li>Entradas de diario: {{ stats.total_entradas_diario }}</li>
+        <li>Recordatorios: {{ stats.total_recordatorios }}</li>
+    </ul>
 </section>
 {% endblock %}

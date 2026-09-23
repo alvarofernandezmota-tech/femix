@@ -5,8 +5,10 @@ from fastapi.testclient import TestClient
 
 from femix.web.app import app
 
+TOKEN_ADMIN = "token-admin-de-pruebas-0123456789"
 
-def _cliente(tmp_path, monkeypatch, token="token-admin"):
+
+def _cliente(tmp_path, monkeypatch, token=TOKEN_ADMIN):
     monkeypatch.setenv("FEMIX_WEB_DATOS_DIR", str(tmp_path))
     monkeypatch.setenv("FEMIX_WEB_ADMIN_TOKEN", token)
     return TestClient(app, base_url="https://testserver")
@@ -27,7 +29,7 @@ def test_admin_con_token_invalido_rechazado(tmp_path, monkeypatch):
 
 def test_crear_y_listar_inquilino(tmp_path, monkeypatch):
     client = _cliente(tmp_path, monkeypatch)
-    cabeceras = {"X-Admin-Token": "token-admin"}
+    cabeceras = {"X-Admin-Token": TOKEN_ADMIN}
 
     respuesta = client.post(
         "/admin/inquilinos",
@@ -41,14 +43,15 @@ def test_crear_y_listar_inquilino(tmp_path, monkeypatch):
     assert "password_hash" not in cuerpo
 
     respuesta = client.get("/admin/inquilinos", headers=cabeceras)
-    assert respuesta.json() == {
-        "inquilinos": [{"id": "acme", "nombre": "ACME S.L.", "fecha_alta": cuerpo["fecha_alta"]}]
-    }
+    [fila] = respuesta.json()["inquilinos"]
+    assert (fila["id"], fila["nombre"], fila["fecha_alta"]) == ("acme", "ACME S.L.", cuerpo["fecha_alta"])
+    assert fila["tiene_perfil"] and fila["acceso_panel"] and fila["activo"]
+    assert fila["bot"]["texto"] == "Sin bot: falta el token"
 
 
 def test_crear_inquilino_duplicado_falla(tmp_path, monkeypatch):
     client = _cliente(tmp_path, monkeypatch)
-    cabeceras = {"X-Admin-Token": "token-admin"}
+    cabeceras = {"X-Admin-Token": TOKEN_ADMIN}
     datos = {"id": "acme", "nombre": "ACME S.L.", "password": "clave-secreta"}
 
     client.post("/admin/inquilinos", json=datos, headers=cabeceras)
@@ -62,7 +65,7 @@ def test_crear_inquilino_con_id_vacio_falla(tmp_path, monkeypatch):
     respuesta = client.post(
         "/admin/inquilinos",
         json={"id": "", "nombre": "ACME S.L.", "password": "clave-secreta"},
-        headers={"X-Admin-Token": "token-admin"},
+        headers={"X-Admin-Token": TOKEN_ADMIN},
     )
     assert respuesta.status_code == 400
 
@@ -72,7 +75,7 @@ def test_crear_inquilino_con_password_vacio_falla(tmp_path, monkeypatch):
     respuesta = client.post(
         "/admin/inquilinos",
         json={"id": "acme", "nombre": "ACME S.L.", "password": ""},
-        headers={"X-Admin-Token": "token-admin"},
+        headers={"X-Admin-Token": TOKEN_ADMIN},
     )
     assert respuesta.status_code == 400
 
@@ -83,14 +86,14 @@ def test_crear_inquilino_con_id_invalido_falla(tmp_path, monkeypatch):
         respuesta = client.post(
             "/admin/inquilinos",
             json={"id": id_malicioso, "nombre": "X", "password": "clave-secreta"},
-            headers={"X-Admin-Token": "token-admin"},
+            headers={"X-Admin-Token": TOKEN_ADMIN},
         )
         assert respuesta.status_code == 400, id_malicioso
 
 
 def test_stats_vacio(tmp_path, monkeypatch):
     client = _cliente(tmp_path, monkeypatch)
-    respuesta = client.get("/admin/stats", headers={"X-Admin-Token": "token-admin"})
+    respuesta = client.get("/admin/stats", headers={"X-Admin-Token": TOKEN_ADMIN})
     assert respuesta.json() == {
         "total_inquilinos": 0,
         "total_tareas": 0,
@@ -101,7 +104,7 @@ def test_stats_vacio(tmp_path, monkeypatch):
 
 def test_stats_agrega_datos_de_todos_los_inquilinos(tmp_path, monkeypatch):
     client = _cliente(tmp_path, monkeypatch)
-    cabeceras = {"X-Admin-Token": "token-admin"}
+    cabeceras = {"X-Admin-Token": TOKEN_ADMIN}
     client.post(
         "/admin/inquilinos",
         json={"id": "acme", "nombre": "ACME S.L.", "password": "clave-acme"},
@@ -134,7 +137,7 @@ def test_stats_agrega_datos_de_todos_los_inquilinos(tmp_path, monkeypatch):
 
 def test_admin_dashboard_html(tmp_path, monkeypatch):
     client = _cliente(tmp_path, monkeypatch)
-    cabeceras = {"X-Admin-Token": "token-admin"}
+    cabeceras = {"X-Admin-Token": TOKEN_ADMIN}
     client.post(
         "/admin/inquilinos",
         json={"id": "acme", "nombre": "ACME S.L.", "password": "clave-secreta"},
