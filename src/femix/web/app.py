@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from femix.bot.fabrica import inquilino_explicito
+from femix.infraestructura.almacen_postgres import VARIABLE_URL, crear_esquema
 from femix.inquilino.migracion import migrar_datos_heredados
 from fastapi.staticfiles import StaticFiles
 
@@ -26,6 +27,9 @@ async def ciclo_de_vida(_app):
         migrar_datos_heredados(directorio_datos_web(), inquilino_explicito())
     except Exception:
         logging.getLogger(__name__).exception("No se pudieron migrar los datos antiguos")
+    url = (os.environ.get(VARIABLE_URL) or "").strip()
+    if url:
+        crear_esquema(url)
     yield
 
 

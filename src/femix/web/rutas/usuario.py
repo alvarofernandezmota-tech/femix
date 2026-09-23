@@ -10,6 +10,8 @@ from femix.dominio.personal.recordatorios import Recordatorios
 from femix.dominio.personal.tareas import Tareas
 from femix.rag.rutas import directorio_inquilino
 
+from femix.bot.fabrica import almacen_dominio
+
 from ..documentos import ingerir_subida, listar_documentos
 from .auth import Inquilino, directorio_datos_web, obtener_inquilino_actual
 
@@ -22,6 +24,11 @@ _templates = Jinja2Templates(directory=_DIRECTORIO_TEMPLATES)
 def _carpeta(inquilino: Inquilino) -> str:
     """`datos/{inquilino_id}/`: donde guardan tareas, diario y recordatorios el bot y el panel."""
     return directorio_inquilino(directorio_datos_web(), inquilino.id)
+
+
+def _almacen(inquilino: Inquilino):
+    """El mismo almacén que usa su bot (JSON o Postgres)."""
+    return almacen_dominio(directorio_datos_web(), inquilino.id)
 
 
 class CrearTareaPeticion(BaseModel):
@@ -49,8 +56,8 @@ class CrearRecordatorioPeticion(BaseModel):
 @router.get("/")
 async def dashboard(request: Request, inquilino: Inquilino = Depends(obtener_inquilino_actual)):
     directorio = _carpeta(inquilino)
-    tareas = Tareas(inquilino.id, directorio).listar()
-    recordatorios = Recordatorios(inquilino.id, directorio).listar_pendientes()
+    tareas = Tareas(inquilino.id, directorio, almacen=_almacen(inquilino)).listar()
+    recordatorios = Recordatorios(inquilino.id, directorio, almacen=_almacen(inquilino)).listar_pendientes()
     return _templates.TemplateResponse(
         request,
         "usuario/dashboard.html",
@@ -60,18 +67,18 @@ async def dashboard(request: Request, inquilino: Inquilino = Depends(obtener_inq
 
 @router.get("/tareas")
 async def listar_tareas(inquilino: Inquilino = Depends(obtener_inquilino_actual)):
-    return {"tareas": Tareas(inquilino.id, _carpeta(inquilino)).listar()}
+    return {"tareas": Tareas(inquilino.id, _carpeta(inquilino), almacen=_almacen(inquilino)).listar()}
 
 
 @router.post("/tareas")
 async def crear_tarea(peticion: CrearTareaPeticion, inquilino: Inquilino = Depends(obtener_inquilino_actual)):
-    mensaje = Tareas(inquilino.id, _carpeta(inquilino)).crear(peticion.descripcion)
+    mensaje = Tareas(inquilino.id, _carpeta(inquilino), almacen=_almacen(inquilino)).crear(peticion.descripcion)
     return {"mensaje": mensaje}
 
 
 @router.post("/tareas/{indice}/completar")
 async def completar_tarea(indice: int, inquilino: Inquilino = Depends(obtener_inquilino_actual)):
-    mensaje = Tareas(inquilino.id, _carpeta(inquilino)).completar(indice)
+    mensaje = Tareas(inquilino.id, _carpeta(inquilino), almacen=_almacen(inquilino)).completar(indice)
     # Tareas.completar() no lanza: para índices fuera de rango devuelve este mensaje como texto,
     # pensado para responderlo tal cual por chat (bot/comandos.py). Aquí sí hay que traducirlo a 404.
     if mensaje.startswith("No existe la tarea número"):
@@ -81,7 +88,7 @@ async def completar_tarea(indice: int, inquilino: Inquilino = Depends(obtener_in
 
 @router.get("/diario")
 async def listar_diario(inquilino: Inquilino = Depends(obtener_inquilino_actual)):
-    return {"entradas": Diario(inquilino.id, _carpeta(inquilino)).listar()}
+    return {"entradas": Diario(inquilino.id, _carpeta(inquilino), almacen=_almacen(inquilino)).listar()}
 
 
 @router.post("/diario")
@@ -89,7 +96,7 @@ async def registrar_diario(
     peticion: CrearEntradaDiarioPeticion, inquilino: Inquilino = Depends(obtener_inquilino_actual)
 ):
     try:
-        mensaje = Diario(inquilino.id, _carpeta(inquilino)).registrar(peticion.texto)
+        mensaje = Diario(inquilino.id, _carpeta(inquilino), almacen=_almacen(inquilino)).registrar(peticion.texto)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return {"mensaje": mensaje}
@@ -97,14 +104,14 @@ async def registrar_diario(
 
 @router.get("/recordatorios")
 async def listar_recordatorios(inquilino: Inquilino = Depends(obtener_inquilino_actual)):
-    return {"recordatorios": Recordatorios(inquilino.id, _carpeta(inquilino)).listar_pendientes()}
+    return {"recordatorios": Recordatorios(inquilino.id, _carpeta(inquilino), almacen=_almacen(inquilino)).listar_pendientes()}
 
 
 @router.post("/recordatorios")
 async def crear_recordatorio(
     peticion: CrearRecordatorioPeticion, inquilino: Inquilino = Depends(obtener_inquilino_actual)
 ):
-    mensaje = Recordatorios(inquilino.id, _carpeta(inquilino)).crear(peticion.texto, peticion.cuando)
+    mensaje = Recordatorios(inquilino.id, _carpeta(inquilino), almacen=_almacen(inquilino)).crear(peticion.texto, peticion.cuando)
     return {"mensaje": mensaje}
 
 

@@ -17,7 +17,7 @@ AYUDA = (
     "/recordatorio listar"
 )
 
-def ejecutar_comando(usuario_id: str, texto: str, directorio_datos: str = "datos") -> str:
+def ejecutar_comando(usuario_id: str, texto: str, directorio_datos: str = "datos", almacen=None) -> str:
     partes = texto.strip().split(maxsplit=1)
     comando = partes[0].lower()
     resto = partes[1] if len(partes) > 1 else ""
@@ -25,20 +25,20 @@ def ejecutar_comando(usuario_id: str, texto: str, directorio_datos: str = "datos
     if comando == "/hoy":
         return resumen_del_dia(usuario_id)
     if comando == "/tarea":
-        return _comando_tarea(usuario_id, resto, directorio_datos)
+        return _comando_tarea(usuario_id, resto, directorio_datos, almacen)
     if comando == "/diario":
-        return _comando_diario(usuario_id, resto, directorio_datos)
+        return _comando_diario(usuario_id, resto, directorio_datos, almacen)
     if comando == "/recordatorio":
-        return _comando_recordatorio(usuario_id, resto, directorio_datos)
+        return _comando_recordatorio(usuario_id, resto, directorio_datos, almacen)
     return AYUDA
 
-def _comando_tarea(usuario_id: str, resto: str, directorio_datos: str) -> str:
+def _comando_tarea(usuario_id: str, resto: str, directorio_datos: str, almacen=None) -> str:
     sub_partes = resto.split(maxsplit=1)
     if not sub_partes:
         return AYUDA
     accion = sub_partes[0].lower()
     argumento = sub_partes[1] if len(sub_partes) > 1 else ""
-    tareas = Tareas(usuario_id, directorio_datos=directorio_datos)
+    tareas = Tareas(usuario_id, directorio_datos=directorio_datos, almacen=almacen)
 
     if accion == "crear":
         if not argumento:
@@ -59,18 +59,18 @@ def _comando_tarea(usuario_id: str, resto: str, directorio_datos: str) -> str:
         return tareas.consultar(indice)
     return AYUDA
 
-def _comando_diario(usuario_id: str, resto: str, directorio_datos: str) -> str:
+def _comando_diario(usuario_id: str, resto: str, directorio_datos: str, almacen=None) -> str:
     if not resto:
         return AYUDA
-    return Diario(usuario_id, directorio_datos=directorio_datos).registrar(resto)
+    return Diario(usuario_id, directorio_datos=directorio_datos, almacen=almacen).registrar(resto)
 
-def _comando_recordatorio(usuario_id: str, resto: str, directorio_datos: str) -> str:
+def _comando_recordatorio(usuario_id: str, resto: str, directorio_datos: str, almacen=None) -> str:
     sub_partes = resto.split(maxsplit=1)
     if not sub_partes:
         return AYUDA
     accion = sub_partes[0].lower()
     argumento = sub_partes[1] if len(sub_partes) > 1 else ""
-    recordatorios = Recordatorios(usuario_id, directorio_datos=directorio_datos)
+    recordatorios = Recordatorios(usuario_id, directorio_datos=directorio_datos, almacen=almacen)
 
     if accion == "crear":
         if "|" not in argumento:

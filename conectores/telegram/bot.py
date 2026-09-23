@@ -14,6 +14,7 @@ ESPERA_TELEGRAM = 30.0
 load_dotenv()
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 from femix.bot.fabrica import DIRECTORIO_DATOS, inquilino_explicito
+from femix.infraestructura.almacen_postgres import VARIABLE_URL, crear_esquema
 from femix.inquilino.migracion import migrar_datos_heredados
 from femix.inquilino.perfil import AlmacenPerfiles
 from .acceso import comprobar_acceso
@@ -121,6 +122,11 @@ def main():
     except Exception:
         # No mover los ficheros antiguos no puede dejar sin bots a todos los inquilinos.
         logging.exception("No se pudieron migrar los datos antiguos; se sigue sin migrar")
+    url = (os.environ.get(VARIABLE_URL) or "").strip()
+    if url:
+        # Fase 4: sin la tabla no arranca ningún bot que guarde algo; mejor fallar aquí y claro.
+        crear_esquema(url)
+        logging.info("Tareas, diario y recordatorios en Postgres (%s).", VARIABLE_URL)
     entorno = bot_del_entorno()
     if entorno is None:
         logging.info("Sin TELEGRAM_BOT_TOKEN en el entorno: solo los bots de los perfiles de inquilino.")

@@ -378,3 +378,17 @@ nada del perfil entra en el prompt (eso es la Fase 3).
   el prompt exacto que recibe el modelo.
 - Límite conocido: el prompt no lleva fecha, hora ni zona horaria.
 - 431 tests en verde con las dependencias de la imagen (378 + 3 saltados sin `python-telegram-bot`).
+
+## Fase 4 (primera parte): dominio personal en Postgres por inquilino (2026-09-23)
+- Puerto `puertos/almacen.py` (cargar/guardar la lista de un usuario) y dos adaptadores:
+  `AlmacenJson` (el mismo fichero de siempre, escritura atómica) y `AlmacenPostgres` (tabla
+  `registros`, construido para un inquilino: `WHERE inquilino_id = %s` en todas las consultas;
+  guardar reescribe la lista en una transacción con bloqueo consultivo). `Tareas`, `Diario` y
+  `Recordatorios` reciben el almacén; comandos, agente de tareas, `Femix`, fábrica y panel lo pasan.
+- `FEMIX_BASE_DATOS_URL` activa Postgres (opcional: sin ella, todo igual que antes). Bot y panel
+  crean la tabla al arrancar. `python -m femix.inquilino.a_postgres` copia los JSON existentes sin
+  pisar lo que ya haya y los deja como respaldo. Estadísticas del panel desde el almacén.
+- Pendiente: citas y disponibilidad de `hugin` (falta permiso para leer ese repo).
+- 12 tests nuevos contra un Postgres 16 real (se saltan sin `FEMIX_PRUEBAS_POSTGRES_URL`), incluida
+  una guarda que falla si alguna consulta sobre `registros` no filtra por `inquilino_id`. 443 en
+  verde con Postgres; 437 + 6 saltados sin él.

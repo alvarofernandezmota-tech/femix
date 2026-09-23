@@ -1,6 +1,8 @@
 import os
 
 from ..inquilino.capacidades import DOCUMENTOS, MEMORIA, POR_DEFECTO
+from ..infraestructura.almacen_json import AlmacenJson
+from ..infraestructura.almacen_postgres import VARIABLE_URL, AlmacenPostgres
 from ..llm.modelos import SelectorDeModelos
 from ..mente.memoria import Memoria, MemoriaDesactivada
 from ..rag.adaptador import IndiceEmbeddingsBuscador
@@ -45,6 +47,14 @@ def del_perfil(directorio_datos: str, inquilino_id: str) -> "tuple[tuple, str | 
         return POR_DEFECTO, None
     return tuple(perfil.capacidades), prompt_sistema_de(perfil)
 
+def almacen_dominio(directorio_datos: str, inquilino_id: str):
+    """Fase 4: con `FEMIX_BASE_DATOS_URL`, Postgres (atado a este inquilino); sin ella, los JSON de
+    siempre en `datos/{inquilino_id}/`."""
+    url = (os.environ.get(VARIABLE_URL) or "").strip()
+    if url:
+        return AlmacenPostgres(url, inquilino_id)
+    return AlmacenJson(directorio_inquilino(directorio_datos, inquilino_id))
+
 def construir_femix(
     directorio_datos: str = DIRECTORIO_DATOS,
     inquilino_id: "str | None" = None,
@@ -76,4 +86,5 @@ def construir_femix(
         # inquilino (`inquilino/personalidad.py`). Sin prompt, el de Femix de siempre.
         extra["selector_modelos"] = SelectorDeModelos(prompt_sistema=prompt_sistema)
     buscador = IndiceEmbeddingsBuscador(directorio_datos=directorio_datos) if DOCUMENTOS in capacidades else None
+    extra.setdefault("almacen", almacen_dominio(directorio_datos, inquilino_id))
     return Femix(inquilino_id=inquilino_id, directorio_datos=carpeta, buscador=buscador, **extra)

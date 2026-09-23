@@ -19,6 +19,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
+from femix.bot.fabrica import almacen_dominio
 from femix.inquilino.capacidades import CATALOGO
 from femix.inquilino.perfil import (
     DIAS, TIPOS, AlmacenPerfiles, Franja, PerfilIlegible, PerfilInquilino, leer_ids_telegram,
@@ -179,19 +180,11 @@ def _estado_bot(inquilino_id: str, perfil: "PerfilInquilino | None", estado: "di
 
 
 def _contar_registros(inquilino_id: str, directorio: str, prefijo: str) -> int:
-    """Registros de `prefijo` de todos los usuarios del inquilino (panel y Telegram)."""
-    carpeta = directorio_inquilino(directorio, inquilino_id)
-    if not os.path.isdir(carpeta):
-        return 0
-    total = 0
-    for nombre in os.listdir(carpeta):
-        if nombre.startswith(f"{prefijo}_") and nombre.endswith(".json"):
-            try:
-                with open(os.path.join(carpeta, nombre), "r", encoding="utf-8") as f:
-                    total += len(json.load(f))
-            except (OSError, ValueError, TypeError):
-                continue  # un fichero roto no tumba las estadísticas de todos
-    return total
+    """Registros de `prefijo` de todos los usuarios del inquilino (panel y Telegram), en JSON o Postgres."""
+    try:
+        return almacen_dominio(directorio, inquilino_id).contar(prefijo)
+    except Exception:
+        return 0  # sin conexión o datos rotos: las estadísticas no tumban el panel
 
 
 

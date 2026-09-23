@@ -20,8 +20,9 @@ class AgenteTareas(Agente):
     """
     nombre = "tareas"
 
-    def __init__(self, directorio_datos: str = "datos"):
+    def __init__(self, directorio_datos: str = "datos", almacen=None):
         self._directorio_datos = directorio_datos
+        self._almacen = almacen
 
     def _normalizar(self, peticion: Peticion) -> str:
         return (peticion.texto or "").strip().lower()
@@ -32,7 +33,7 @@ class AgenteTareas(Agente):
 
     def ejecutar(self, peticion: Peticion) -> "RespuestaAgente | None":
         texto = self._normalizar(peticion)
-        tareas = Tareas(peticion.usuario_id, directorio_datos=self._directorio_datos)
+        tareas = Tareas(peticion.usuario_id, directorio_datos=self._directorio_datos, almacen=self._almacen)
 
         if any(frase in texto for frase in FRASES_LISTAR):
             items = tareas.listar()

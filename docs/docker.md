@@ -121,6 +121,26 @@ y añadir el alias del host:
    ```
 3. En `.env`: `OLLAMA_URL=http://host.docker.internal:11434/api/chat`.
 
+## Postgres (Fase 4, opcional)
+
+Sin `FEMIX_BASE_DATOS_URL`, tareas, diario y recordatorios siguen en JSON (`datos/{inquilino}/`).
+Con ella, van a Postgres: una tabla `registros` en la que **toda** consulta lleva
+`inquilino_id`. `madre` ya tiene un Postgres nativo (el de `midgaror_diario`); femix usa en él una
+base y un rol propios, sin tocar los de midgaror:
+
+```bash
+sudo -u postgres psql -c "CREATE ROLE femix LOGIN PASSWORD 'pon-una-clave-larga'"
+sudo -u postgres psql -c "CREATE DATABASE femix OWNER femix"
+# en .env:
+# FEMIX_BASE_DATOS_URL=postgresql://femix:pon-una-clave-larga@localhost:5432/femix
+docker compose up -d --build                     # crea la tabla al arrancar
+docker compose run --rm femix-bot python -m femix.inquilino.a_postgres   # copia los JSON
+```
+
+La copia no pisa nada que ya esté en Postgres y deja los JSON como respaldo. Si Postgres pide
+contraseña por TCP y rechaza la conexión, revisa `pg_hba.conf` (`host femix femix 127.0.0.1/32
+scram-sha-256`). Para volver a JSON basta con quitar la variable.
+
 ## RAG
 
 El bot busca en `datos/{FEMIX_INQUILINO_ID}/rag/indice.json`, dentro del volumen `femix-datos`

@@ -5,8 +5,9 @@
 ## Fase actual del roadmap
 Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En marcha.
 Fase 2: estructura de inquilino. **Hecha** (2026-09-23).
-Fase 3: el perfil personaliza el prompt del sistema. **Hecha** (2026-09-23). Siguiente: Fase 4
-(Postgres por inquilino, migrado de `hugin`).
+Fase 3: el perfil personaliza el prompt del sistema. **Hecha** (2026-09-23).
+Fase 4: Postgres por inquilino. **En marcha**: el dominio personal ya puede ir a Postgres
+(`FEMIX_BASE_DATOS_URL`, opcional); faltan las citas de `hugin` (pendiente de permiso para leerlo).
 
 ## Qué funciona de verdad
 - Motor Ollama conectado vía `llm/router.py`.
@@ -125,6 +126,12 @@ Fase 3: el perfil personaliza el prompt del sistema. **Hecha** (2026-09-23). Sig
   sale personalización de negocio para el prompt (`AGENTS.md`). La capa `llm/` sigue sin saber de
   inquilinos: los proveedores reciben el prompt hecho y el selector se lo da a los motores rápido y
   complejo de ese bot. Cambiarlo en el panel rearranca su bot; el panel enseña el prompt exacto.
+
+- Postgres (Fase 4, 2026-09-23): puerto `puertos/almacen.py` con dos adaptadores,
+  `AlmacenJson` (los ficheros de siempre) y `AlmacenPostgres` (tabla `registros`, construido para
+  un inquilino, `inquilino_id` en todas las consultas; un test lo comprueba leyendo el SQL). La
+  fábrica elige según `FEMIX_BASE_DATOS_URL`; bot y panel crean la tabla al arrancar;
+  `python -m femix.inquilino.a_postgres` copia los JSON sin pisar nada.
 
 ## Qué está a medias o pendiente
 - El prompt no lleva la fecha ni la hora (el bot lo dice en vez de adivinar si está abierto ahora),

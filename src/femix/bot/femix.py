@@ -37,12 +37,15 @@ class Femix:
         selector_modelos: "SelectorDeModelos | None" = None,
         buscador=None,
         delegar: bool = True,
+        almacen=None,
     ):
         self._selector = selector_modelos or SelectorDeModelos()
         self._motor = motor or self._selector.motor(tipo_tarea=TAREA_RAPIDA)
         self._memoria = memoria or Memoria()
         self._inquilino_id = inquilino_id
         self._directorio_datos = directorio_datos
+        # Dónde guarda tareas, diario y recordatorios (JSON o Postgres). None = JSON en directorio_datos.
+        self._almacen = almacen
         if not delegar:
             self._subagente = None
         elif subagente is not None:
@@ -59,14 +62,14 @@ class Femix:
 
         Si nos inyectaron un motor concreto, el respaldo del subagente usa ese mismo motor.
         """
-        cadena = CadenaDeAgentes([AgenteTareas(directorio_datos=self._directorio_datos)])
+        cadena = CadenaDeAgentes([AgenteTareas(directorio_datos=self._directorio_datos, almacen=self._almacen)])
         return Subagente(cadena, motor=motor, selector=self._selector, buscador=buscador)
 
     def procesar(self, usuario_id: str, texto: str) -> str:
         inicio = time.monotonic()
         intencion = clasificar_intencion(texto)
         if intencion == "comando":
-            respuesta = ejecutar_comando(usuario_id, texto, directorio_datos=self._directorio_datos)
+            respuesta = ejecutar_comando(usuario_id, texto, directorio_datos=self._directorio_datos, almacen=self._almacen)
             self._registrar_mensaje(usuario_id, "comando", inicio, texto, respuesta)
             return respuesta
         contexto = self._memoria.contexto(self._inquilino_id, usuario_id)
