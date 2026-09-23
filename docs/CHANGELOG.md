@@ -425,3 +425,12 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   permitidos y les escribe "⏰ Recordatorio: …". Se marca `avisado` después de enviar (si falla, se
   reintenta; nunca se repite). Los recordatorios antiguos sin el campo se leen igual.
 - 7 tests nuevos. 478 en verde con Postgres real (460 + 18 saltados sin él).
+
+## Mejora 5: el RAG busca por sentido (2026-09-23)
+- `MotorEmbeddingsOllama` (`rag/embeddings_ollama.py`): embeddings de `/api/embed` del Ollama del
+  host (`nomic-embed-text` por defecto). Se activa con `FEMIX_EMBEDDINGS=ollama`; sin ella, el de
+  palabras de siempre.
+- Cambiar de motor reindexa solo: el índice guarda el texto de cada fragmento y, si sus vectores
+  son de otro motor, se recalculan en la primera búsqueda y se guardan.
+- Umbral por motor (0.05 el de palabras, 0.5 el semántico; `FEMIX_EMBEDDINGS_UMBRAL`).
+- 4 tests con un Ollama simulado que entiende de temas.

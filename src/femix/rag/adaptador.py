@@ -1,6 +1,7 @@
 from ..puertos.busqueda import Buscador
 from ..puertos.embeddings import MotorEmbeddings
 from .contexto import construir_contexto
+from .embeddings_ollama import motor_embeddings_desde_entorno
 from .indice import IndiceEmbeddings
 
 PUNTUACION_MINIMA = 0.05
@@ -26,12 +27,17 @@ class IndiceEmbeddingsBuscador(Buscador):
         directorio_datos: str = "datos",
         motor_embeddings: "MotorEmbeddings | None" = None,
         limite_caracteres: int = 2000,
-        puntuacion_minima: float = PUNTUACION_MINIMA,
+        puntuacion_minima: "float | None" = None,
     ):
         self._directorio_datos = directorio_datos
-        self._motor_embeddings = motor_embeddings
+        # Uno solo para todas las búsquedas (un modelo real no se recrea en cada mensaje).
+        self._motor_embeddings = motor_embeddings or motor_embeddings_desde_entorno()
         self._limite_caracteres = limite_caracteres
-        self._puntuacion_minima = puntuacion_minima
+        # Cada motor puntúa en su escala: el de palabras roza 0 con lo irrelevante; uno semántico, no.
+        self._puntuacion_minima = (
+            puntuacion_minima if puntuacion_minima is not None
+            else getattr(self._motor_embeddings, "puntuacion_minima", PUNTUACION_MINIMA)
+        )
 
     def indice(self, inquilino_id: str) -> IndiceEmbeddings:
         """El índice de ese inquilino. Útil también para ingerir desde fuera del agente."""

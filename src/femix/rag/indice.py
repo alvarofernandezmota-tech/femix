@@ -5,7 +5,8 @@ from dataclasses import asdict
 
 from ..puertos.embeddings import MotorEmbeddings
 from .documentos import Documento, Fragmento, ResultadoBusqueda
-from .embeddings_local import MotorEmbeddingsHash, similitud_coseno
+from .embeddings_local import similitud_coseno
+from .embeddings_ollama import motor_embeddings_desde_entorno
 from .fragmentos import fragmentar
 from .rutas import directorio_rag, ruta_indice, ruta_indice_heredada, validar_inquilino_id
 
@@ -33,13 +34,14 @@ class IndiceEmbeddings:
     ):
         self._inquilino_id = validar_inquilino_id(inquilino_id)
         self._directorio_datos = directorio_datos
-        self._motor = motor_embeddings or MotorEmbeddingsHash()
+        self._motor = motor_embeddings or motor_embeddings_desde_entorno()
         self._directorio = directorio_rag(directorio_datos, self._inquilino_id)
         self._ruta = ruta_indice(directorio_datos, self._inquilino_id)
         os.makedirs(self._directorio, exist_ok=True)
         self.migrado_desde_heredado = self._migrar_heredado() if migrar_heredado else False
         self.fragmentos_descartados = 0
         self._fragmentos: list[Fragmento] = self._cargar()
+        self.reindexados = 0
 
     @property
     def inquilino_id(self) -> str:
@@ -121,6 +123,20 @@ class IndiceEmbeddings:
             info["fragmentos"] += 1
         return list(documentos.values())
 
+    def _reindexar_si_hace_falta(self, vector_consulta: list) -> None:
+        """Si hay fragmentos calculados con otro motor (otro tamaño de vector), se recalculan desde
+        su texto y se guarda. Así cambiar de motor de embeddings no obliga a reingerir nada."""
+        viejos = [i for i, f in enumerate(self._fragmentos) if len(f.vector) != len(vector_consulta)]
+        for i in viejos:
+            fragmento = self._fragmentos[i]
+            self._fragmentos[i] = Fragmento(
+                fragmento.inquilino_id, fragmento.documento_id, fragmento.fuente, fragmento.indice,
+                fragmento.texto, self._motor.embed(fragmento.texto),
+            )
+        if viejos:
+            self.reindexados = len(viejos)
+            self._guardar()
+
     def buscar(self, consulta: str, k: int = 3) -> list[ResultadoBusqueda]:
         if not consulta:
             return []
@@ -128,6 +144,8 @@ class IndiceEmbeddings:
         if not propios:
             return []
         vector_consulta = self._motor.embed(consulta)
+        self._reindexar_si_hace_falta(vector_consulta)
+        propios = [f for f in self._fragmentos if f.inquilino_id == self._inquilino_id]
         resultados = [
             ResultadoBusqueda(fragmento, similitud_coseno(vector_consulta, fragmento.vector))
             for fragmento in propios

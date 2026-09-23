@@ -165,9 +165,10 @@ Relanzarlo es inocuo: los ficheros ya cargados (por nombre) se omiten. Para otro
 `... python -m femix.bot.ingerir --inquilino acme /app/documentos`. No hace falta reiniciar el
 bot: el índice se relee en cada búsqueda.
 
-La relevancia es la de `MotorEmbeddingsHash` (bolsa de palabras): funciona si la pregunta
-comparte palabras con el documento. Para búsqueda semántica de verdad hay que enchufar un
-proveedor de embeddings real por el puerto `MotorEmbeddings` (ver `CONTEXT.md`).
+Por defecto la búsqueda es por palabras (`MotorEmbeddingsHash`): encuentra el documento si la
+pregunta repite sus palabras. Para buscar por sentido ("¿a qué hora abrís?" → "horario de
+atención"), con el Ollama de `madre`: `ollama pull nomic-embed-text` y en `.env`
+`FEMIX_EMBEDDINGS=ollama`. Los índices que ya había se recalculan solos en la primera búsqueda.
 
 ## Panel web (en pruebas)
 
