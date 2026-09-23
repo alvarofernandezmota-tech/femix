@@ -23,6 +23,8 @@ from femix.inquilino.capacidades import CATALOGO
 from femix.inquilino.perfil import (
     DIAS, TIPOS, AlmacenPerfiles, Franja, PerfilIlegible, PerfilInquilino, leer_ids_telegram,
 )
+from femix.inquilino.personalidad import prompt_sistema_de
+from femix.llm.prompts import PROMPT_SISTEMA
 from femix.rag.rutas import directorio_inquilino, validar_inquilino_id
 
 from ..documentos import ingerir_subida, listar_documentos
@@ -46,7 +48,7 @@ _templates = Jinja2Templates(directory=_DIRECTORIO_TEMPLATES)
 
 AVISOS = {
     "creado": "Inquilino creado.",
-    "perfil": "Perfil guardado. El bot recoge los cambios en unos 30 s.",
+    "perfil": "Perfil guardado. Su bot se rearranca con los cambios en unos 30 s.",
     "baja": "Inquilino de baja: su bot se para y no puede entrar en su panel. No se ha borrado nada.",
     "alta": "Inquilino reactivado.",
     "documento": "Documento añadido a su RAG.",
@@ -268,6 +270,15 @@ def _leer_perfil(inquilino_id: str) -> "tuple[PerfilInquilino | None, str | None
         return None, str(exc)
 
 
+def _prompt_para_ver(perfil: "PerfilInquilino | None") -> str:
+    if perfil is None:
+        return PROMPT_SISTEMA
+    try:
+        return prompt_sistema_de(perfil.validado())
+    except ValueError:
+        return PROMPT_SISTEMA
+
+
 def _contexto_detalle(inquilino_id: str, sesion: dict, documentos=(), **extra) -> dict:
     directorio = directorio_datos_web()
     perfil, ilegible = _leer_perfil(inquilino_id)
@@ -283,6 +294,8 @@ def _contexto_detalle(inquilino_id: str, sesion: dict, documentos=(), **extra) -
         "perfil_ilegible": ilegible,
         "horario_texto": escribir_horario(perfil.horario) if perfil else "",
         "permitidos_texto": ", ".join(str(i) for i in perfil.telegram_permitidos) if perfil else "",
+        # Lo que recibe el modelo, tal cual: el dueño ve cómo se va a presentar su bot.
+        "prompt": _prompt_para_ver(perfil),
         "acceso_panel": acceso is not None,
         "del_entorno": inquilino_id == entorno,
         "bot": {"clase": "error", "texto": "Perfil ilegible"} if ilegible else _estado_bot(inquilino_id, perfil, estado, entorno),
@@ -384,6 +397,8 @@ async def guardar_perfil(
     tipo: str = Form("persona"),
     descripcion: str = Form(""),
     horario: str = Form(""),
+    nombre_asistente: str = Form(""),
+    tono: str = Form(""),
     capacidades: list[str] = Form(default=[]),
     telegram_token: str = Form(""),
     quitar_token: bool = Form(False),
@@ -408,6 +423,7 @@ async def guardar_perfil(
         base = PerfilInquilino(
             inquilino_id=inquilino_id, nombre=nombre, tipo=tipo, descripcion=descripcion,
             horario=leer_horario(horario), capacidades=capacidades,
+            nombre_asistente=nombre_asistente, tono=tono,
         )
         if contexto["perfil_ilegible"]:
             almacen.reparar(con_telegram(base, None))

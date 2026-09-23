@@ -57,7 +57,7 @@ def test_obtener_motor_openai_respeta_el_modelo_configurado(monkeypatch):
 
     monkeypatch.setattr("femix.llm.router.ProveedorOpenAI", ProveedorOpenAIFalso)
     obtener_motor(ConfiguracionLLM(proveedor="openai", modelo="qwen2.5:3b", openai_api_key="ollama"))
-    assert capturado == {"modelo": "qwen2.5:3b", "api_key": "ollama"}
+    assert capturado == {"modelo": "qwen2.5:3b", "api_key": "ollama", "prompt_sistema": None}
 
 def test_obtener_motor_proveedor_no_soportado():
     config = ConfiguracionLLM(proveedor="inventado")
@@ -70,3 +70,24 @@ def test_obtener_motor_proveedor_no_soportado():
 def test_proveedor_ollama_usa_temperatura_configurada():
     motor = ProveedorOllama(temperatura=0.1)
     assert motor._temperatura == 0.1
+
+
+def test_el_proveedor_manda_el_prompt_que_le_dan(monkeypatch):
+    enviado = {}
+
+    class Respuesta:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"message": {"content": "hola"}}
+
+    def post(url, json, timeout):
+        enviado.update(json)
+        return Respuesta()
+
+    monkeypatch.setattr("femix.llm.proveedores.requests.post", post)
+    ProveedorOllama(prompt_sistema="Eres el asistente de ACME.").generar("", "hola")
+    assert enviado["messages"][0] == {"role": "system", "content": "Eres el asistente de ACME."}
+    ProveedorOllama().generar("", "hola")
+    assert "Femix" in enviado["messages"][0]["content"]  # sin prompt, el de siempre

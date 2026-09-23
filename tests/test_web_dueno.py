@@ -425,3 +425,21 @@ def test_el_panel_migra_los_datos_antiguos_al_arrancar(entorno, monkeypatch):
     with TestClient(app, base_url="https://testserver"):
         pass
     assert (entorno / "varo" / "tareas_7.json").exists()
+
+
+# --- Fase 3: personalidad -------------------------------------------------------------------
+
+def test_la_personalidad_se_edita_y_se_ve_el_prompt(entorno):
+    cliente, csrf = _entrar(entorno)
+    _crear(cliente, csrf, tipo="empresa")
+    ficha = cliente.get("/admin/inquilinos/acme", headers=HTML).text
+    assert "Así se presenta su bot" in ficha and "Eres Femix, asistente de ACME" in ficha
+
+    _guardar_perfil(cliente, csrf, nombre_asistente="Lola", tono="Formal, de usted.",
+                    descripcion="Taller de bicis <b>barato</b>", horario="lunes 09:00-14:00")
+    perfil = AlmacenPerfiles(str(entorno)).obtener("acme")
+    assert (perfil.nombre_asistente, perfil.tono) == ("Lola", "Formal, de usted.")
+    ficha = cliente.get("/admin/inquilinos/acme", headers=HTML).text
+    assert "Eres Lola, asistente de ACME" in ficha
+    assert "Formal, de usted." in ficha and "lunes: de 09:00 a 14:00" in ficha
+    assert "&lt;b&gt;barato&lt;/b&gt;" in ficha  # escapado también en la vista previa

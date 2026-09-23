@@ -1,6 +1,7 @@
 import os
 
 from ..inquilino.capacidades import DOCUMENTOS, MEMORIA, POR_DEFECTO
+from ..llm.modelos import SelectorDeModelos
 from ..mente.memoria import Memoria, MemoriaDesactivada
 from ..rag.adaptador import IndiceEmbeddingsBuscador
 from ..rag.rutas import directorio_inquilino, validar_inquilino_id
@@ -27,19 +28,28 @@ def inquilino_explicito() -> "str | None":
     valor = os.environ.get(VARIABLE_INQUILINO)
     return validar_inquilino_id(valor) if valor else None
 
-def capacidades_del_perfil(directorio_datos: str, inquilino_id: str) -> tuple:
-    """Las capacidades del perfil del inquilino; las de siempre si no tiene perfil o no se lee."""
+def del_perfil(directorio_datos: str, inquilino_id: str) -> "tuple[tuple, str | None]":
+    """(capacidades, prompt del sistema) del perfil del inquilino.
+
+    Sin perfil, o si no se puede leer o validar, lo de siempre: todas las capacidades y el prompt
+    de Femix.
+    """
     from ..inquilino.perfil import AlmacenPerfiles
+    from ..inquilino.personalidad import prompt_sistema_de
     try:
         perfil = AlmacenPerfiles(directorio_datos).obtener(inquilino_id)
-        return tuple(perfil.validado().capacidades) if perfil is not None else POR_DEFECTO
+        if perfil is None:
+            return POR_DEFECTO, None
+        perfil = perfil.validado()
     except ValueError:
-        return POR_DEFECTO
+        return POR_DEFECTO, None
+    return tuple(perfil.capacidades), prompt_sistema_de(perfil)
 
 def construir_femix(
     directorio_datos: str = DIRECTORIO_DATOS,
     inquilino_id: "str | None" = None,
     capacidades=POR_DEFECTO,
+    prompt_sistema: "str | None" = None,
     **extra,
 ) -> Femix:
     """El `Femix` de un inquilino, con sus piezas según sus capacidades y sus datos en su carpeta.
@@ -61,5 +71,9 @@ def construir_femix(
         extra["memoria"] = (
             Memoria(ruta=os.path.join(carpeta, NOMBRE_MEMORIA)) if MEMORIA in capacidades else MemoriaDesactivada()
         )
+    if prompt_sistema and "selector_modelos" not in extra:
+        # Fase 3: todos los motores de este bot (rápido y complejo) hablan con la personalidad del
+        # inquilino (`inquilino/personalidad.py`). Sin prompt, el de Femix de siempre.
+        extra["selector_modelos"] = SelectorDeModelos(prompt_sistema=prompt_sistema)
     buscador = IndiceEmbeddingsBuscador(directorio_datos=directorio_datos) if DOCUMENTOS in capacidades else None
     return Femix(inquilino_id=inquilino_id, directorio_datos=carpeta, buscador=buscador, **extra)

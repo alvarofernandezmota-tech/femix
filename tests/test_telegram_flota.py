@@ -29,7 +29,7 @@ TOKEN_NUEVO = "333333333:" + "C" * 35
 
 
 def _perfil(inquilino_id, token="", **extra):
-    return PerfilInquilino(inquilino_id=inquilino_id, nombre=inquilino_id, telegram_token=token, **extra)
+    return PerfilInquilino(inquilino_id=inquilino_id, nombre=extra.pop("nombre", inquilino_id), telegram_token=token, **extra)
 
 
 # --- Qué bots tienen que estar en marcha --------------------------------------------------
@@ -41,7 +41,12 @@ def test_solo_los_activos_con_token():
         _perfil("de_baja", TOKEN_ACME, activo=False),
     ]
     deseado, problemas = configuracion_deseada(perfiles, None)
-    assert deseado == {"varo": ConfigBot("varo", TOKEN_VARO, frozenset({7}), ("memoria_largo_plazo", "voz", "documentos"))}
+    assert list(deseado) == ["varo"]
+    config = deseado["varo"]
+    assert (config.token, config.permitidos, config.capacidades) == (
+        TOKEN_VARO, frozenset({7}), ("memoria_largo_plazo", "voz", "documentos")
+    )
+    assert "asistente personal de varo" in config.prompt_sistema
     assert problemas == {}
 
 
@@ -61,7 +66,9 @@ def test_el_entorno_manda_en_token_y_permitidos_pero_no_en_capacidades():
     perfiles = [_perfil("varo", TOKEN_NUEVO, telegram_permitidos=[1], capacidades=["voz"])]
     entorno = BotDelEntorno("varo", TOKEN_VARO, frozenset({7}))
     deseado, _ = configuracion_deseada(perfiles, entorno)
-    assert deseado["varo"] == ConfigBot("varo", TOKEN_VARO, frozenset({7}), ("voz",))
+    config = deseado["varo"]
+    assert (config.token, config.permitidos, config.capacidades) == (TOKEN_VARO, frozenset({7}), ("voz",))
+    assert config.prompt_sistema  # la personalidad sí sale del perfil
 
 
 def test_el_entorno_sin_perfil_arranca_con_las_capacidades_por_defecto():
@@ -158,7 +165,9 @@ class Fabrica:
         self.apps.append(app)
         return app
 
-    def femix(self, directorio_datos, inquilino_id, capacidades):
+    def femix(self, directorio_datos, inquilino_id, capacidades, prompt_sistema=None):
+        self.prompts = getattr(self, "prompts", {})
+        self.prompts[inquilino_id] = prompt_sistema
         return ("femix", inquilino_id, capacidades)
 
 
@@ -579,3 +588,32 @@ def test_main_migra_antes_de_leer_los_permitidos(tmp_path, monkeypatch):
     with pytest.raises(ValueError):
         bot.main()
     assert (tmp_path / "datos" / "varo" / "tareas_7.json").exists()
+
+
+# --- Fase 3: la personalidad del perfil llega al bot -------------------------------------------
+
+def test_cada_bot_arranca_con_la_personalidad_de_su_inquilino(tmp_path):
+    flota, fabrica, almacen = _flota(tmp_path)
+    almacen.crear(_perfil("acme", TOKEN_ACME, nombre="ACME", tipo="empresa", nombre_asistente="Lola"))
+    asyncio.run(flota.reconciliar())
+    assert "Eres Lola, asistente de ACME" in fabrica.prompts["acme"]
+
+
+def test_cambiar_la_personalidad_rearranca_el_bot(tmp_path):
+    flota, fabrica, almacen = _flota(tmp_path)
+    almacen.crear(_perfil("acme", TOKEN_ACME, nombre="ACME"))
+
+    async def escenario():
+        await flota.reconciliar()
+        almacen.actualizar(_perfil("acme", TOKEN_ACME, nombre="ACME", tono="Muy formal, de usted."))
+        await flota.reconciliar()
+
+    asyncio.run(escenario())
+    assert len(fabrica.apps) == 2
+    assert "Muy formal, de usted." in fabrica.prompts["acme"]
+
+
+def test_el_bot_del_env_sin_perfil_valido_usa_el_prompt_de_siempre():
+    deseado, _ = configuracion_deseada([], BotDelEntorno("varo", TOKEN_VARO, frozenset({7})))
+    assert deseado["varo"].prompt_sistema is None
+    assert "prompt_sistema" not in repr(deseado["varo"])

@@ -46,11 +46,18 @@
                 {% endfor %}
             </select>
         </label>
-        <label>Descripción <small>(qué hace; todavía no llega al bot: eso es la Fase 3)</small>
-            <textarea name="descripcion" rows="3" maxlength="2000">{{ perfil.descripcion if perfil else "" }}</textarea>
+        <label>Descripción <small>(qué hace, qué ofrece, precios, dirección... Su bot lo sabrá y no inventará lo que no esté aquí ni en sus documentos)</small>
+            <textarea name="descripcion" rows="4" maxlength="2000">{{ perfil.descripcion if perfil else "" }}</textarea>
         </label>
         <label>Horario <small>(una franja por línea: <code>lunes 09:00-14:00</code>)</small>
             <textarea name="horario" rows="4" placeholder="lunes 09:00-14:00&#10;lunes 16:00-20:00">{{ horario_texto }}</textarea>
+        </label>
+
+        <label>Nombre del asistente <small>(cómo se presenta su bot; vacío = Femix)</small>
+            <input name="nombre_asistente" maxlength="40" value="{{ perfil.nombre_asistente if perfil else '' }}" placeholder="Femix">
+        </label>
+        <label>Tono <small>(cómo habla; vacío = cercano y directo)</small>
+            <input name="tono" maxlength="300" value="{{ perfil.tono if perfil else '' }}" placeholder="Cercano y directo, sin formalismos excesivos.">
         </label>
 
         <fieldset>
@@ -91,6 +98,12 @@
 
         <button type="submit">Guardar perfil</button>
     </form>
+</section>
+
+<section class="tarjeta">
+    <h3>Así se presenta su bot</h3>
+    <p class="secundario">El texto que recibe el modelo antes de cada conversación, sacado del perfil guardado.</p>
+    <pre class="prompt">{{ prompt }}</pre>
 </section>
 
 <section class="tarjeta">

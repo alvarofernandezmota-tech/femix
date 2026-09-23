@@ -3,10 +3,12 @@
 Un inquilino es siempre una persona o una empresa, con su propio bot de Telegram acoplado. El perfil
 vive en `datos/{inquilino_id}/perfil.json`, junto al resto de sus datos.
 
-Fase 2 del ROADMAP: estructura de datos, **sin conectar al LLM**. Nada de aquí entra en el prompt
-del sistema; eso es la Fase 3. Lo que sí se usa ya es la parte operativa: el token y los
-permitidos de Telegram (qué bot arranca y quién le puede hablar) y las capacidades (qué piezas se
-enchufan: memoria, voz, documentos).
+Parte operativa (Fase 2): el token y los permitidos de Telegram (qué bot arranca y quién le puede
+hablar) y las capacidades (qué piezas se enchufan: memoria, voz, documentos).
+
+Parte de personalidad (Fase 3): nombre, tipo, descripción, horario, nombre del asistente y tono se
+convierten en el prompt del sistema de su bot en `inquilino/personalidad.py`. Es el único sitio de
+donde sale personalización de negocio para el prompt (regla de `AGENTS.md`).
 """
 import json
 import logging
@@ -24,6 +26,8 @@ TIPOS = ("persona", "empresa")
 DIAS = ("lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo")
 LONGITUD_MAXIMA_NOMBRE = 100
 LONGITUD_MAXIMA_DESCRIPCION = 2000
+LONGITUD_MAXIMA_NOMBRE_ASISTENTE = 40
+LONGITUD_MAXIMA_TONO = 300
 
 # [0-9] y fullmatch: `\d` acepta dígitos de otras escrituras ("٠٩:٠٠") y `$` un salto de línea.
 _PATRON_HORA = re.compile(r"([01][0-9]|2[0-3]):[0-5][0-9]")
@@ -55,13 +59,16 @@ class PerfilInquilino:
     capacidades: list = field(default_factory=lambda: list(POR_DEFECTO))
     telegram_token: str = ""
     telegram_permitidos: list = field(default_factory=list)
+    # Fase 3: cómo se presenta y habla su bot. Vacíos = los de Femix.
+    nombre_asistente: str = ""
+    tono: str = ""
     activo: bool = True
     fecha_alta: str = ""
     fecha_baja: "str | None" = None
 
     def validado(self) -> "PerfilInquilino":
         """Copia normalizada, o `ValueError` diciendo qué campo está mal."""
-        for campo in ("nombre", "tipo", "descripcion", "telegram_token"):
+        for campo in ("nombre", "tipo", "descripcion", "telegram_token", "nombre_asistente", "tono"):
             if not isinstance(getattr(self, campo) or "", str):
                 raise ValueError(f"{campo} tiene que ser texto")
         for campo in ("horario", "capacidades", "telegram_permitidos"):
@@ -80,6 +87,12 @@ class PerfilInquilino:
         descripcion = (self.descripcion or "").strip()
         if len(descripcion) > LONGITUD_MAXIMA_DESCRIPCION:
             raise ValueError(f"La descripción no puede pasar de {LONGITUD_MAXIMA_DESCRIPCION} caracteres")
+        nombre_asistente = " ".join((self.nombre_asistente or "").split())
+        if len(nombre_asistente) > LONGITUD_MAXIMA_NOMBRE_ASISTENTE:
+            raise ValueError(f"El nombre del asistente no puede pasar de {LONGITUD_MAXIMA_NOMBRE_ASISTENTE} caracteres")
+        tono = (self.tono or "").strip()
+        if len(tono) > LONGITUD_MAXIMA_TONO:
+            raise ValueError(f"El tono no puede pasar de {LONGITUD_MAXIMA_TONO} caracteres")
         token = (self.telegram_token or "").strip()
         if token and not _PATRON_TOKEN.fullmatch(token):
             raise ValueError("El token de Telegram no tiene la forma de los de @BotFather (número:clave)")
@@ -92,6 +105,8 @@ class PerfilInquilino:
             capacidades=validar_capacidades(self.capacidades),
             telegram_token=token,
             telegram_permitidos=_validar_permitidos(self.telegram_permitidos),
+            nombre_asistente=nombre_asistente,
+            tono=tono,
         )
 
     def a_dict(self) -> dict:

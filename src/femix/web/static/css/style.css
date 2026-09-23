@@ -142,3 +142,11 @@ body {
 .de-baja td {
     opacity: 0.6;
 }
+
+.prompt {
+    white-space: pre-wrap;
+    background: #f7f7f9;
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-size: 0.85em;
+}

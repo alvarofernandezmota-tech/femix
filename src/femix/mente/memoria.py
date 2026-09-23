@@ -52,7 +52,8 @@ class Memoria:
 
     def contexto(self, inquilino_id: str, usuario_id: str) -> str:
         k = self.clave(inquilino_id, usuario_id)
-        return "\n".join(f"Usuario: {t.entrada}\nHugin: {t.salida}" for t in self._historial.get(k, []))
+        # "Asistente" y no un nombre: cada inquilino puede llamar a su bot como quiera.
+        return "\n".join(f"Usuario: {t.entrada}\nAsistente: {t.salida}" for t in self._historial.get(k, []))
 
 class MemoriaDesactivada:
     """Para inquilinos sin la capacidad `memoria_largo_plazo`: cada mensaje empieza de cero."""

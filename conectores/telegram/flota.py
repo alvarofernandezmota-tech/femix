@@ -21,6 +21,7 @@ from femix.bot.fabrica import construir_femix, inquilino_desde_entorno
 from femix.infraestructura.ficheros import escribir_json_atomico
 from femix.inquilino.capacidades import CATALOGO, POR_DEFECTO, VOZ
 from femix.inquilino.perfil import AlmacenPerfiles, InquilinoYaExiste, PerfilInquilino
+from femix.inquilino.personalidad import prompt_sistema_de
 
 from .acceso import VARIABLE_PERMITIDOS, leer_permitidos
 
@@ -41,6 +42,8 @@ class ConfigBot:
     token: str = field(repr=False)
     permitidos: frozenset = frozenset()
     capacidades: tuple = POR_DEFECTO
+    # Fase 3: la personalidad del inquilino hecha prompt. None = el de Femix de siempre.
+    prompt_sistema: "str | None" = field(default=None, repr=False)
 
 
 @dataclass(frozen=True)
@@ -105,8 +108,10 @@ def configuracion_deseada(perfiles, entorno: "BotDelEntorno | None", ilegibles=N
         elif crudo is not None and crudo.activo is not True:
             problemas[entorno.inquilino_id] = "está de baja (aunque tenga token en el .env)"
         else:
+            prompt_sistema = None
             if perfil is not None:
                 capacidades = tuple(perfil.capacidades)
+                prompt_sistema = prompt_sistema_de(perfil)
             else:
                 # El bot del .env arranca aunque su perfil tenga algo mal (funcionaba antes de que
                 # hubiera perfiles), pero sin encender lo que el perfil tiene apagado.
@@ -117,7 +122,7 @@ def configuracion_deseada(perfiles, entorno: "BotDelEntorno | None", ilegibles=N
                         f"con {', '.join(capacidades) or 'ninguna capacidad'})"
                     )
             deseado[entorno.inquilino_id] = ConfigBot(
-                entorno.inquilino_id, entorno.token, frozenset(entorno.permitidos), capacidades,
+                entorno.inquilino_id, entorno.token, frozenset(entorno.permitidos), capacidades, prompt_sistema,
             )
 
     duenos = {c.token: c.inquilino_id for c in deseado.values()}
@@ -132,7 +137,8 @@ def configuracion_deseada(perfiles, entorno: "BotDelEntorno | None", ilegibles=N
             continue
         duenos[perfil.telegram_token] = inquilino_id
         deseado[inquilino_id] = ConfigBot(
-            inquilino_id, perfil.telegram_token, frozenset(perfil.telegram_permitidos), tuple(perfil.capacidades)
+            inquilino_id, perfil.telegram_token, frozenset(perfil.telegram_permitidos), tuple(perfil.capacidades),
+            prompt_sistema_de(perfil),
         )
     return deseado, problemas
 
@@ -254,8 +260,10 @@ class FlotaDeBots:
             causa = _polling_caido(bot.app)
             if nuevo is None:
                 por_parar[inquilino_id] = "ya no tiene que estar en marcha (baja, sin token o sin perfil)"
-            elif nuevo.token != bot.config.token or nuevo.capacidades != bot.config.capacidades:
-                por_parar[inquilino_id] = "cambió su token o sus capacidades; se rearranca"
+            elif (nuevo.token, nuevo.capacidades, nuevo.prompt_sistema) != (
+                bot.config.token, bot.config.capacidades, bot.config.prompt_sistema
+            ):
+                por_parar[inquilino_id] = "cambió su token, sus capacidades o su personalidad; se rearranca"
             elif not bot.app.updater.running or causa is not None:
                 detalle = _sin_token(f"{type(causa).__name__}: {causa}", bot.config.token) if causa else "parado"
                 por_parar[inquilino_id] = f"dejó de recibir mensajes ({detalle}); se rearranca"
@@ -303,7 +311,8 @@ class FlotaDeBots:
         app = None
         try:
             femix = self._fabricar_femix(
-                directorio_datos=self._directorio, inquilino_id=inquilino_id, capacidades=config.capacidades
+                directorio_datos=self._directorio, inquilino_id=inquilino_id,
+                capacidades=config.capacidades, prompt_sistema=config.prompt_sistema,
             )
             app = self._construir_app(config.token, femix, config.permitidos, voz=VOZ in config.capacidades)
             app.bot_data["inquilino_id"] = inquilino_id
