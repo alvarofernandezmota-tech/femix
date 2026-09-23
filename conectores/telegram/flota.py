@@ -19,7 +19,7 @@ from telegram.error import InvalidToken
 
 from femix.bot.fabrica import construir_femix, inquilino_desde_entorno
 from femix.infraestructura.ficheros import escribir_json_atomico
-from femix.inquilino.capacidades import POR_DEFECTO, VOZ
+from femix.inquilino.capacidades import POR_DEFECTO, VOZ, validar_capacidades
 from femix.inquilino.perfil import AlmacenPerfiles, PerfilInquilino
 
 from .acceso import VARIABLE_PERMITIDOS, leer_permitidos
@@ -79,20 +79,32 @@ def configuracion_deseada(perfiles, entorno: "BotDelEntorno | None") -> "tuple[d
     """Qué bots tienen que estar en marcha, y por qué no está alguno que podría estarlo."""
     deseado, problemas = {}, {}
     validos = {}
+    crudos = {p.inquilino_id: p for p in perfiles}
     for perfil in perfiles:
         try:
             validos[perfil.inquilino_id] = perfil.validado()
-        except ValueError as exc:
+        except (ValueError, TypeError) as exc:
             problemas[perfil.inquilino_id] = f"perfil no válido: {exc}"
 
     if entorno is not None:
         perfil = validos.get(entorno.inquilino_id)
-        if perfil is not None and not perfil.activo:
+        crudo = crudos.get(entorno.inquilino_id)
+        if crudo is not None and crudo.activo is False:
             problemas[entorno.inquilino_id] = "está de baja (aunque tenga token en el .env)"
         else:
+            if perfil is not None:
+                capacidades = tuple(perfil.capacidades)
+            else:
+                # El bot del .env arranca aunque su perfil tenga algo mal (funcionaba antes de que
+                # hubiera perfiles), pero sin encender lo que el perfil tiene apagado.
+                capacidades = _capacidades_rescatables(crudo)
+                if crudo is not None:
+                    problemas[entorno.inquilino_id] = (
+                        f"{problemas[entorno.inquilino_id]} (el bot del .env arranca igualmente, "
+                        f"con {', '.join(capacidades) or 'ninguna capacidad'})"
+                    )
             deseado[entorno.inquilino_id] = ConfigBot(
-                entorno.inquilino_id, entorno.token, frozenset(entorno.permitidos),
-                tuple(perfil.capacidades) if perfil is not None else POR_DEFECTO,
+                entorno.inquilino_id, entorno.token, frozenset(entorno.permitidos), capacidades,
             )
 
     duenos = {c.token: c.inquilino_id for c in deseado.values()}
@@ -112,6 +124,15 @@ def configuracion_deseada(perfiles, entorno: "BotDelEntorno | None") -> "tuple[d
     return deseado, problemas
 
 
+def _capacidades_rescatables(perfil: "PerfilInquilino | None") -> tuple:
+    if perfil is None:
+        return POR_DEFECTO
+    try:
+        return tuple(validar_capacidades(perfil.capacidades))
+    except (ValueError, TypeError):
+        return POR_DEFECTO
+
+
 @dataclass
 class _BotEnMarcha:
     config: ConfigBot
@@ -120,18 +141,54 @@ class _BotEnMarcha:
     desde: str
 
 
-async def _cerrar(app) -> None:
-    """Para y libera un bot, venga del estado que venga (también de un arranque fallido)."""
+async def _paso(nombre: str, accion) -> None:
     try:
-        if app.updater is not None and app.updater.running:
-            await app.updater.stop()
-        if app.running:
-            await app.stop()
-        await app.shutdown()
-    finally:
-        # Si `initialize` falló a medias (token rechazado), `app.shutdown` no hace nada y las
-        # conexiones HTTP del bot quedarían abiertas: se cierran aquí.
-        await app.bot.shutdown()
+        await accion()
+    except Exception as exc:
+        # Cada paso del cierre va por su cuenta: si uno falla (p. ej. `updater.stop()` relanza el
+        # InvalidToken que tumbó el polling), los siguientes se ejecutan igual.
+        _log.warning("Fallo cerrando un bot (%s): %s", nombre, type(exc).__name__)
+
+
+async def _dejar_de_recibir(app) -> None:
+    if app.updater is not None and app.updater.running:
+        await _paso("updater.stop", app.updater.stop)
+
+
+async def _terminar(app) -> None:
+    """Termina lo que ya estaba recibido y libera el bot, venga del estado que venga."""
+    if app.running:
+        await _paso("app.stop", app.stop)
+    await _paso("app.shutdown", app.shutdown)
+    # Si `initialize` falló a medias (token rechazado), `app.shutdown` no hace nada y las
+    # conexiones HTTP del bot quedarían abiertas: se cierran aquí.
+    await _paso("bot.shutdown", app.bot.shutdown)
+
+
+async def _cerrar_todos(apps) -> None:
+    """Primero ninguno recibe mensajes nuevos; después todos terminan los que tenían, a la vez.
+
+    Uno a uno, mientras se paraba el primero los demás seguían aceptando mensajes, y cada
+    respuesta de un LLM en CPU puede tardar un minuto: `docker stop` los mataba a medias.
+    """
+    await asyncio.gather(*(_dejar_de_recibir(app) for app in apps))
+    await asyncio.gather(*(_terminar(app) for app in apps))
+
+
+def _polling_caido(app) -> "BaseException | None":
+    """Si el polling de un bot murió, por qué. `None` si sigue vivo (o no se puede saber).
+
+    python-telegram-bot reintenta solo los cortes de red; con InvalidToken (token revocado en
+    @BotFather con el bot en marcha) termina la tarea de polling pero deja `updater.running` en
+    True, así que no basta con mirar eso. La tarea es privada: si una versión futura la renombra,
+    esto devuelve None y los tests con la aplicación real lo detectan.
+    """
+    tarea = getattr(app.updater, "_Updater__polling_task", None)
+    if tarea is None or not tarea.done():
+        return None
+    if tarea.cancelled():
+        return asyncio.CancelledError()
+    return tarea.exception() or RuntimeError("el polling terminó sin error")
 
 
 def _al_error_de_polling(app):
@@ -176,19 +233,23 @@ class FlotaDeBots:
         deseado, problemas = configuracion_deseada(self._almacen.listar(), self._entorno)
         self._avisar_problemas(problemas)
 
-        for inquilino_id in list(self._bots):
-            bot = self._bots[inquilino_id]
+        por_parar = {}
+        for inquilino_id, bot in self._bots.items():
             nuevo = deseado.get(inquilino_id)
+            causa = _polling_caido(bot.app)
             if nuevo is None:
-                await self._parar(inquilino_id, "ya no tiene que estar en marcha (baja, sin token o sin perfil)")
+                por_parar[inquilino_id] = "ya no tiene que estar en marcha (baja, sin token o sin perfil)"
             elif nuevo.token != bot.config.token or nuevo.capacidades != bot.config.capacidades:
-                await self._parar(inquilino_id, "cambió su token o sus capacidades; se rearranca")
-            elif not bot.app.updater.running:
-                await self._parar(inquilino_id, "dejó de recibir mensajes; se rearranca")
+                por_parar[inquilino_id] = "cambió su token o sus capacidades; se rearranca"
+            elif not bot.app.updater.running or causa is not None:
+                detalle = _sin_token(f"{type(causa).__name__}: {causa}", bot.config.token) if causa else "parado"
+                por_parar[inquilino_id] = f"dejó de recibir mensajes ({detalle}); se rearranca"
             elif nuevo.permitidos != bot.config.permitidos:
                 bot.app.bot_data["permitidos"] = nuevo.permitidos
                 bot.config = nuevo
                 _log.info("Bot de %s: permitidos actualizados (%d)", inquilino_id, len(nuevo.permitidos))
+        # Todos a la vez: parar uno que está terminando un mensaje no retrasa a los demás.
+        await self._parar_varios(por_parar)
 
         for inquilino_id in list(self._rechazados):
             if self._rechazados[inquilino_id][0] != deseado.get(inquilino_id):
@@ -204,8 +265,7 @@ class FlotaDeBots:
         self._escribir_estado()
 
     async def detener_todo(self) -> None:
-        for inquilino_id in list(self._bots):
-            await self._parar(inquilino_id, "se apaga el proceso")
+        await self._parar_varios({inquilino_id: "se apaga el proceso" for inquilino_id in self._bots})
         self._escribir_estado(apagado=True)
 
     async def ejecutar(self, parar: asyncio.Event, intervalo: float = INTERVALO) -> None:
@@ -266,18 +326,16 @@ class FlotaDeBots:
                 inquilino_id,
             )
 
-    async def _parar(self, inquilino_id: str, motivo: str) -> None:
-        bot = self._bots.pop(inquilino_id)
-        _log.info("Bot de %s (@%s): se para, %s", inquilino_id, bot.usuario, motivo)
-        await self._cerrar_sin_ruido(bot.app)
+    async def _parar_varios(self, motivos: dict) -> None:
+        bots = [self._bots.pop(inquilino_id) for inquilino_id in motivos]
+        for bot in bots:
+            _log.info("Bot de %s (@%s): se para, %s", bot.config.inquilino_id, bot.usuario, motivos[bot.config.inquilino_id])
+        if bots:
+            await _cerrar_todos([bot.app for bot in bots])
 
     async def _cerrar_sin_ruido(self, app) -> None:
-        if app is None:
-            return
-        try:
-            await _cerrar(app)
-        except Exception:
-            _log.warning("Fallo cerrando un bot", exc_info=True)
+        if app is not None:
+            await _cerrar_todos([app])
 
     def _avisar_problemas(self, problemas: dict) -> None:
         # Una vez por problema, no cada 30 s.

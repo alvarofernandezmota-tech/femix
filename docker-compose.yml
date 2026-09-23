@@ -27,6 +27,10 @@ services:
   femix-bot:
     <<: *femix
     container_name: femix-bot
+    # Al pararlo, cada bot termina el mensaje que tenía entre manos, y una respuesta del LLM en
+    # CPU puede tardar hasta el minuto que espera a Ollama. Con los 10 s por defecto, Docker lo
+    # mataba a medias y esa respuesta se perdía (Telegram ya había dado el mensaje por entregado).
+    stop_grace_period: 90s
     volumes:
       - femix-datos:/app/datos
       - ./documentos:/app/documentos:ro

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import signal
 import sys
 from dotenv import load_dotenv
@@ -71,12 +72,33 @@ def construir_aplicacion(token: str, femix, permitidos=frozenset(), voz: bool = 
     app.add_handler(MessageHandler(filters.TEXT, manejar_mensaje))
     return app
 
+# Forma de un token de @BotFather, también dentro de la URL de la API (`/bot<token>/getMe`).
+_PATRON_TOKEN = re.compile(r"\d{5,}:[A-Za-z0-9_-]{30,}")
+
+class FiltroTokens(logging.Filter):
+    """Tapa cualquier token de bot en los logs, venga de nuestro código o de las librerías.
+
+    python-telegram-bot mete el token en el mensaje de InvalidToken y en la URL de cada petición;
+    un traceback o un nivel de log mal puesto lo dejarían en `docker compose logs`.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.msg = _PATRON_TOKEN.sub("<token>", record.getMessage())
+        record.args = ()
+        if record.exc_info and not record.exc_text:
+            record.exc_text = logging.Formatter().formatException(record.exc_info)
+        if record.exc_text:
+            record.exc_text = _PATRON_TOKEN.sub("<token>", record.exc_text)
+        return True
+
 def configurar_logs():
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+    for manejador in logging.getLogger().handlers:
+        manejador.addFilter(FiltroTokens())
     # httpx escribe una línea por cada consulta a Telegram (cada pocos segundos): tapa los mensajes.
     # Y cada línea lleva la URL de la API, que incluye el token del bot: no bajar esto a INFO (ni
     # python-telegram-bot a DEBUG) en producción.
@@ -93,13 +115,18 @@ async def _principal(flota) -> None:
 def main():
     configurar_logs()
     entorno = bot_del_entorno()
-    migrar_datos_heredados(DIRECTORIO_DATOS, entorno.inquilino_id if entorno else inquilino_desde_entorno())
+    try:
+        migrar_datos_heredados(DIRECTORIO_DATOS, entorno.inquilino_id if entorno else inquilino_desde_entorno())
+    except Exception:
+        # No mover los ficheros antiguos no puede dejar sin bots a todos los inquilinos.
+        logging.exception("No se pudieron migrar los datos antiguos; se sigue sin migrar")
     if entorno is None:
         logging.info("Sin TELEGRAM_BOT_TOKEN en el entorno: solo los bots de los perfiles de inquilino.")
     else:
         try:
             sincronizar_entorno(AlmacenPerfiles(DIRECTORIO_DATOS), entorno)
-        except (ValueError, KeyError) as exc:
+        except Exception as exc:
+            # Solo sirve para que el panel lo enseñe: el bot del .env arranca sin esto.
             logging.error("No se pudo guardar el bot del .env en el perfil de %s: %s", entorno.inquilino_id, exc)
     logging.info("FEMIX: arrancando los bots de Telegram. Ctrl+C para detener.")
     asyncio.run(_principal(FlotaDeBots(DIRECTORIO_DATOS, entorno)))

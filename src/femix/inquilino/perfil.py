@@ -95,11 +95,16 @@ class PerfilInquilino:
 
     @classmethod
     def de_dict(cls, datos: dict) -> "PerfilInquilino":
+        if not isinstance(datos, dict):
+            raise ValueError(f"Un perfil tiene que ser un objeto JSON, no {type(datos).__name__}")
         # Campos desconocidos se ignoran: un perfil escrito por una versión más nueva no tumba esta.
         conocidos = {f.name for f in fields(cls)}
         limpio = {k: v for k, v in datos.items() if k in conocidos}
-        limpio["horario"] = [f if isinstance(f, Franja) else Franja(**f) for f in limpio.get("horario", [])]
-        return cls(**limpio)
+        try:
+            limpio["horario"] = [f if isinstance(f, Franja) else Franja(**f) for f in limpio.get("horario") or []]
+            return cls(**limpio)
+        except TypeError as exc:
+            raise ValueError(f"Perfil mal formado: {exc}") from None
 
     def a_publico(self) -> dict:
         """Todo menos el token del bot: con él cualquiera puede suplantar al bot."""
@@ -191,7 +196,8 @@ class AlmacenPerfiles:
                 continue
             try:
                 perfil = self.obtener(nombre)
-            except (OSError, ValueError, TypeError) as exc:
+            except Exception as exc:
+                # Lo que sea (JSON roto, `null`, tipos raros): uno mal no deja sin bots al resto.
                 _log.warning("Perfil ilegible de %s, se ignora: %s", nombre, exc)
                 continue
             if perfil.inquilino_id != nombre:

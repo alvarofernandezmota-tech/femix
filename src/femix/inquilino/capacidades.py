@@ -37,6 +37,8 @@ def validar_capacidades(nombres) -> list[str]:
     """Nombres del catálogo y disponibles, sin repetir, en el orden del catálogo."""
     pedidas = set()
     for nombre in nombres:
+        if not isinstance(nombre, str):
+            raise ValueError(f"Capacidad no válida: {nombre!r}")
         capacidad = CATALOGO.get(nombre)
         if capacidad is None:
             raise ValueError(f"Capacidad desconocida: {nombre!r}")

@@ -3,6 +3,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import asyncio
+import logging
 from unittest import mock
 
 import pytest
@@ -155,3 +156,16 @@ def test_si_falla_el_aviso_al_denegado_el_mensaje_sigue_sin_llegar_a_femix():
     from telegram.error import NetworkError
     femix, _, _ = _procesar([_update_de(8, "hola")], permitidos={7}, fallo_al_responder=NetworkError("caído"))
     assert femix.llamadas == []
+
+
+def test_el_filtro_de_logs_tapa_los_tokens_tambien_en_las_trazas():
+    token = "123456789:" + "A" * 35
+    registro = logging.LogRecord("x", logging.ERROR, __file__, 1, "URL https://api.telegram.org/bot%s/getMe", (token,), None)
+    try:
+        raise RuntimeError(f"The token `{token}` was rejected by the server.")
+    except RuntimeError:
+        registro.exc_info = sys.exc_info()
+    bot.FiltroTokens().filter(registro)
+    texto = logging.Formatter().format(registro)
+    assert token not in texto
+    assert "bot<token>/getMe" in texto and "The token `<token>`" in texto

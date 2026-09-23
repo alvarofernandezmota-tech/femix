@@ -1,6 +1,12 @@
 import json
+import logging
 import os
 from dataclasses import dataclass, asdict
+from datetime import datetime
+
+from ..infraestructura.ficheros import escribir_json_atomico
+
+_log = logging.getLogger(__name__)
 
 @dataclass
 class Turno:
@@ -17,14 +23,22 @@ class Memoria:
     def _cargar(self) -> dict:
         if not os.path.exists(self._ruta):
             return {}
-        with open(self._ruta, "r", encoding="utf-8") as f:
-            bruto = json.load(f)
-        return {k: [Turno(**t) for t in v] for k, v in bruto.items()}
+        try:
+            with open(self._ruta, "r", encoding="utf-8") as f:
+                bruto = json.load(f)
+            return {k: [Turno(**t) for t in v] for k, v in bruto.items()}
+        except (ValueError, TypeError, AttributeError) as exc:
+            # Un fichero a medias (se cortó una escritura antigua) no puede dejar al bot sin
+            # arrancar para siempre: se aparta, se avisa y se empieza de cero.
+            apartado = f"{self._ruta}.corrupto-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            os.replace(self._ruta, apartado)
+            _log.warning("Memoria ilegible (%s): apartada en %s, se empieza vacía", exc, apartado)
+            return {}
 
     def _guardar(self):
         bruto = {k: [asdict(t) for t in v] for k, v in self._historial.items()}
-        with open(self._ruta, "w", encoding="utf-8") as f:
-            json.dump(bruto, f, ensure_ascii=False, indent=2)
+        # Atómico: cortar a medias una escritura (disco lleno, `docker stop`) no deja el fichero roto.
+        escribir_json_atomico(self._ruta, bruto)
 
     def clave(self, inquilino_id: str, usuario_id: str) -> str:
         return f"{inquilino_id}:{usuario_id}"

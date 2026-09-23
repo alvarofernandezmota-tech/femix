@@ -276,13 +276,13 @@ def test_un_fallo_de_red_al_arrancar_se_reintenta_y_no_filtra_el_token(tmp_path,
     assert caplog.text.count("no arranca") == 1
 
 
-def test_un_bot_que_deja_de_recibir_se_rearranca(tmp_path):
+def test_un_bot_cuyo_updater_se_para_se_rearranca(tmp_path):
     flota, fabrica, almacen = _flota(tmp_path)
     almacen.crear(_perfil("varo", TOKEN_VARO))
 
     async def escenario():
         await flota.reconciliar()
-        fabrica.apps[0].updater.running = False  # p. ej. el token se revocó con el bot en marcha
+        fabrica.apps[0].updater.running = False
         await flota.reconciliar()
 
     asyncio.run(escenario())
@@ -437,3 +437,108 @@ def test_main_sin_token_en_el_entorno_arranca_igual(tmp_path, monkeypatch):
     monkeypatch.setattr(bot, "configurar_logs", lambda: None)
     bot.main()
     assert flotas[0]._entorno is None
+
+
+def test_token_revocado_con_el_bot_en_marcha_se_detecta_y_se_cierra_entero(tmp_path, caplog):
+    # python-telegram-bot, ante un InvalidToken en getUpdates, termina el polling pero deja
+    # `updater.running` en True; y al pararlo, `updater.stop()` relanza el error.
+    flota = FlotaDeBots(str(tmp_path), fabricar_femix=lambda **_: object())
+    AlmacenPerfiles(str(tmp_path)).crear(_perfil("varo", TOKEN_VARO))
+    revocado = {"ya": False}
+
+    async def get_me(self, *args, **kwargs):
+        if revocado["ya"]:
+            raise InvalidToken()
+        return await _get_me(self)
+
+    async def get_updates(self, *args, **kwargs):
+        await asyncio.sleep(0.01)
+        if revocado["ya"]:
+            raise InvalidToken("Unauthorized")  # lo que devuelve Telegram con un token revocado
+        return ()
+
+    async def escenario():
+        await flota.reconciliar()
+        viejo = flota._bots["varo"].app
+        revocado["ya"] = True
+        await asyncio.sleep(0.1)
+        assert viejo.updater.running  # lo que confundía a la flota
+        await flota.reconciliar()
+        return viejo
+
+    with mock.patch.object(ExtBot, "get_me", get_me), \
+         mock.patch.object(ExtBot, "get_updates", get_updates), \
+         mock.patch.object(ExtBot, "delete_webhook", _delete_webhook), \
+         caplog.at_level(logging.INFO):
+        viejo = asyncio.run(escenario())
+
+    assert flota.en_marcha == {}
+    assert not viejo.running and not viejo._initialized and not viejo.bot._requests_initialized
+    assert _estado(tmp_path)["bots"]["varo"] == {"estado": "error", "detalle": "Telegram rechaza el token"}
+    assert "dejó de recibir mensajes (InvalidToken" in caplog.text
+    assert TOKEN_VARO not in caplog.text
+
+
+def test_parar_la_flota_no_deja_aceptar_mensajes_a_los_demas_mientras(tmp_path):
+    # Antes se paraban de uno en uno: mientras el primero terminaba su mensaje, el resto seguía
+    # recibiendo. Ahora todos dejan de recibir antes de que ninguno se ponga a terminar.
+    flota, fabrica, almacen = _flota(tmp_path)
+    almacen.crear(_perfil("varo", TOKEN_VARO))
+    almacen.crear(_perfil("acme", TOKEN_ACME))
+    orden = []
+
+    async def escenario():
+        await flota.reconciliar()
+        for app in fabrica.apps:
+            async def parar_updater(app=app):
+                orden.append(("deja de recibir", app.token))
+                app.updater.running = False
+            async def parar_app(app=app):
+                await asyncio.sleep(0.01)
+                orden.append(("termina", app.token))
+            app.updater.stop, app.stop = parar_updater, parar_app
+            app.running = True
+        await flota.detener_todo()
+
+    asyncio.run(escenario())
+    assert [paso for paso, _ in orden] == ["deja de recibir", "deja de recibir", "termina", "termina"]
+
+
+# --- Perfiles rotos no tumban a los demás (revisión adversarial) ----------------------------
+
+@pytest.mark.parametrize("contenido", ["null", "[]", '"texto"', '{"inquilino_id": "zzz"}',
+                                       '{"inquilino_id": "zzz", "nombre": "Z", "capacidades": [["voz"]]}'])
+def test_un_perfil_roto_no_deja_sin_bots_a_los_demas(tmp_path, contenido):
+    flota, _, almacen = _flota(tmp_path, BotDelEntorno("varo", TOKEN_VARO, frozenset({7})))
+    almacen.crear(_perfil("acme", TOKEN_ACME))
+    (tmp_path / "zzz").mkdir()
+    (tmp_path / "zzz" / "perfil.json").write_text(contenido)
+
+    asyncio.run(flota.reconciliar())
+
+    assert set(flota.en_marcha) == {"varo", "acme"}
+
+
+def test_el_bot_del_env_con_perfil_invalido_no_enciende_lo_que_estaba_apagado():
+    roto = _perfil("varo", capacidades=["voz"], horario=[{"dia": "Lunes", "desde": "09:00", "hasta": "14:00"}])
+    deseado, problemas = configuracion_deseada([roto], BotDelEntorno("varo", TOKEN_VARO, frozenset({7})))
+    assert deseado["varo"].capacidades == ("voz",)
+    assert "arranca igualmente" in problemas["varo"]
+
+
+def test_main_arranca_aunque_el_perfil_del_env_este_roto(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", TOKEN_VARO)
+    monkeypatch.setenv("FEMIX_INQUILINO_ID", "varo")
+    monkeypatch.setenv("FEMIX_TELEGRAM_PERMITIDOS", "7")
+    (tmp_path / "datos" / "varo").mkdir(parents=True)
+    (tmp_path / "datos" / "varo" / "perfil.json").write_text('{"inquilino_id": "varo"}')  # sin nombre
+    flotas = []
+
+    async def principal(flota):
+        flotas.append(flota)
+
+    monkeypatch.setattr(bot, "_principal", principal)
+    monkeypatch.setattr(bot, "configurar_logs", lambda: None)
+    bot.main()
+    assert flotas and flotas[0]._entorno.inquilino_id == "varo"
