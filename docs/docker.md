@@ -123,9 +123,15 @@ y añadir el alias del host:
 
 ## Postgres (Fase 4, opcional)
 
-Sin `FEMIX_BASE_DATOS_URL`, tareas, diario y recordatorios siguen en JSON (`datos/{inquilino}/`).
-Con ella, van a Postgres: una tabla `registros` en la que **toda** consulta lleva
-`inquilino_id`. `madre` ya tiene un Postgres nativo (el de `midgaror_diario`); femix usa en él una
+Sin `FEMIX_BASE_DATOS_URL`, todo sigue en ficheros dentro de `datos/`. Con ella, van a Postgres:
+
+| Qué | Tabla |
+|---|---|
+| Tareas, diario, recordatorios y memoria de cada inquilino | `registros` (toda consulta lleva `inquilino_id`) |
+| Perfiles de inquilino (con el token de su bot) | `perfiles` |
+| Accesos y sesiones del panel | `documentos` |
+
+Siguen en ficheros el índice RAG (`datos/{inquilino}/rag/`) y el estado de los bots. `madre` ya tiene un Postgres nativo (el de `midgaror_diario`); femix usa en él una
 base y un rol propios, sin tocar los de midgaror:
 
 ```bash
@@ -137,7 +143,9 @@ docker compose up -d --build                     # crea la tabla al arrancar
 docker compose run --rm femix-bot python -m femix.inquilino.a_postgres   # copia los JSON
 ```
 
-La copia no pisa nada que ya esté en Postgres y deja los JSON como respaldo. Si Postgres pide
+La copia (tareas, diario, recordatorios, memoria, perfiles y accesos al panel) no pisa nada que
+ya esté en Postgres y deja los ficheros como respaldo. Las sesiones del panel no se copian: basta
+con volver a entrar. Si Postgres pide
 contraseña por TCP y rechaza la conexión, revisa `pg_hba.conf` (`host femix femix 127.0.0.1/32
 scram-sha-256`). Para volver a JSON basta con quitar la variable.
 

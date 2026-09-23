@@ -6,8 +6,9 @@
 Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En marcha.
 Fase 2: estructura de inquilino. **Hecha** (2026-09-23).
 Fase 3: el perfil personaliza el prompt del sistema. **Hecha** (2026-09-23).
-Fase 4: Postgres por inquilino. **En marcha**: el dominio personal ya puede ir a Postgres
-(`FEMIX_BASE_DATOS_URL`, opcional); faltan las citas de `hugin` (pendiente de permiso para leerlo).
+Fase 4: Postgres por inquilino. **En marcha**: con `FEMIX_BASE_DATOS_URL` (opcional) van a
+Postgres tareas, diario, recordatorios, memoria, perfiles y accesos/sesiones del panel. Faltan las
+citas (a partir de `hugin`).
 
 ## Qué funciona de verdad
 - Motor Ollama conectado vía `llm/router.py`.

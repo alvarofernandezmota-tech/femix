@@ -269,3 +269,50 @@ def test_la_flota_lee_los_perfiles_de_postgres(perfiles, url, tmp_path, monkeypa
     flota = FlotaDeBots(str(tmp_path), construir_app=fabrica.construir_app, fabricar_femix=fabrica.femix)
     asyncio.run(flota.reconciliar())
     assert set(flota.en_marcha) == {"varo"} and "Lola" in fabrica.prompts["varo"]
+
+
+# --- Panel web entero sobre Postgres ----------------------------------------------------------
+
+@requiere_postgres
+def test_el_panel_entero_funciona_sobre_postgres(url, tmp_path, monkeypatch):
+    import psycopg
+    from fastapi.testclient import TestClient
+    from femix.inquilino.perfil import AlmacenPerfiles
+    from femix.web.app import app
+    with psycopg.connect(url) as conexion:
+        conexion.execute("TRUNCATE perfiles, documentos, registros")
+    token = "token-admin-de-pruebas-0123456789"
+    monkeypatch.setenv("FEMIX_BASE_DATOS_URL", url)
+    monkeypatch.setenv("FEMIX_WEB_DATOS_DIR", str(tmp_path))
+    monkeypatch.setenv("FEMIX_WEB_ADMIN_TOKEN", token)
+
+    duenno = TestClient(app, base_url="https://testserver")
+    r = duenno.post("/admin/inquilinos", json={"id": "acme", "nombre": "ACME", "password": "clave"},
+                    headers={"X-Admin-Token": token})
+    assert r.status_code == 201
+    inquilino = TestClient(app, base_url="https://testserver")
+    assert inquilino.post("/login", data={"inquilino_id": "acme", "password": "clave"},
+                          follow_redirects=False).status_code == 303
+    inquilino.post("/usuario/tareas", json={"descripcion": "desde el panel"})
+    assert inquilino.get("/usuario/tareas").json()["tareas"] == ["0. [ ] desde el panel"]
+    assert duenno.get("/admin/stats", headers={"X-Admin-Token": token}).json()["total_tareas"] == 1
+
+    assert AlmacenPerfiles(str(tmp_path)).obtener("acme").nombre == "ACME"
+    assert AlmacenPostgres(url, "acme").cargar("tareas", "acme")[0]["descripcion"] == "desde el panel"
+    # Ni perfiles, ni accesos, ni sesiones, ni tareas en disco (solo ficheros de bloqueo, si acaso).
+    en_disco = [p.name for p in tmp_path.rglob("*") if p.is_file() and not p.name.startswith(".")]
+    assert en_disco == []
+
+
+@requiere_postgres
+def test_copiar_accesos_del_panel(url, tmp_path):
+    import json, psycopg
+    from femix.infraestructura.documentos import DocumentoEnPostgres
+    from femix.inquilino.a_postgres import copiar
+    with psycopg.connect(url) as conexion:
+        conexion.execute("TRUNCATE documentos")
+    accesos = [{"id": "acme", "nombre": "A", "password_hash": "sal$hash", "fecha_alta": "2026"}]
+    (tmp_path / "inquilinos.json").write_text(json.dumps(accesos))
+    assert ("-", "accesos", "-", 1) in copiar(str(tmp_path), url)
+    assert DocumentoEnPostgres(url, "inquilinos").leer([]) == accesos
+    assert ("-", "accesos", "-", 1) not in copiar(str(tmp_path), url)

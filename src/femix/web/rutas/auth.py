@@ -9,8 +9,7 @@ from fastapi import APIRouter, Cookie, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from femix.infraestructura.ficheros import bloqueo as _bloqueo
-from femix.infraestructura.ficheros import escribir_json_atomico
+from femix.infraestructura.documentos import documento
 from femix.inquilino.perfil import AlmacenPerfiles
 from femix.rag.rutas import validar_inquilino_id
 
@@ -60,25 +59,21 @@ class Inquilino:
 class AlmacenInquilinos:
     def __init__(self, directorio_datos: "str | None" = None):
         self._directorio = directorio_datos or directorio_datos_web()
-        self._ruta = os.path.join(self._directorio, "inquilinos.json")
-        os.makedirs(self._directorio, exist_ok=True)
+        self._documento = documento(self._directorio, "inquilinos")
         self._inquilinos: dict[str, Inquilino] = self._cargar()
 
     def _cargar(self) -> dict:
-        if not os.path.exists(self._ruta):
-            return {}
-        with open(self._ruta, "r", encoding="utf-8") as f:
-            bruto = json.load(f)
+        bruto = self._documento.leer([])
         return {i["id"]: Inquilino(**i) for i in bruto}
 
     def _guardar(self):
-        escribir_json_atomico(self._ruta, [asdict(i) for i in self._inquilinos.values()])
+        self._documento.escribir([asdict(i) for i in self._inquilinos.values()])
 
     def crear(self, inquilino_id: str, nombre: str, password: str) -> Inquilino:
         inquilino_id = validar_inquilino_id(inquilino_id)
         if not password:
             raise ValueError("password no puede estar vacío")
-        with _bloqueo(self._directorio, "inquilinos"):
+        with self._documento.bloqueo():
             self._inquilinos = self._cargar()
             if inquilino_id in self._inquilinos:
                 raise ValueError(f"El inquilino '{inquilino_id}' ya existe")
@@ -103,7 +98,7 @@ class AlmacenInquilinos:
         inquilino_id = validar_inquilino_id(inquilino_id)
         if not password:
             raise ValueError("password no puede estar vacío")
-        with _bloqueo(self._directorio, "inquilinos"):
+        with self._documento.bloqueo():
             self._inquilinos = self._cargar()
             actual = self._inquilinos.get(inquilino_id)
             inquilino = Inquilino(
@@ -135,24 +130,20 @@ class AlmacenSesiones:
         self._directorio = directorio_datos or directorio_datos_web()
         self._nombre = nombre
         self._duracion = timedelta(hours=duracion_horas)
-        self._ruta = os.path.join(self._directorio, f"{nombre}.json")
-        os.makedirs(self._directorio, exist_ok=True)
+        self._documento = documento(self._directorio, nombre)
         self._sesiones: dict = self._cargar()
 
     def _cargar(self) -> dict:
-        if not os.path.exists(self._ruta):
-            return {}
-        with open(self._ruta, "r", encoding="utf-8") as f:
-            return json.load(f)
+        return self._documento.leer({})
 
     def _guardar(self):
-        escribir_json_atomico(self._ruta, self._sesiones)
+        self._documento.escribir(self._sesiones)
 
     def crear(self, inquilino_id: str, **extra) -> str:
         session_id = secrets.token_urlsafe(32)
         ahora = datetime.utcnow()
         expira = (ahora + self._duracion).isoformat()
-        with _bloqueo(self._directorio, self._nombre):
+        with self._documento.bloqueo():
             self._sesiones = self._cargar()
             # De paso se barren las caducadas: si no, el fichero solo crece.
             self._sesiones = {
@@ -169,7 +160,7 @@ class AlmacenSesiones:
         if sesion is None:
             return None
         if datetime.fromisoformat(sesion["expira"]) < datetime.utcnow():
-            with _bloqueo(self._directorio, self._nombre):
+            with self._documento.bloqueo():
                 self._sesiones = self._cargar()
                 self._sesiones.pop(session_id, None)
                 self._guardar()
@@ -182,7 +173,7 @@ class AlmacenSesiones:
 
     def eliminar_de(self, inquilino_id: str):
         """Cierra todas las sesiones de un inquilino (al darlo de baja)."""
-        with _bloqueo(self._directorio, self._nombre):
+        with self._documento.bloqueo():
             self._sesiones = self._cargar()
             quedan = {k: v for k, v in self._sesiones.items() if v.get("inquilino_id") != inquilino_id}
             if len(quedan) != len(self._sesiones):
@@ -192,7 +183,7 @@ class AlmacenSesiones:
     def eliminar(self, session_id: "str | None"):
         if not session_id:
             return
-        with _bloqueo(self._directorio, self._nombre):
+        with self._documento.bloqueo():
             self._sesiones = self._cargar()
             if session_id in self._sesiones:
                 del self._sesiones[session_id]

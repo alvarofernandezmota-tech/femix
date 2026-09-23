@@ -22,7 +22,7 @@ _PATRON = re.compile(r"(%s)_(.+)\.json" % "|".join(COLECCIONES))
 def copiar(directorio_datos: str, url: str) -> list:
     """Devuelve `(inquilino, coleccion, usuario, n)` de lo copiado."""
     crear_esquema(url)
-    copiado = []
+    copiado = _copiar_accesos(directorio_datos, url)
     for inquilino_id in sorted(os.listdir(directorio_datos)):
         carpeta = os.path.join(directorio_datos, inquilino_id)
         try:
@@ -102,3 +102,17 @@ def main(argv=None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def _copiar_accesos(directorio_datos: str, url: str) -> list:
+    """`inquilinos.json` (contraseñas del panel, ya con hash). Las sesiones no: se vuelve a entrar."""
+    from ..infraestructura.documentos import DocumentoEnFichero, DocumentoEnPostgres
+    origen = DocumentoEnFichero(directorio_datos, "inquilinos")
+    destino = DocumentoEnPostgres(url, "inquilinos")
+    accesos = origen.leer([])
+    if not accesos or destino.leer([]):
+        return []
+    with destino.bloqueo():
+        destino.escribir(accesos)
+    print(f"  inquilinos.json: {len(accesos)} accesos al panel copiados")
+    return [("-", "accesos", "-", len(accesos))]

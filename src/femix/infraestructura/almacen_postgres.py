@@ -26,6 +26,10 @@ CREATE TABLE IF NOT EXISTS registros (
 CREATE TABLE IF NOT EXISTS perfiles (
     inquilino_id text  PRIMARY KEY,
     datos        jsonb NOT NULL
+);
+CREATE TABLE IF NOT EXISTS documentos (
+    nombre text  PRIMARY KEY,
+    datos  jsonb NOT NULL
 )
 """
 

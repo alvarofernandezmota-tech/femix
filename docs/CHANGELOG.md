@@ -392,3 +392,14 @@ nada del perfil entra en el prompt (eso es la Fase 3).
 - 12 tests nuevos contra un Postgres 16 real (se saltan sin `FEMIX_PRUEBAS_POSTGRES_URL`), incluida
   una guarda que falla si alguna consulta sobre `registros` no filtra por `inquilino_id`. 443 en
   verde con Postgres; 437 + 6 saltados sin él.
+
+## Fase 4 (segunda parte): todo lo del inquilino y del panel en Postgres (2026-09-23)
+- Memoria de las conversaciones en el almacén del inquilino (`MemoriaEnAlmacen`).
+- Perfiles de inquilino en la tabla `perfiles`, con la misma API; el bloqueo global que impide
+  dos inquilinos con el mismo token pasa a ser un bloqueo consultivo de Postgres.
+- Accesos y sesiones del panel en la tabla `documentos` (`infraestructura/documentos.py`).
+- `a_postgres` copia también memoria, perfiles (con su alta y baja) y accesos al panel.
+- `crear_esquema` rechaza una base que no esté en UTF8 (en SQL_ASCII cualquier tilde fallaba).
+- Sin `FEMIX_BASE_DATOS_URL` todo sigue en ficheros, como antes.
+- 454 tests en verde con Postgres 16 real (437 + 17 saltados sin él); uno recorre el panel entero
+  sobre Postgres y comprueba que no se escribe nada en disco.
