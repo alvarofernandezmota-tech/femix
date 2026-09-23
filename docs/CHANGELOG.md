@@ -360,3 +360,21 @@ nada del perfil entra en el prompt (eso es la Fase 3).
 - Verificado en Chromium (panel en escritorio y móvil) y con el proceso real parándose con SIGTERM.
   No verificado todavía en `madre`.
 - 417 tests en verde con las dependencias de la imagen (367 + 3 saltados sin `python-telegram-bot`).
+
+## Fase 3: el perfil personaliza el prompt de cada bot (2026-09-23)
+- `inquilino/personalidad.py`: del perfil a la personalidad del bot. Identidad según sea persona
+  ("asistente personal de…") o empresa ("asistente de…, atiendes a quien escribe a…"), nombre del
+  asistente y tono (campos nuevos del perfil, opcionales; vacíos = los de Femix), descripción y
+  horario de atención ("lunes: de 09:00 a 14:00 y de 16:00 a 20:00… Cerrado: …"). Añade reglas para
+  no cambiar el horario, no inventar precios, servicios ni citas (empresas) y no fingir que sabe la
+  hora. Único sitio de donde sale personalización de negocio para el prompt (`AGENTS.md`).
+- Capa `llm/` sin conocimiento de inquilinos: `ProveedorOllama`/`ProveedorOpenAI` reciben
+  `prompt_sistema` (antes importaban la constante global), `obtener_motor` y `SelectorDeModelos` lo
+  pasan a todos los motores de un bot (rápido y complejo). Sin perfil, el prompt de siempre.
+  `Personalidad` gana un campo genérico `contexto`.
+- La flota lleva el prompt en la configuración de cada bot y lo rearranca si cambia; el CLI lo
+  toma del perfil. La memoria etiqueta las respuestas previas como "Asistente" (decía "Hugin").
+- Panel del dueño: campos de nombre del asistente y tono, y la sección "Así se presenta su bot" con
+  el prompt exacto que recibe el modelo.
+- Límite conocido: el prompt no lleva fecha, hora ni zona horaria.
+- 431 tests en verde con las dependencias de la imagen (378 + 3 saltados sin `python-telegram-bot`).

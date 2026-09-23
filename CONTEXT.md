@@ -4,7 +4,9 @@
 
 ## Fase actual del roadmap
 Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En marcha.
-Fase 2: estructura de inquilino. **Hecha** (2026-09-23), sin conectar al LLM. Siguiente: Fase 3.
+Fase 2: estructura de inquilino. **Hecha** (2026-09-23).
+Fase 3: el perfil personaliza el prompt del sistema. **Hecha** (2026-09-23). Siguiente: Fase 4
+(Postgres por inquilino, migrado de `hugin`).
 
 ## Qué funciona de verdad
 - Motor Ollama conectado vía `llm/router.py`.
@@ -117,11 +119,16 @@ Fase 2: estructura de inquilino. **Hecha** (2026-09-23), sin conectar al LLM. Si
     defecto), antes que cualquier otro handler.
   - Panel del dueño (`/admin/login`): inquilinos y estado de sus bots, alta, perfil, baja/alta,
     documentos RAG y contraseña de su panel. Cookie propia + CSRF; el token de ejemplo no abre nada.
-  - **Nada del perfil entra en el prompt del LLM** (eso es la Fase 3).
+- Personalidad por inquilino (Fase 3, 2026-09-23): `inquilino/personalidad.py` convierte el perfil
+  (persona/empresa, nombre, nombre del asistente, tono, descripción, horario) en el prompt del
+  sistema de su bot, con límites para no inventar precios, citas ni horarios. Único sitio de donde
+  sale personalización de negocio para el prompt (`AGENTS.md`). La capa `llm/` sigue sin saber de
+  inquilinos: los proveedores reciben el prompt hecho y el selector se lo da a los motores rápido y
+  complejo de ese bot. Cambiarlo en el panel rearranca su bot; el panel enseña el prompt exacto.
 
 ## Qué está a medias o pendiente
-- Fase 3: que el perfil (descripción, horario, tono) personalice el prompt del sistema. Los campos
-  ya existen en el perfil, pero no se usan con el LLM.
+- El prompt no lleva la fecha ni la hora (el bot lo dice en vez de adivinar si está abierto ahora),
+  ni zona horaria del inquilino. Para eso haría falta pasar la hora en cada mensaje.
 - Probar en `madre` el paso a varios bots: al arrancar la versión nueva, los datos sueltos de
   `datos/` pasan a `datos/varo/`, y hay que poner `FEMIX_TELEGRAM_PERMITIDOS` en el `.env` o el
   bot no atenderá a nadie.
@@ -153,9 +160,9 @@ Fase 2: estructura de inquilino. **Hecha** (2026-09-23), sin conectar al LLM. Si
   segundos, entrada y salida recortadas).
 
 ## Próximo paso concreto
-Desplegar en `madre` y comprobar la migración y el bot de `varo` (con `FEMIX_TELEGRAM_PERMITIDOS`).
-Después, Fase 3: que el perfil personalice `PROMPT_SISTEMA` (vía `llm/personalidad.py`), sin que
-el LLM sepa nada del negocio más allá de lo que le pase el perfil.
+Desplegar en `madre` y comprobar la migración, el bot de `varo` (con `FEMIX_TELEGRAM_PERMITIDOS`) y
+su personalidad desde el panel. Después, Fase 4: Postgres por inquilino (citas y disponibilidad
+migradas de `hugin`), siempre con `inquilino_id` obligatorio en cada consulta.
 
 ## Repos relacionados
 - `hugin`: lógica de negocio a migrar (citas, Postgres, teléfono).

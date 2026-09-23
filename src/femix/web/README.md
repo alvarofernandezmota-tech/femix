@@ -5,8 +5,9 @@
 Dos paneles en la misma app:
 
 - **El del dueño** (`/admin/`): todos los inquilinos (personas o empresas) y sus bots de Telegram.
-  Alta, perfil (horario, capacidades, token y permitidos del bot), baja sin borrar datos,
-  documentos de su RAG, contraseña de su panel y estado de cada bot.
+  Alta, perfil (horario, personalidad, capacidades, token y permitidos del bot) con vista previa
+  del prompt de su bot, baja sin borrar datos, documentos de su RAG, contraseña de su panel y
+  estado de cada bot.
 - **El de cada inquilino** (`/usuario/`): sus tareas, diario, recordatorios y documentos.
 
 ## Arquitectura
@@ -61,9 +62,7 @@ src/femix/web/
 - `GET /usuario/rag` / `POST /usuario/rag/documentos` — Ver documentos subidos / subir un documento de texto (multipart, campo `archivo`) al índice RAG del inquilino
 
 ### Pendiente
-- Personalizar el bot con el perfil (descripción, horario, tono): es la Fase 3 del roadmap. Hoy el
-  perfil decide qué bot arranca, quién puede hablarle y qué piezas lleva (memoria, voz,
-  documentos), pero nada del perfil entra en el prompt del LLM.
+- `/usuario/config`: que el propio inquilino edite su perfil (hoy solo lo hace el dueño).
 - Borrar documentos RAG desde el panel (`IndiceEmbeddings` no tiene todavía un método para ello).
 - Borrar un inquilino del todo: a propósito no existe; la baja no borra nada.
 
