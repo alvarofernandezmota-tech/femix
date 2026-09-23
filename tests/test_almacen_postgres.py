@@ -182,3 +182,90 @@ def test_una_base_que_no_es_utf8_se_rechaza_al_arrancar(url):
         conexion.execute("CREATE DATABASE femix_ascii ENCODING 'SQL_ASCII' TEMPLATE template0 LC_COLLATE 'C' LC_CTYPE 'C'")
     with pytest.raises(RuntimeError, match="UTF8"):
         crear_esquema(urlunsplit(partes._replace(path="/femix_ascii")))
+
+
+# --- Perfiles en Postgres ---------------------------------------------------------------------
+
+TOKEN_A = "111111111:" + "A" * 35
+
+
+@pytest.fixture
+def perfiles(url, tmp_path):
+    import psycopg
+    from femix.inquilino.perfil import AlmacenPerfiles
+    with psycopg.connect(url) as conexion:
+        conexion.execute("TRUNCATE perfiles")
+    return AlmacenPerfiles(str(tmp_path), url=url)
+
+
+@requiere_postgres
+def test_perfiles_crear_leer_listar_y_baja(perfiles, tmp_path):
+    from femix.inquilino.perfil import PerfilInquilino
+    perfiles.crear(PerfilInquilino("varo", "Varo", tono="cercano", telegram_token=TOKEN_A))
+    perfiles.crear(PerfilInquilino("acme", "ACME", tipo="empresa"))
+    assert [p.inquilino_id for p in perfiles.listar()] == ["acme", "varo"]
+    assert perfiles.obtener("varo").tono == "cercano"
+    perfiles.dar_de_baja("varo")
+    assert perfiles.obtener("varo").activo is False
+    assert not list(tmp_path.iterdir())  # nada en disco
+
+
+@requiere_postgres
+def test_perfiles_token_unico_entre_procesos(perfiles, url):
+    from concurrent.futures import ThreadPoolExecutor
+    from femix.inquilino.perfil import AlmacenPerfiles, PerfilInquilino
+
+    def crear(i):
+        try:
+            AlmacenPerfiles("x", url=url).crear(PerfilInquilino(f"i{i}", f"I{i}", telegram_token=TOKEN_A))
+            return True
+        except ValueError:
+            return False
+
+    with ThreadPoolExecutor(8) as hilos:
+        assert sum(hilos.map(crear, range(8))) == 1
+
+
+@requiere_postgres
+def test_perfil_ilegible_en_postgres_se_aparta_y_se_repara(perfiles, url):
+    import psycopg
+    from femix.inquilino.perfil import PerfilIlegible, PerfilInquilino
+    perfiles.crear(PerfilInquilino("acme", "ACME"))
+    with psycopg.connect(url) as conexion:
+        conexion.execute("INSERT INTO perfiles VALUES ('roto', 'null'::jsonb)")
+    lista, errores = perfiles.listar_con_errores()
+    assert [p.inquilino_id for p in lista] == ["acme"] and list(errores) == ["roto"]
+    with pytest.raises(PerfilIlegible):
+        perfiles.obtener("roto")
+    perfiles.reparar(PerfilInquilino("roto", "Arreglado"))
+    assert perfiles.obtener("roto").nombre == "Arreglado"
+
+
+@requiere_postgres
+def test_copiar_perfiles_a_postgres(perfiles, url, tmp_path):
+    from femix.inquilino.a_postgres import copiar
+    from femix.inquilino.perfil import AlmacenPerfiles, PerfilInquilino
+    AlmacenPerfiles(str(tmp_path), url="").crear(PerfilInquilino("varo", "Varo", tono="x"))
+    AlmacenPerfiles(str(tmp_path), url="").dar_de_baja("varo")
+    assert ("varo", "perfil", "-", 1) in copiar(str(tmp_path), url)
+    copiado = perfiles.obtener("varo")
+    assert copiado.tono == "x" and copiado.activo is False  # la baja se conserva
+    assert ("varo", "perfil", "-", 1) not in copiar(str(tmp_path), url)
+
+
+@requiere_postgres
+def test_la_flota_lee_los_perfiles_de_postgres(perfiles, url, tmp_path, monkeypatch):
+    pytest.importorskip("telegram")
+    pytest.importorskip("faster_whisper")
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    import asyncio
+    from conectores.telegram.flota import FlotaDeBots
+    from femix.inquilino.perfil import PerfilInquilino
+    from test_telegram_flota import Fabrica
+
+    monkeypatch.setenv("FEMIX_BASE_DATOS_URL", url)
+    perfiles.crear(PerfilInquilino("varo", "Varo", telegram_token=TOKEN_A, nombre_asistente="Lola"))
+    fabrica = Fabrica()
+    flota = FlotaDeBots(str(tmp_path), construir_app=fabrica.construir_app, fabricar_femix=fabrica.femix)
+    asyncio.run(flota.reconciliar())
+    assert set(flota.en_marcha) == {"varo"} and "Lola" in fabrica.prompts["varo"]

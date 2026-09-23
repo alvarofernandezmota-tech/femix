@@ -45,7 +45,24 @@ def copiar(directorio_datos: str, url: str) -> list:
             copiado.append((inquilino_id, coleccion, usuario, len(elementos)))
             print(f"  {inquilino_id}/{nombre}: {len(elementos)} copiados")
         copiado += _copiar_memoria(carpeta, inquilino_id, destino)
+        copiado += _copiar_perfil(directorio_datos, inquilino_id, url)
     return copiado
+
+
+def _copiar_perfil(directorio_datos: str, inquilino_id: str, url: str) -> list:
+    from .perfil import AlmacenPerfiles, PerfilIlegible
+    en_ficheros, en_postgres = AlmacenPerfiles(directorio_datos, url=""), AlmacenPerfiles(directorio_datos, url=url)
+    try:
+        perfil = en_ficheros.obtener(inquilino_id)
+    except PerfilIlegible:
+        print(f"  {inquilino_id}/perfil.json: ilegible, no se copia")
+        return []
+    if perfil is None or en_postgres.existe(inquilino_id):
+        return []
+    with en_postgres._fondo.bloqueo():
+        en_postgres._fondo.escribir(inquilino_id, perfil.a_dict())  # tal cual: fechas y baja incluidas
+    print(f"  {inquilino_id}/perfil.json: copiado")
+    return [(inquilino_id, "perfil", "-", 1)]
 
 
 def _copiar_memoria(carpeta: str, inquilino_id: str, destino) -> list:

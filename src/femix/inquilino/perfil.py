@@ -18,6 +18,7 @@ from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import datetime, timezone
 
 from ..infraestructura.ficheros import bloqueo, escribir_json_atomico
+from ..infraestructura.almacen_postgres import VARIABLE_URL
 from ..rag.rutas import directorio_inquilino, validar_inquilino_id
 from .capacidades import POR_DEFECTO, validar_capacidades
 
@@ -194,28 +195,118 @@ class InquilinoYaExiste(ValueError):
     pass
 
 
+class _PerfilesEnFicheros:
+    """`datos/{inquilino_id}/perfil.json`, bajo un bloqueo de fichero global."""
+
+    def __init__(self, directorio_datos: str):
+        self._directorio = directorio_datos
+
+    def ruta(self, inquilino_id: str) -> str:
+        return os.path.join(directorio_inquilino(self._directorio, inquilino_id), NOMBRE_PERFIL)
+
+    def existe(self, inquilino_id: str) -> bool:
+        return os.path.exists(self.ruta(inquilino_id))
+
+    def leer(self, inquilino_id: str):
+        with open(self.ruta(inquilino_id), "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    def escribir(self, inquilino_id: str, datos: dict) -> None:
+        escribir_json_atomico(self.ruta(inquilino_id), datos)
+
+    def ids(self) -> list:
+        if not os.path.isdir(self._directorio):
+            return []
+        ids = []
+        for nombre in sorted(os.listdir(self._directorio)):
+            try:
+                validar_inquilino_id(nombre)
+            except ValueError:
+                continue
+            if os.path.isfile(os.path.join(self._directorio, nombre, NOMBRE_PERFIL)):
+                ids.append(nombre)
+        return ids
+
+    def bloqueo(self):
+        return bloqueo(self._directorio, "perfiles")
+
+
+class _PerfilesEnPostgres:
+    """Fase 4: tabla `perfiles` (una fila por inquilino). Cada consulta va por `inquilino_id`,
+    salvo `ids()`, que es justo la lista de inquilinos (la necesitan la flota y el panel del dueño).
+
+    El bloqueo global es un bloqueo consultivo de Postgres dentro de una transacción: lo que se lee
+    y escribe mientras se tiene usa esa misma conexión, así que es atómico entre procesos.
+    """
+    _CLAVE_BLOQUEO = 7_451_001  # cualquiera fija: "los perfiles"
+
+    def __init__(self, url: str):
+        self._url = url
+        self._conexion = None
+
+    def _ejecutar(self, sql: str, parametros=()):
+        import psycopg
+        if self._conexion is not None:
+            return self._conexion.execute(sql, parametros).fetchall()
+        with psycopg.connect(self._url) as conexion:
+            return conexion.execute(sql, parametros).fetchall()
+
+    def existe(self, inquilino_id: str) -> bool:
+        return bool(self._ejecutar("SELECT 1 FROM perfiles WHERE inquilino_id = %s", (inquilino_id,)))
+
+    def leer(self, inquilino_id: str):
+        filas = self._ejecutar("SELECT datos FROM perfiles WHERE inquilino_id = %s", (inquilino_id,))
+        return filas[0][0]
+
+    def escribir(self, inquilino_id: str, datos: dict) -> None:
+        from psycopg.types.json import Jsonb
+        self._ejecutar(
+            "INSERT INTO perfiles (inquilino_id, datos) VALUES (%s, %s) "
+            "ON CONFLICT (inquilino_id) DO UPDATE SET datos = EXCLUDED.datos RETURNING 1",
+            (inquilino_id, Jsonb(datos)),
+        )
+
+    def ids(self) -> list:
+        return [fila[0] for fila in self._ejecutar("SELECT inquilino_id FROM perfiles ORDER BY inquilino_id")]
+
+    def bloqueo(self):
+        from contextlib import contextmanager
+        import psycopg
+
+        @contextmanager
+        def transaccion():
+            with psycopg.connect(self._url) as conexion:
+                conexion.execute("SELECT pg_advisory_xact_lock(%s)", (self._CLAVE_BLOQUEO,))
+                self._conexion = conexion
+                try:
+                    yield
+                finally:
+                    self._conexion = None
+        return transaccion()
+
+
 class AlmacenPerfiles:
-    """Los perfiles en disco, uno por carpeta de inquilino.
+    """Los perfiles: en disco, uno por carpeta de inquilino, o en Postgres con `FEMIX_BASE_DATOS_URL`.
 
     Cada escritura va bajo un bloqueo global de perfiles (no por inquilino): comprobar que un token
     de Telegram no lo usa otro inquilino exige ver todos a la vez. Dos bots con el mismo token se
     tumban mutuamente (`Conflict: terminated by other getUpdates request`).
     """
 
-    def __init__(self, directorio_datos: str = "datos"):
+    def __init__(self, directorio_datos: str = "datos", url: "str | None" = None):
         self._directorio = directorio_datos
+        url = url if url is not None else (os.environ.get(VARIABLE_URL) or "").strip()
+        self._fondo = _PerfilesEnPostgres(url) if url else _PerfilesEnFicheros(directorio_datos)
 
-    def ruta(self, inquilino_id: str) -> str:
-        return os.path.join(directorio_inquilino(self._directorio, inquilino_id), NOMBRE_PERFIL)
+    def existe(self, inquilino_id: str) -> bool:
+        return self._fondo.existe(validar_inquilino_id(inquilino_id))
 
     def obtener(self, inquilino_id: str) -> "PerfilInquilino | None":
         """El perfil, `None` si no tiene, o `PerfilIlegible` si lo tiene pero no se puede leer."""
-        ruta = self.ruta(inquilino_id)
-        if not os.path.exists(ruta):
+        if not self.existe(inquilino_id):
             return None
         try:
-            with open(ruta, "r", encoding="utf-8") as f:
-                perfil = PerfilInquilino.de_dict(json.load(f))
+            perfil = PerfilInquilino.de_dict(self._fondo.leer(inquilino_id))
         except Exception as exc:
             # Lo que sea (JSON roto, `null`, tipos raros): quien llama decide qué hacer con él.
             raise PerfilIlegible(f"El perfil de '{inquilino_id}' no se puede leer: {exc}") from None
@@ -228,16 +319,8 @@ class AlmacenPerfiles:
 
         Uno roto se aparta y se avisa: no puede dejar sin bots (ni sin panel) al resto.
         """
-        if not os.path.isdir(self._directorio):
-            return [], {}
         perfiles, errores = [], {}
-        for nombre in sorted(os.listdir(self._directorio)):
-            try:
-                validar_inquilino_id(nombre)
-            except ValueError:
-                continue
-            if not os.path.isfile(os.path.join(self._directorio, nombre, NOMBRE_PERFIL)):
-                continue
+        for nombre in self._fondo.ids():
             try:
                 perfiles.append(self.obtener(nombre))
             except PerfilIlegible as exc:
@@ -250,11 +333,11 @@ class AlmacenPerfiles:
 
     def crear(self, perfil: PerfilInquilino) -> PerfilInquilino:
         perfil = replace(perfil.validado(), activo=True, fecha_alta=_ahora(), fecha_baja=None)
-        with bloqueo(self._directorio, "perfiles"):
-            if os.path.exists(self.ruta(perfil.inquilino_id)):
+        with self._fondo.bloqueo():
+            if self.existe(perfil.inquilino_id):
                 raise InquilinoYaExiste(f"El inquilino '{perfil.inquilino_id}' ya existe")
             self._comprobar_token_libre(perfil)
-            escribir_json_atomico(self.ruta(perfil.inquilino_id), perfil.a_dict())
+            self._fondo.escribir(perfil.inquilino_id, perfil.a_dict())
         return perfil
 
     def modificar(self, inquilino_id: str, cambio) -> PerfilInquilino:
@@ -263,7 +346,7 @@ class AlmacenPerfiles:
         Leer fuera y escribir dentro perdía lo que otro proceso (el panel, el bot al arrancar)
         guardara entre medias. El alta, la baja y la fecha de alta no se tocan aquí.
         """
-        with bloqueo(self._directorio, "perfiles"):
+        with self._fondo.bloqueo():
             actual = self._obtener_existente(inquilino_id)
             perfil = cambio(actual).validado()
             perfil = replace(
@@ -271,7 +354,7 @@ class AlmacenPerfiles:
                 fecha_alta=actual.fecha_alta, fecha_baja=actual.fecha_baja,
             )
             self._comprobar_token_libre(perfil)
-            escribir_json_atomico(self.ruta(inquilino_id), perfil.a_dict())
+            self._fondo.escribir(inquilino_id, perfil.a_dict())
         return perfil
 
     def actualizar(self, perfil: PerfilInquilino) -> PerfilInquilino:
@@ -282,7 +365,7 @@ class AlmacenPerfiles:
     def reparar(self, perfil: PerfilInquilino) -> PerfilInquilino:
         """Escribe un perfil nuevo encima de uno ilegible. Si el actual se puede leer, no toca nada."""
         perfil = replace(perfil.validado(), activo=True, fecha_alta=_ahora(), fecha_baja=None)
-        with bloqueo(self._directorio, "perfiles"):
+        with self._fondo.bloqueo():
             try:
                 self.obtener(perfil.inquilino_id)
             except PerfilIlegible:
@@ -290,7 +373,7 @@ class AlmacenPerfiles:
             else:
                 raise ValueError(f"El perfil de '{perfil.inquilino_id}' se puede leer: no hay nada que reparar")
             self._comprobar_token_libre(perfil)
-            escribir_json_atomico(self.ruta(perfil.inquilino_id), perfil.a_dict())
+            self._fondo.escribir(perfil.inquilino_id, perfil.a_dict())
         return perfil
 
     def dar_de_baja(self, inquilino_id: str) -> PerfilInquilino:
@@ -301,10 +384,10 @@ class AlmacenPerfiles:
         return self._cambiar_estado(inquilino_id, activo=True)
 
     def _cambiar_estado(self, inquilino_id: str, activo: bool) -> PerfilInquilino:
-        with bloqueo(self._directorio, "perfiles"):
+        with self._fondo.bloqueo():
             actual = self._obtener_existente(inquilino_id)
             perfil = replace(actual, activo=activo, fecha_baja=None if activo else _ahora())
-            escribir_json_atomico(self.ruta(inquilino_id), perfil.a_dict())
+            self._fondo.escribir(inquilino_id, perfil.a_dict())
         return perfil
 
     def _obtener_existente(self, inquilino_id: str) -> PerfilInquilino:

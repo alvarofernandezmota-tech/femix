@@ -496,7 +496,7 @@ def _crear_inquilino(inquilino_id: str, nombre: str, tipo: str, password: str) -
     directorio = directorio_datos_web()
     perfiles, accesos = AlmacenPerfiles(directorio), AlmacenInquilinos(directorio)
     perfil = PerfilInquilino(inquilino_id=inquilino_id, nombre=nombre, tipo=tipo).validado()
-    if os.path.exists(perfiles.ruta(perfil.inquilino_id)) or accesos.obtener(perfil.inquilino_id) is not None:
+    if perfiles.existe(perfil.inquilino_id) or accesos.obtener(perfil.inquilino_id) is not None:
         raise ValueError(f"El inquilino '{perfil.inquilino_id}' ya existe")
     perfil = perfiles.crear(perfil)
     if password:
