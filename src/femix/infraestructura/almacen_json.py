@@ -37,3 +37,11 @@ class AlmacenJson:
                 except (OSError, ValueError, TypeError):
                     continue  # un fichero roto no tumba las estadísticas de todos
         return total
+
+    def usuarios(self, coleccion: str) -> list:
+        """Usuarios que tienen algo de esa colección (para los avisos de recordatorios)."""
+        prefijo = f"{validar_coleccion(coleccion)}_"
+        if not os.path.isdir(self.directorio):
+            return []
+        return sorted(n[len(prefijo):-5] for n in os.listdir(self.directorio)
+                      if n.startswith(prefijo) and n.endswith(".json"))

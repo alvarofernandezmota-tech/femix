@@ -8,6 +8,8 @@ from femix.dominio.personal.reloj import Reloj, RelojSistema
 class Recordatorio:
     texto: str
     cuando: str
+    # Ya se avisó por Telegram. Los guardados antes de existir este campo cuentan como no avisados.
+    avisado: bool = False
 
 def esta_vencido(cuando: datetime, ahora: datetime) -> bool:
     return ahora >= cuando
@@ -36,6 +38,18 @@ class Recordatorios:
         self._recordatorios.append(Recordatorio(texto, cuando_iso))
         self._guardar()
         return f"Recordatorio creado: {texto} ({cuando_iso})"
+
+    def por_avisar(self) -> list:
+        """Vencidos y sin avisar: `[(posición, Recordatorio)]`, del más antiguo al más nuevo."""
+        ahora = self._reloj.ahora()
+        vencidos = [(i, r) for i, r in enumerate(self._recordatorios)
+                    if not r.avisado and esta_vencido(datetime.fromisoformat(r.cuando), ahora)]
+        return sorted(vencidos, key=lambda par: par[1].cuando)
+
+    def marcar_avisado(self, posicion: int) -> None:
+        """Se marca uno a uno y solo después de enviarlo: si el envío falla, se reintenta."""
+        self._recordatorios[posicion].avisado = True
+        self._guardar()
 
     def listar_pendientes(self) -> list[dict]:
         ahora = self._reloj.ahora()

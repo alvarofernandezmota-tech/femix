@@ -416,3 +416,12 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
 - Las dos en el almacén del inquilino (JSON o Postgres, siempre con `inquilino_id`).
 - 18 tests nuevos (reglas de hugin, comandos, cableado en el bot, aislamiento en Postgres). 472 en
   verde con Postgres real.
+
+## Mejoras: fecha y hora, y recordatorios que avisan (2026-09-23)
+- `RelojZona` (`FEMIX_ZONA_HORARIA`, por defecto `Europe/Madrid`; `tzdata` en requirements): cada
+  mensaje lleva "Ahora es martes 22 de septiembre de 2026, 23:30" en el contexto, y reservas,
+  recordatorios, diario y agenda usan la hora local en vez de la UTC del contenedor.
+- Recordatorios proactivos: cada bot revisa cada minuto los recordatorios vencidos de sus usuarios
+  permitidos y les escribe "⏰ Recordatorio: …". Se marca `avisado` después de enviar (si falla, se
+  reintenta; nunca se repite). Los recordatorios antiguos sin el campo se leen igual.
+- 7 tests nuevos. 478 en verde con Postgres real (460 + 18 saltados sin él).

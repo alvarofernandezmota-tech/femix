@@ -90,3 +90,13 @@ class AlmacenPostgres:
                 "SELECT count(*) FROM registros WHERE inquilino_id = %s AND coleccion = %s",
                 (self.inquilino_id, validar_coleccion(coleccion)),
             ).fetchone()[0]
+
+    def usuarios(self, coleccion: str) -> list:
+        """Usuarios de este inquilino que tienen algo de esa colección."""
+        with self._conectar() as conexion:
+            filas = conexion.execute(
+                "SELECT DISTINCT usuario_id FROM registros WHERE inquilino_id = %s AND coleccion = %s "
+                "ORDER BY usuario_id",
+                (self.inquilino_id, validar_coleccion(coleccion)),
+            ).fetchall()
+        return [fila[0] for fila in filas]

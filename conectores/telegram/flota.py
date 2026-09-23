@@ -17,7 +17,8 @@ from datetime import datetime, timezone
 
 from telegram.error import InvalidToken
 
-from femix.bot.fabrica import construir_femix, inquilino_desde_entorno
+from femix.bot.fabrica import almacen_dominio, construir_femix, inquilino_desde_entorno
+from femix.dominio.personal.recordatorios import Recordatorios
 from femix.infraestructura.ficheros import escribir_json_atomico
 from femix.inquilino.capacidades import CATALOGO, POR_DEFECTO, VOZ
 from femix.inquilino.perfil import AlmacenPerfiles, InquilinoYaExiste, PerfilInquilino
@@ -160,6 +161,54 @@ class _BotEnMarcha:
     app: object = field(repr=False)
     usuario: str
     desde: str
+    avisos: object = field(default=None, repr=False)   # tarea asyncio de los recordatorios
+
+
+INTERVALO_AVISOS = 60.0
+
+
+def avisos_pendientes(directorio_datos: str, inquilino_id: str, permitidos, reloj) -> list:
+    """`[(usuario_id, Recordatorios, posición, Recordatorio)]` vencidos y sin avisar.
+
+    Solo de usuarios permitidos con ID de Telegram (el panel usa el id del inquilino como usuario:
+    a ese no hay a quién escribirle).
+    """
+    almacen = almacen_dominio(directorio_datos, inquilino_id)
+    pendientes = []
+    for usuario in almacen.usuarios("recordatorios"):
+        if not (usuario.isascii() and usuario.isdigit()) or int(usuario) not in permitidos:
+            continue
+        recordatorios = Recordatorios(usuario, reloj=reloj, almacen=almacen)
+        pendientes += [(usuario, recordatorios, i, r) for i, r in recordatorios.por_avisar()]
+    return pendientes
+
+
+async def avisar_recordatorios(app, directorio_datos: str, inquilino_id: str, reloj) -> int:
+    """Una pasada: manda los recordatorios vencidos y los marca. Devuelve cuántos mandó."""
+    permitidos = app.bot_data.get("permitidos", frozenset())
+    pendientes = await asyncio.to_thread(avisos_pendientes, directorio_datos, inquilino_id, permitidos, reloj)
+    enviados = 0
+    for usuario, recordatorios, posicion, recordatorio in pendientes:
+        try:
+            await app.bot.send_message(chat_id=int(usuario), text=f"⏰ Recordatorio: {recordatorio.texto}")
+        except Exception as exc:
+            _log.warning("Bot de %s: no se pudo avisar a %s (%s); se reintenta", inquilino_id, usuario, type(exc).__name__)
+            continue
+        await asyncio.to_thread(recordatorios.marcar_avisado, posicion)
+        enviados += 1
+    return enviados
+
+
+async def _bucle_avisos(app, directorio_datos: str, inquilino_id: str) -> None:
+    reloj = RelojZona()
+    while True:
+        try:
+            await avisar_recordatorios(app, directorio_datos, inquilino_id, reloj)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            _log.warning("Bot de %s: fallo revisando recordatorios", inquilino_id, exc_info=True)
+        await asyncio.sleep(INTERVALO_AVISOS)
 
 
 async def _paso(nombre: str, accion) -> None:
@@ -231,6 +280,7 @@ class FlotaDeBots:
         entorno: "BotDelEntorno | None" = None,
         construir_app=None,
         fabricar_femix=construir_femix,
+        avisos: bool = True,
     ):
         if construir_app is None:
             from .bot import construir_aplicacion as construir_app
@@ -239,6 +289,7 @@ class FlotaDeBots:
         self._entorno = entorno
         self._construir_app = construir_app
         self._fabricar_femix = fabricar_femix
+        self._avisos = avisos
         self._bots: dict = {}
         # Tokens que Telegram rechazó: no se reintentan hasta que cambie la configuración.
         self._rechazados: dict = {}
@@ -341,7 +392,8 @@ class FlotaDeBots:
             usuario = app.bot.username or "?"
         except Exception:  # sin get_me cacheado, python-telegram-bot lanza RuntimeError
             usuario = "?"
-        self._bots[inquilino_id] = _BotEnMarcha(config, app, usuario, _ahora())
+        avisos = asyncio.create_task(_bucle_avisos(app, self._directorio, inquilino_id)) if self._avisos else None
+        self._bots[inquilino_id] = _BotEnMarcha(config, app, usuario, _ahora(), avisos)
         _log.info(
             "Bot de %s en marcha: @%s (%s; %d permitidos)", inquilino_id, usuario,
             "texto + voz" if VOZ in config.capacidades else "solo texto", len(config.permitidos),
@@ -356,6 +408,9 @@ class FlotaDeBots:
         bots = [self._bots.pop(inquilino_id) for inquilino_id in motivos]
         for bot in bots:
             _log.info("Bot de %s (@%s): se para, %s", bot.config.inquilino_id, bot.usuario, motivos[bot.config.inquilino_id])
+        for bot in bots:
+            if bot.avisos is not None:
+                bot.avisos.cancel()
         if bots:
             await _cerrar_todos([bot.app for bot in bots])
 

@@ -156,7 +156,7 @@ Siguiente: Fase 5 (tool calling).
 - Los dos LLM (rápido + complejo) ya están implementados y enchufados, pero sin medir en
   producción: falta decidir qué modelo concreto va en cada carril con la CPU actual (ver la nota de
   rendimiento de `docs/ROADMAP.md`).
-- `recordatorios` no tiene scheduler ni notificación proactiva, solo cálculo de vencimiento y listado.
+- `recordatorios`: avisan por Telegram al vencer (bucle de la flota, cada minuto).
 - Panel web (`src/femix/web/`): `/usuario/config` (personalización del bot por el propio
   inquilino) depende de la Fase 3. Sesiones en JSON local con lock de fichero: valen para varios
   workers en la misma máquina, no para varias máquinas. El panel está en pruebas: en Docker va tras
