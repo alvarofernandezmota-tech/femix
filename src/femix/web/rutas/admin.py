@@ -26,7 +26,7 @@ from femix.inquilino.perfil import (
 )
 from femix.inquilino.personalidad import prompt_sistema_de
 from femix.llm.prompts import PROMPT_SISTEMA
-from femix.rag.rutas import directorio_inquilino, validar_inquilino_id
+from femix.rag.rutas import validar_inquilino_id
 
 from ..documentos import ingerir_subida, listar_documentos
 from .auth import (

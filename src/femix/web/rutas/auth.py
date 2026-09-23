@@ -1,7 +1,6 @@
 import hashlib
 import os
 import secrets
-import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 

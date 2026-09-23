@@ -22,7 +22,7 @@ Reglas (las mismas que en hugin, con sus porqués):
 import threading
 import unicodedata
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 from ..personal.reloj import Reloj, RelojSistema
 
