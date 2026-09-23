@@ -32,6 +32,7 @@ AYUDA_RESERVA = (
 
 def ejecutar_comando(
     usuario_id: str, texto: str, directorio_datos: str = "datos", almacen=None, reservas=None,
+    reloj=None,
 ) -> str:
     """`reservas`: la agenda del negocio (`dominio/negocio/reservas.Reservas`) si el inquilino tiene
     la capacidad; None = este bot no hace reservas."""
@@ -44,11 +45,11 @@ def ejecutar_comando(
     if comando == "/tarea":
         return _comando_tarea(usuario_id, resto, directorio_datos, almacen)
     if comando == "/diario":
-        return _comando_diario(usuario_id, resto, directorio_datos, almacen)
+        return _comando_diario(usuario_id, resto, directorio_datos, almacen, reloj)
     if comando == "/recordatorio":
-        return _comando_recordatorio(usuario_id, resto, directorio_datos, almacen)
+        return _comando_recordatorio(usuario_id, resto, directorio_datos, almacen, reloj)
     if comando == "/agenda":
-        return _comando_agenda(usuario_id, resto, directorio_datos, almacen)
+        return _comando_agenda(usuario_id, resto, directorio_datos, almacen, reloj)
     if comando == "/reserva":
         if reservas is None:
             return "Este bot no hace reservas."
@@ -82,18 +83,18 @@ def _comando_tarea(usuario_id: str, resto: str, directorio_datos: str, almacen=N
         return tareas.consultar(indice)
     return AYUDA
 
-def _comando_diario(usuario_id: str, resto: str, directorio_datos: str, almacen=None) -> str:
+def _comando_diario(usuario_id: str, resto: str, directorio_datos: str, almacen=None, reloj=None) -> str:
     if not resto:
         return AYUDA
-    return Diario(usuario_id, directorio_datos=directorio_datos, almacen=almacen).registrar(resto)
+    return Diario(usuario_id, directorio_datos=directorio_datos, reloj=reloj, almacen=almacen).registrar(resto)
 
-def _comando_recordatorio(usuario_id: str, resto: str, directorio_datos: str, almacen=None) -> str:
+def _comando_recordatorio(usuario_id: str, resto: str, directorio_datos: str, almacen=None, reloj=None) -> str:
     sub_partes = resto.split(maxsplit=1)
     if not sub_partes:
         return AYUDA
     accion = sub_partes[0].lower()
     argumento = sub_partes[1] if len(sub_partes) > 1 else ""
-    recordatorios = Recordatorios(usuario_id, directorio_datos=directorio_datos, almacen=almacen)
+    recordatorios = Recordatorios(usuario_id, directorio_datos=directorio_datos, reloj=reloj, almacen=almacen)
 
     if accion == "crear":
         if "|" not in argumento:
@@ -134,13 +135,13 @@ def _es_fecha(texto: str) -> bool:
 def _linea_cita(c: dict) -> str:
     return f"{c['id']}. {c['fecha']} {c.get('hora') or '(todo el día)'} {c['texto']}"
 
-def _comando_agenda(usuario_id: str, resto: str, directorio_datos: str, almacen=None) -> str:
+def _comando_agenda(usuario_id: str, resto: str, directorio_datos: str, almacen=None, reloj=None) -> str:
     agenda = AgendaPersonal(usuario_id, directorio_datos=directorio_datos, almacen=almacen)
     partes = resto.split()
     if not partes:
         return AYUDA
     if partes[0].lower() == "listar":
-        citas = agenda.activas(desde=datetime.now().date().isoformat())
+        citas = agenda.activas(desde=(reloj.ahora() if reloj else datetime.now()).date().isoformat())
         return "\n".join(_linea_cita(c) for c in citas) if citas else "No tienes citas."
     if partes[0].lower() == "cancelar":
         indice = _parsear_indice(partes[1]) if len(partes) > 1 else None
@@ -167,7 +168,7 @@ def _comando_reserva(usuario_id: str, resto: str, reservas) -> str:
     accion = partes[0].lower()
     if accion == "huecos":
         argumentos = (partes[1] if len(partes) > 1 else "").split()
-        fecha = next((a for a in argumentos if _es_fecha(a)), datetime.now().date().isoformat())
+        fecha = next((a for a in argumentos if _es_fecha(a)), reservas.hoy())
         minutos = next((int(a) for a in argumentos if a.isascii() and a.isdigit()), 30)
         huecos = reservas.proximos_huecos(fecha, minutos, tope=5)
         return ("Huecos libres:\n" + "\n".join(f"{h.fecha} {h.hora}" for h in huecos)) if huecos \

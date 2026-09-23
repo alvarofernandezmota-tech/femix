@@ -165,7 +165,7 @@ class Fabrica:
         self.apps.append(app)
         return app
 
-    def femix(self, directorio_datos, inquilino_id, capacidades, prompt_sistema=None):
+    def femix(self, directorio_datos, inquilino_id, capacidades, prompt_sistema=None, **_):
         self.prompts = getattr(self, "prompts", {})
         self.prompts[inquilino_id] = prompt_sistema
         return ("femix", inquilino_id, capacidades)

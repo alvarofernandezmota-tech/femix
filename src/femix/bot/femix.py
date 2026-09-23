@@ -9,6 +9,7 @@ from ..llm.modelos import TAREA_RAPIDA, SelectorDeModelos
 from ..mente.decidir import necesita_agente
 from ..mente.entender import clasificar_intencion
 from ..mente.memoria import Memoria
+from ..dominio.personal.reloj import fecha_en_palabras
 from .comandos import ejecutar_comando
 
 RESPUESTA_VACIA = "No he conseguido generar una respuesta. ¿Puedes decirlo de otra forma?"
@@ -39,6 +40,7 @@ class Femix:
         delegar: bool = True,
         almacen=None,
         reservas=None,
+        reloj=None,
     ):
         self._selector = selector_modelos or SelectorDeModelos()
         self._motor = motor or self._selector.motor(tipo_tarea=TAREA_RAPIDA)
@@ -49,6 +51,9 @@ class Femix:
         self._almacen = almacen
         # Agenda del negocio (`dominio/negocio/reservas.py`) si el inquilino tiene la capacidad.
         self._reservas = reservas
+        # Con reloj, cada mensaje lleva la fecha y la hora actuales en el contexto: sin eso el
+        # modelo no sabe si el negocio está abierto ni qué es "mañana".
+        self._reloj = reloj
         if not delegar:
             self._subagente = None
         elif subagente is not None:
@@ -73,11 +78,15 @@ class Femix:
         intencion = clasificar_intencion(texto)
         if intencion == "comando":
             respuesta = ejecutar_comando(
-                usuario_id, texto, directorio_datos=self._directorio_datos, almacen=self._almacen, reservas=self._reservas
+                usuario_id, texto, directorio_datos=self._directorio_datos, almacen=self._almacen, reservas=self._reservas,
+                reloj=self._reloj,
             )
             self._registrar_mensaje(usuario_id, "comando", inicio, texto, respuesta)
             return respuesta
         contexto = self._memoria.contexto(self._inquilino_id, usuario_id)
+        if self._reloj is not None:
+            ahora = f"Ahora es {fecha_en_palabras(self._reloj.ahora())} (hora local)."
+            contexto = f"{ahora}\n{contexto}" if contexto else ahora
         respuesta, camino = self._responder(usuario_id, texto, contexto, intencion)
         # Un modelo local puede devolver la cadena vacía. Telegram rechaza un mensaje vacío
         # ("Message text is empty") y el usuario se quedaría sin nada; mejor decírselo.

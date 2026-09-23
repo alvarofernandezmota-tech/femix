@@ -47,8 +47,11 @@ def personalidad_de(perfil: PerfilInquilino, base: Personalidad = PERSONALIDAD_F
             horario += f" Cerrado: {', '.join(cerrados)}."
         contexto.append(horario)
         reglas.append("Si preguntan por el horario, da exactamente el que tienes; no lo cambies ni lo completes.")
-        # El prompt no lleva la fecha ni la hora: mejor decirlo que adivinar.
-        limites.append("No sabes qué día ni qué hora es: si preguntan si está abierto ahora, da el horario.")
+        # La fecha y la hora llegan en cada mensaje ("Ahora es ..."); si faltaran, mejor no adivinar.
+        limites.append(
+            "Para saber si está abierto ahora usa la fecha y hora que te dan en el contexto; si no te "
+            "las dan, no las adivines: da el horario."
+        )
     if perfil.tipo == "empresa":
         limites.append(
             f"No inventes precios, servicios, citas ni datos de {perfil.nombre} que no estén aquí o en "

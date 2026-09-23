@@ -61,6 +61,7 @@ def construir_femix(
     inquilino_id: "str | None" = None,
     capacidades=POR_DEFECTO,
     prompt_sistema: "str | None" = None,
+    reloj=None,
     **extra,
 ) -> Femix:
     """El `Femix` de un inquilino, con sus piezas según sus capacidades y sus datos en su carpeta.
@@ -92,8 +93,8 @@ def construir_femix(
         extra["selector_modelos"] = SelectorDeModelos(prompt_sistema=prompt_sistema)
     buscador = IndiceEmbeddingsBuscador(directorio_datos=directorio_datos) if DOCUMENTOS in capacidades else None
     if RESERVAS in capacidades and "reservas" not in extra:
-        extra["reservas"] = Reservas(_horario_del_perfil(directorio_datos, inquilino_id), almacen)
-    return Femix(inquilino_id=inquilino_id, directorio_datos=carpeta, buscador=buscador, **extra)
+        extra["reservas"] = Reservas(_horario_del_perfil(directorio_datos, inquilino_id), almacen, reloj)
+    return Femix(inquilino_id=inquilino_id, directorio_datos=carpeta, buscador=buscador, reloj=reloj, **extra)
 
 def _horario_del_perfil(directorio_datos: str, inquilino_id: str) -> list:
     """Sin perfil legible, sin horario: y sin horario no se reserva (regla de las reservas)."""

@@ -76,6 +76,9 @@ class Reservas:
         for tramos in self._tramos.values():
             tramos.sort()
 
+    def hoy(self) -> str:
+        return self._reloj.ahora().date().isoformat()
+
     # -- almacenamiento ---------------------------------------------------------------------
 
     def citas(self, fecha: "str | None" = None) -> list:

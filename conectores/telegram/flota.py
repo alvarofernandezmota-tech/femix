@@ -22,6 +22,7 @@ from femix.infraestructura.ficheros import escribir_json_atomico
 from femix.inquilino.capacidades import CATALOGO, POR_DEFECTO, VOZ
 from femix.inquilino.perfil import AlmacenPerfiles, InquilinoYaExiste, PerfilInquilino
 from femix.inquilino.personalidad import prompt_sistema_de
+from femix.dominio.personal.reloj import RelojZona
 
 from .acceso import VARIABLE_PERMITIDOS, leer_permitidos
 
@@ -313,6 +314,7 @@ class FlotaDeBots:
             femix = self._fabricar_femix(
                 directorio_datos=self._directorio, inquilino_id=inquilino_id,
                 capacidades=config.capacidades, prompt_sistema=config.prompt_sistema,
+                reloj=RelojZona(),
             )
             app = self._construir_app(config.token, femix, config.permitidos, voz=VOZ in config.capacidades)
             app.bot_data["inquilino_id"] = inquilino_id

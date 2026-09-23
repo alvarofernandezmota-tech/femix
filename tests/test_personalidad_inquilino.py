@@ -23,7 +23,7 @@ def test_empresa_con_todo():
     assert "lunes: de 09:00 a 14:00 y de 16:00 a 20:00; sábado: de 10:00 a 14:00" in prompt
     assert "Cerrado: martes, miércoles, jueves, viernes, domingo." in prompt
     assert "No inventes precios" in prompt
-    assert "No sabes qué día ni qué hora es" in prompt
+    assert "usa la fecha y hora que te dan en el contexto" in prompt
 
 
 def test_persona_minima_usa_lo_de_femix():
