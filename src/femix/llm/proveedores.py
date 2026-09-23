@@ -22,7 +22,15 @@ class ProveedorOllama(MotorLLM):
                 "model": self._modelo,
                 "messages": mensajes,
                 "stream": False,
-                "options": {"temperature": self._temperatura},
+                "options": {
+                    "temperature": self._temperatura,
+                    # En CPU el tiempo es casi proporcional a lo que escribe y a lo que lee: se
+                    # limitan las dos cosas (las respuestas ya se piden breves en el prompt).
+                    "num_predict": int(os.environ.get("HUGIN_LLM_MAX_TOKENS") or 300),
+                    "num_ctx": int(os.environ.get("HUGIN_LLM_CONTEXTO") or 4096),
+                },
+                # El modelo se queda cargado aunque no se haya configurado OLLAMA_KEEP_ALIVE.
+                "keep_alive": os.environ.get("HUGIN_LLM_KEEP_ALIVE") or "30m",
             }, timeout=self._timeout_segundos)
             resp.raise_for_status()
             return resp.json()["message"]["content"]

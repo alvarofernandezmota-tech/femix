@@ -434,3 +434,10 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   son de otro motor, se recalculan en la primera búsqueda y se guardan.
 - Umbral por motor (0.05 el de palabras, 0.5 el semántico; `FEMIX_EMBEDDINGS_UMBRAL`).
 - 4 tests con un Ollama simulado que entiende de temas.
+
+## Velocidad en madre (2026-09-23)
+- Verificado en `madre`: migración, bot, memoria (te llama por tu nombre), borrado de ramas. Pero
+  lento: 31 s un "hola" y 60 s de corte en la segunda pregunta.
+- Ollama: `num_predict` 300 (`HUGIN_LLM_MAX_TOKENS`) y `num_ctx` 4096 (`HUGIN_LLM_CONTEXTO`) —en
+  CPU el tiempo va con lo que escribe y lo que lee—, `keep_alive` 30m en cada petición
+  (`HUGIN_LLM_KEEP_ALIVE`) y límite de espera 120 s (`HUGIN_LLM_TIMEOUT`).
