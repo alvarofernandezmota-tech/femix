@@ -1,11 +1,46 @@
-version: "3.9"
+# Ollama corre en el host (madre), escuchando solo en 127.0.0.1:11434.
+#
+# Por eso los servicios usan `network_mode: host`: el contenedor comparte la red del host y
+# `localhost:11434` ES el Ollama del host, sin tocar su configuración. Con la red bridge por
+# defecto, `localhost` sería el propio contenedor y `host.docker.internal` llega a la IP del
+# bridge (172.17.0.1), que un Ollama atado a 127.0.0.1 rechaza. Alternativa sin red del host
+# en docs/docker.md.
+#
+#   docker compose up -d --build              # solo el bot de Telegram
+#   docker compose --profile web up -d        # bot + panel web (en pruebas)
+#   docker compose run --rm femix-bot python -m femix.bot.ingerir /app/documentos   # cargar RAG
+
+x-femix: &femix
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: femix:latest
+  env_file:
+    - .env
+  network_mode: host
+  restart: unless-stopped
+  volumes:
+    - femix-datos:/app/datos
+    - ./documentos:/app/documentos:ro
 
 services:
   femix-bot:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    <<: *femix
     container_name: femix-bot
-    env_file:
-      - .env
-    restart: unless-stopped
+    volumes:
+      - femix-datos:/app/datos
+      - ./documentos:/app/documentos:ro
+      - femix-cache:/home/femix/.cache
+
+  femix-web:
+    <<: *femix
+    container_name: femix-web
+    profiles: ["web"]
+    command:
+      - sh
+      - -c
+      - uvicorn femix.web.app:app --host "$${FEMIX_WEB_HOST:-127.0.0.1}" --port "$${FEMIX_WEB_PORT:-8000}"
+
+volumes:
+  femix-datos:
+  femix-cache:
