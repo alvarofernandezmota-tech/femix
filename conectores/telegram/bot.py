@@ -10,7 +10,8 @@ ESPERA_TELEGRAM = 30.0
 
 load_dotenv()
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
-from femix.bot.fabrica import construir_femix
+from femix.bot.fabrica import DIRECTORIO_DATOS, construir_femix, inquilino_desde_entorno
+from femix.inquilino.migracion import migrar_datos_heredados
 from .acceso import VARIABLE_PERMITIDOS, comprobar_acceso, leer_permitidos
 from .voz import manejar_nota_de_voz
 
@@ -74,6 +75,7 @@ def main():
             "%s está vacío: el bot no atenderá a nadie. Escríbele y mira aquí qué ID se deniega.",
             VARIABLE_PERMITIDOS,
         )
+    migrar_datos_heredados(DIRECTORIO_DATOS, inquilino_desde_entorno())
     app = construir_aplicacion(os.environ["TELEGRAM_BOT_TOKEN"], construir_femix(), permitidos)
     print("FEMIX conectado a Telegram (texto + voz). Ctrl+C para detener.")
     app.run_polling()

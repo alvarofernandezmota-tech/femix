@@ -39,3 +39,12 @@ class Memoria:
     def contexto(self, inquilino_id: str, usuario_id: str) -> str:
         k = self.clave(inquilino_id, usuario_id)
         return "\n".join(f"Usuario: {t.entrada}\nHugin: {t.salida}" for t in self._historial.get(k, []))
+
+class MemoriaDesactivada:
+    """Para inquilinos sin la capacidad `memoria_largo_plazo`: cada mensaje empieza de cero."""
+
+    def registrar(self, inquilino_id: str, usuario_id: str, entrada: str, salida: str):
+        pass
+
+    def contexto(self, inquilino_id: str, usuario_id: str) -> str:
+        return ""

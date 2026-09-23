@@ -108,3 +108,42 @@ def test_usa_el_directorio_de_datos_que_le_dan(tmp_path):
     femix.procesar("usuario1", PREGUNTA)
     assert (tmp_path / "acme" / "rag" / "indice.json").exists()
     assert "nueve a catorce" in motor.llamadas[0][0]
+
+# --- datos por inquilino y capacidades -----------------------------------------
+
+def _femix_con_memoria_real(tmp_path, inquilino_id, **extra):
+    motor = MotorFalso()
+    return construir_femix(directorio_datos=str(tmp_path), inquilino_id=inquilino_id, motor=motor, **extra), motor
+
+def test_las_tareas_de_cada_inquilino_van_en_su_carpeta(tmp_path):
+    acme, _ = _femix_con_memoria_real(tmp_path, "acme")
+    globex, _ = _femix_con_memoria_real(tmp_path, "globex")
+    acme.procesar("7", "/tarea crear secreto de acme")
+    assert (tmp_path / "acme" / "tareas_7.json").exists()
+    # El mismo usuario de Telegram hablando con el bot de otro inquilino no ve esas tareas.
+    assert "secreto de acme" not in globex.procesar("7", "/tarea listar")
+
+def test_la_memoria_de_cada_inquilino_va_en_su_carpeta(tmp_path):
+    acme, motor_acme = _femix_con_memoria_real(tmp_path, "acme")
+    globex, motor_globex = _femix_con_memoria_real(tmp_path, "globex")
+    acme.procesar("7", "me llamo Varo")
+    globex.procesar("7", "hola")
+    assert (tmp_path / "acme" / "memoria.json").exists()
+    assert "Varo" not in motor_globex.llamadas[0][0]
+    # Dos Memoria en el mismo proceso ya no reescriben el mismo fichero: la de acme sigue ahí.
+    acme_otra_vez, motor = _femix_con_memoria_real(tmp_path, "acme")
+    acme_otra_vez.procesar("7", "¿cómo me llamo?")
+    assert "me llamo Varo" in motor.llamadas[0][0]
+
+def test_sin_capacidad_de_memoria_no_recuerda(tmp_path):
+    femix, motor = _femix_con_memoria_real(tmp_path, "acme", capacidades=("voz", "documentos"))
+    femix.procesar("7", "me llamo Varo")
+    femix.procesar("7", "¿cómo me llamo?")
+    assert motor.llamadas[1][0] == ""
+    assert not (tmp_path / "acme" / "memoria.json").exists()
+
+def test_sin_capacidad_de_documentos_no_busca_en_el_indice(tmp_path):
+    _ingerir(tmp_path, "acme", HORARIO)
+    femix, motor = _femix(tmp_path, inquilino_id="acme", capacidades=("memoria_largo_plazo",))
+    femix.procesar("usuario1", PREGUNTA)
+    assert "nueve a catorce" not in motor.llamadas[0][0]

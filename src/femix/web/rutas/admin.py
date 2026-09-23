@@ -5,6 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
+from femix.rag.rutas import directorio_inquilino
+
 from .auth import AlmacenInquilinos, directorio_datos_web, requerir_admin
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(requerir_admin)])
@@ -20,11 +22,16 @@ class CrearInquilinoPeticion(BaseModel):
 
 
 def _contar_registros(inquilino_id: str, directorio: str, prefijo: str) -> int:
-    ruta = os.path.join(directorio, f"{prefijo}_{inquilino_id}.json")
-    if not os.path.exists(ruta):
+    """Registros de `prefijo` de todos los usuarios del inquilino (panel y Telegram)."""
+    carpeta = directorio_inquilino(directorio, inquilino_id)
+    if not os.path.isdir(carpeta):
         return 0
-    with open(ruta, "r", encoding="utf-8") as f:
-        return len(json.load(f))
+    total = 0
+    for nombre in os.listdir(carpeta):
+        if nombre.startswith(f"{prefijo}_") and nombre.endswith(".json"):
+            with open(os.path.join(carpeta, nombre), "r", encoding="utf-8") as f:
+                total += len(json.load(f))
+    return total
 
 
 def _calcular_stats(directorio: str, inquilinos: list) -> dict:
