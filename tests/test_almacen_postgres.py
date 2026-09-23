@@ -122,3 +122,63 @@ def test_copiar_los_json_a_postgres(url, tmp_path, capsys):
     assert AlmacenPostgres(url, "varo").cargar("recordatorios", "7")[0]["texto"] == "ya estaba"
     assert copiar(str(tmp_path), url) == []  # relanzarlo no duplica
     assert (tmp_path / "varo" / "tareas_7.json").exists()  # los JSON se quedan como copia
+
+
+@requiere_postgres
+def test_la_memoria_va_a_postgres_por_inquilino(url, tmp_path, monkeypatch):
+    from femix.bot.fabrica import construir_femix
+    from femix.mente.memoria import MemoriaEnAlmacen
+    monkeypatch.setenv("FEMIX_BASE_DATOS_URL", url)
+
+    class Motor:
+        def __init__(self):
+            self.contextos = []
+
+        def generar(self, contexto, entrada):
+            self.contextos.append(contexto)
+            return "vale"
+
+    motor_a, motor_b = Motor(), Motor()
+    a = construir_femix(directorio_datos=str(tmp_path), inquilino_id="acme", motor=motor_a, delegar=False)
+    b = construir_femix(directorio_datos=str(tmp_path), inquilino_id="globex", motor=motor_b, delegar=False)
+    assert isinstance(a._memoria, MemoriaEnAlmacen)
+    a.procesar("7", "me llamo Varo")
+    a.procesar("7", "¿cómo me llamo?")
+    b.procesar("7", "hola")
+    assert "me llamo Varo" in motor_a.contextos[1]
+    assert motor_b.contextos[0] == ""
+    assert not (tmp_path / "acme" / "memoria.json").exists()
+
+
+@requiere_postgres
+def test_la_memoria_recorta_a_los_ultimos_turnos(url):
+    from femix.mente.memoria import MemoriaEnAlmacen
+    memoria = MemoriaEnAlmacen(AlmacenPostgres(url, "varo"), maximo_turnos=3)
+    for i in range(5):
+        memoria.registrar("varo", "7", f"e{i}", f"s{i}")
+    contexto = memoria.contexto("varo", "7")
+    assert "e1" not in contexto and "e2" in contexto and "e4" in contexto
+
+
+@requiere_postgres
+def test_copiar_la_memoria_json_a_postgres(url, tmp_path):
+    import json
+    from femix.inquilino.a_postgres import copiar
+    (tmp_path / "varo").mkdir()
+    (tmp_path / "varo" / "memoria.json").write_text(json.dumps({
+        "varo:7": [{"entrada": "hola", "salida": "qué tal"}], "otro:7": [{"entrada": "x", "salida": "y"}],
+    }))
+    assert ("varo", "memoria", "7", 1) in copiar(str(tmp_path), url)
+    assert AlmacenPostgres(url, "varo").cargar("memoria", "7") == [{"entrada": "hola", "salida": "qué tal"}]
+
+
+@requiere_postgres
+def test_una_base_que_no_es_utf8_se_rechaza_al_arrancar(url):
+    import psycopg
+    from urllib.parse import urlsplit, urlunsplit
+    partes = urlsplit(url)
+    with psycopg.connect(urlunsplit(partes._replace(path="/postgres")), autocommit=True) as conexion:
+        conexion.execute("DROP DATABASE IF EXISTS femix_ascii")
+        conexion.execute("CREATE DATABASE femix_ascii ENCODING 'SQL_ASCII' TEMPLATE template0 LC_COLLATE 'C' LC_CTYPE 'C'")
+    with pytest.raises(RuntimeError, match="UTF8"):
+        crear_esquema(urlunsplit(partes._replace(path="/femix_ascii")))

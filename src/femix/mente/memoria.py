@@ -63,3 +63,24 @@ class MemoriaDesactivada:
 
     def contexto(self, inquilino_id: str, usuario_id: str) -> str:
         return ""
+
+
+class MemoriaEnAlmacen:
+    """La memoria en el almacén del inquilino (Fase 4: Postgres). Misma interfaz que `Memoria`.
+
+    El almacén ya está atado a un inquilino, así que cada conversación se guarda por usuario:
+    lista de turnos en la colección "memoria".
+    """
+
+    def __init__(self, almacen, maximo_turnos: int = 12):
+        self._almacen = almacen
+        self.maximo_turnos = maximo_turnos
+
+    def registrar(self, inquilino_id: str, usuario_id: str, entrada: str, salida: str):
+        turnos = self._almacen.cargar("memoria", usuario_id)
+        turnos.append(asdict(Turno(entrada, salida)))
+        self._almacen.guardar("memoria", usuario_id, turnos[-self.maximo_turnos:])
+
+    def contexto(self, inquilino_id: str, usuario_id: str) -> str:
+        turnos = [Turno(**t) for t in self._almacen.cargar("memoria", usuario_id)]
+        return "\n".join(f"Usuario: {t.entrada}\nAsistente: {t.salida}" for t in turnos)

@@ -130,7 +130,7 @@ base y un rol propios, sin tocar los de midgaror:
 
 ```bash
 sudo -u postgres psql -c "CREATE ROLE femix LOGIN PASSWORD 'pon-una-clave-larga'"
-sudo -u postgres psql -c "CREATE DATABASE femix OWNER femix"
+sudo -u postgres psql -c "CREATE DATABASE femix OWNER femix ENCODING 'UTF8' TEMPLATE template0"
 # en .env:
 # FEMIX_BASE_DATOS_URL=postgresql://femix:pon-una-clave-larga@localhost:5432/femix
 docker compose up -d --build                     # crea la tabla al arrancar

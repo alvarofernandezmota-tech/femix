@@ -44,6 +44,29 @@ def copiar(directorio_datos: str, url: str) -> list:
             destino.guardar(coleccion, usuario, elementos)
             copiado.append((inquilino_id, coleccion, usuario, len(elementos)))
             print(f"  {inquilino_id}/{nombre}: {len(elementos)} copiados")
+        copiado += _copiar_memoria(carpeta, inquilino_id, destino)
+    return copiado
+
+
+def _copiar_memoria(carpeta: str, inquilino_id: str, destino) -> list:
+    """`memoria.json` guarda `{inquilino:usuario: [turnos]}`: cada usuario a su lista."""
+    import json
+    ruta = os.path.join(carpeta, "memoria.json")
+    if not os.path.isfile(ruta):
+        return []
+    try:
+        with open(ruta, "r", encoding="utf-8") as f:
+            historial = json.load(f)
+    except (OSError, ValueError):
+        print(f"  {inquilino_id}/memoria.json: ilegible, no se copia")
+        return []
+    copiado = []
+    for clave, turnos in historial.items():
+        dueno, _, usuario = clave.partition(":")
+        if dueno != inquilino_id or not usuario or destino.cargar("memoria", usuario):
+            continue
+        destino.guardar("memoria", usuario, turnos)
+        copiado.append((inquilino_id, "memoria", usuario, len(turnos)))
     return copiado
 
 

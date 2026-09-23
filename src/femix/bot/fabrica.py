@@ -4,7 +4,7 @@ from ..inquilino.capacidades import DOCUMENTOS, MEMORIA, POR_DEFECTO
 from ..infraestructura.almacen_json import AlmacenJson
 from ..infraestructura.almacen_postgres import VARIABLE_URL, AlmacenPostgres
 from ..llm.modelos import SelectorDeModelos
-from ..mente.memoria import Memoria, MemoriaDesactivada
+from ..mente.memoria import Memoria, MemoriaDesactivada, MemoriaEnAlmacen
 from ..rag.adaptador import IndiceEmbeddingsBuscador
 from ..rag.rutas import directorio_inquilino, validar_inquilino_id
 from .femix import Femix
@@ -77,14 +77,17 @@ def construir_femix(
     """
     inquilino_id = validar_inquilino_id(inquilino_id or inquilino_desde_entorno())
     carpeta = directorio_inquilino(directorio_datos, inquilino_id)
+    almacen = extra.setdefault("almacen", almacen_dominio(directorio_datos, inquilino_id))
     if "memoria" not in extra:
-        extra["memoria"] = (
-            Memoria(ruta=os.path.join(carpeta, NOMBRE_MEMORIA)) if MEMORIA in capacidades else MemoriaDesactivada()
-        )
+        if MEMORIA not in capacidades:
+            extra["memoria"] = MemoriaDesactivada()
+        elif isinstance(almacen, AlmacenPostgres):
+            extra["memoria"] = MemoriaEnAlmacen(almacen)
+        else:
+            extra["memoria"] = Memoria(ruta=os.path.join(carpeta, NOMBRE_MEMORIA))
     if prompt_sistema and "selector_modelos" not in extra:
         # Fase 3: todos los motores de este bot (rápido y complejo) hablan con la personalidad del
         # inquilino (`inquilino/personalidad.py`). Sin prompt, el de Femix de siempre.
         extra["selector_modelos"] = SelectorDeModelos(prompt_sistema=prompt_sistema)
     buscador = IndiceEmbeddingsBuscador(directorio_datos=directorio_datos) if DOCUMENTOS in capacidades else None
-    extra.setdefault("almacen", almacen_dominio(directorio_datos, inquilino_id))
     return Femix(inquilino_id=inquilino_id, directorio_datos=carpeta, buscador=buscador, **extra)

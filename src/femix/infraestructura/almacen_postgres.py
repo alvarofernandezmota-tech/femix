@@ -29,6 +29,14 @@ CREATE TABLE IF NOT EXISTS registros (
 def crear_esquema(url: str) -> None:
     import psycopg
     with psycopg.connect(url) as conexion:
+        # Una base en SQL_ASCII rechaza cualquier tilde en jsonb ("unsupported Unicode escape"):
+        # mejor no arrancar y decirlo que fallar en el primer "¿qué tal?".
+        codificacion = conexion.execute("SHOW server_encoding").fetchone()[0]
+        if codificacion.upper() not in ("UTF8", "UTF-8"):
+            raise RuntimeError(
+                f"La base de datos está en {codificacion}; femix necesita UTF8 "
+                "(CREATE DATABASE ... ENCODING 'UTF8' TEMPLATE template0)"
+            )
         conexion.execute(ESQUEMA)
 
 
