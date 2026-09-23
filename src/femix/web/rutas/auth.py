@@ -1,10 +1,7 @@
-import fcntl
 import hashlib
 import os
 import secrets
-import tempfile
 import json
-from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 
@@ -12,6 +9,8 @@ from fastapi import APIRouter, Cookie, Form, Header, HTTPException, Request, sta
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from femix.infraestructura.ficheros import bloqueo as _bloqueo
+from femix.infraestructura.ficheros import escribir_json_atomico
 from femix.rag.rutas import validar_inquilino_id
 
 DURACION_SESION_HORAS = 24
@@ -24,24 +23,6 @@ _templates = Jinja2Templates(directory=_DIRECTORIO_TEMPLATES)
 
 def directorio_datos_web() -> str:
     return os.environ.get("FEMIX_WEB_DATOS_DIR", "datos")
-
-
-@contextmanager
-def _bloqueo(directorio: str, nombre: str):
-    """Bloqueo exclusivo entre procesos para el ciclo leer-modificar-escribir de un almacén JSON.
-
-    Sin esto, dos peticiones concurrentes (dos workers de uvicorn, o dos hilos del mismo proceso)
-    pueden leer el mismo estado, modificarlo cada una por su cuenta y que la segunda en escribir se
-    coma los cambios de la primera (last-writer-wins): un login o un alta de inquilino que
-    devuelve éxito pero cuyo dato nunca llega a persistir.
-    """
-    ruta_lock = os.path.join(directorio, f".{nombre}.lock")
-    with open(ruta_lock, "w") as f:
-        fcntl.flock(f, fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(f, fcntl.LOCK_UN)
 
 
 def _hash_password(password: str, sal: "str | None" = None) -> str:
@@ -90,15 +71,7 @@ class AlmacenInquilinos:
         return {i["id"]: Inquilino(**i) for i in bruto}
 
     def _guardar(self):
-        bruto = [asdict(i) for i in self._inquilinos.values()]
-        fd, ruta_temp = tempfile.mkstemp(dir=self._directorio)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(bruto, f, ensure_ascii=False, indent=2)
-            os.replace(ruta_temp, self._ruta)
-        except Exception:
-            os.remove(ruta_temp)
-            raise
+        escribir_json_atomico(self._ruta, [asdict(i) for i in self._inquilinos.values()])
 
     def crear(self, inquilino_id: str, nombre: str, password: str) -> Inquilino:
         inquilino_id = validar_inquilino_id(inquilino_id)
@@ -147,14 +120,7 @@ class AlmacenSesiones:
             return json.load(f)
 
     def _guardar(self):
-        fd, ruta_temp = tempfile.mkstemp(dir=self._directorio)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(self._sesiones, f, ensure_ascii=False, indent=2)
-            os.replace(ruta_temp, self._ruta)
-        except Exception:
-            os.remove(ruta_temp)
-            raise
+        escribir_json_atomico(self._ruta, self._sesiones)
 
     def crear(self, inquilino_id: str) -> str:
         session_id = secrets.token_urlsafe(32)
