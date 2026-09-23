@@ -44,7 +44,7 @@ src/femix/web/
 - `GET /admin/inquilinos/{id}` — Ficha (HTML con `Accept: text/html`; JSON sin token si no)
 - `POST /admin/inquilinos/{id}/perfil` — Guardar perfil (lo crea si el inquilino no tenía)
 - `POST /admin/inquilinos/{id}/baja` / `.../alta` — Baja (para el bot, cierra su panel, no borra nada) / reactivar
-- `POST /admin/inquilinos/{id}/documentos` — Subir un documento a su RAG (multipart `archivo`, máx. 5 MB)
+- `POST /admin/inquilinos/{id}/documentos` — Subir un documento a su RAG (multipart `archivo`, máx. 5 MB; índice de hasta 100 MB por inquilino)
 - `POST /admin/inquilinos/{id}/password` — Dar o cambiar la contraseña de su panel
 
 ### Dueño: API (cabecera `X-Admin-Token`, o cookie + cabecera `X-CSRF-Token`)
@@ -103,6 +103,10 @@ caracteres, el panel del dueño queda cerrado (el login lo explica).
   `TestClient(app, base_url="https://testserver")`.
 - `inquilino_id` se valida como nombre de carpeta (`rag/rutas.py::validar_inquilino_id`: letras,
   dígitos, punto, guion y guion bajo): con él se construyen rutas en disco.
+- Cambiar la contraseña de un inquilino o darlo de baja cierra sus sesiones abiertas (la sesión
+  guarda una huella de la contraseña).
+- Ninguna petición puede pasar de 6 MB (`web/limites.py`): se corta antes de autenticar, porque
+  FastAPI guarda los formularios en disco antes de ejecutar las dependencias.
 - Los almacenes JSON (`inquilinos.json`, `sesiones*.json`, perfiles) se escriben de forma atómica y
   bajo un lock de fichero entre procesos (`infraestructura/ficheros.py`), porque el panel (con
   varios workers) y el proceso de los bots escriben a la vez.

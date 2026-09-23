@@ -36,7 +36,12 @@ cada bot queda en `datos/.estado_bots.json`, que es lo que enseña el panel.
 
 La primera vez que arranca esta versión, los ficheros sueltos de antes (`datos/tareas_<id>.json`,
 `diario_`, `recordatorios_`, y las conversaciones de `datos/memoria.json`) pasan a la carpeta del
-inquilino del `.env`. No se pisa nada que ya exista y el `memoria.json` antiguo se deja como está.
+inquilino de `FEMIX_INQUILINO_ID`. No se pisa nada: si en el destino ya hay algo, se juntan las
+listas; el `memoria.json` antiguo se deja como está. **Sin `FEMIX_INQUILINO_ID` no se mueven** (no
+se sabe de quién eran) y el log lo avisa.
+
+Al pararlo (`docker compose down`, `restart`), cada bot deja de recibir y termina el mensaje que
+tenía entre manos; por eso el compose le da 90 s (`stop_grace_period`) en vez de los 10 de Docker.
 
 ## Quién puede usar el bot
 

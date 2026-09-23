@@ -318,3 +318,45 @@
   que existe el conector (`75be47d`): `filters.TEXT & ~filters.COMMAND` los descartaba. Arreglado.
   `bot.py` ya no construye `Femix` al importarse (`construir_aplicacion`), y tiene tests.
 - 264 tests en verde con las dependencias de la imagen (260 + 1 saltado sin `python-telegram-bot`).
+
+## Fase 2: inquilinos, un bot por inquilino y panel del dueño (2026-09-23)
+Un inquilino es una persona o una empresa, con su bot de Telegram acoplado. Sin conectar al LLM:
+nada del perfil entra en el prompt (eso es la Fase 3).
+- **Control de acceso** (`conectores/telegram/acceso.py`): cada bot solo atiende a sus IDs de
+  Telegram permitidos; vacío = nadie. Corta en el grupo -1, antes de `/start`, comandos, texto y
+  voz; al desconocido le dice su ID (en privado) y queda en el log para autorizarlo. En `.env`:
+  `FEMIX_TELEGRAM_PERMITIDOS`. **Al actualizar `madre` hay que ponerlo o el bot no contesta.**
+- **Perfil** (`inquilino/perfil.py`) en `datos/{id}/perfil.json` (0600, lleva el token): tipo,
+  descripción, horario por franjas, capacidades, token y permitidos de Telegram, alta/baja.
+  Validado campo a campo; escrituras atómicas bajo un bloqueo global (dos inquilinos no pueden
+  compartir token); `modificar()` lee y escribe dentro del bloqueo; un perfil ilegible se aparta
+  (`PerfilIlegible`) sin tumbar a los demás. La baja no borra nada.
+- **Capacidades** (`inquilino/capacidades.py`): memoria, voz y documentos (RAG) deciden qué piezas
+  lleva cada bot; las pendientes del ROADMAP (búsqueda web, citas en Postgres, tool calling) están en
+  el catálogo pero no se pueden encender.
+- **Datos por inquilino**: tareas, diario, recordatorios y memoria en `datos/{id}/` (antes sueltos y
+  compartidos). `inquilino/migracion.py` los mueve al arrancar (bot, CLI y panel), bajo bloqueo,
+  sin pisar nada; si el destino ya existe, junta las listas. Sin `FEMIX_INQUILINO_ID` no adivina de
+  quién son los del bot. `Memoria` pasa a escribir de forma atómica.
+- **Un bot por inquilino en un proceso** (`conectores/telegram/flota.py`): cada 30 s relee los
+  perfiles y arranca, para o rearranca solo lo que cambió; permitidos en caliente; un token
+  rechazado no se reintenta hasta que cambie; detecta un token revocado con el bot en marcha;
+  parada en dos fases (nadie acepta mensajes nuevos mientras otro termina) y `stop_grace_period`
+  de 90 s. El `.env` sigue valiendo y manda sobre el perfil de su inquilino. LLM y Whisper en hilos
+  para que un bot no pare a los demás. Estado de cada bot en `datos/.estado_bots.json`. Filtro de
+  logs que tapa cualquier token de bot.
+- **Panel del dueño** (`/admin/login`): inquilinos con el estado de su bot, alta, perfil, baja y
+  reactivación, documentos de su RAG y contraseña de su panel. Cookie propia (`SameSite=Strict`,
+  solo `/admin`, caduca al cambiar el token) + CSRF en cada formulario; el token de ejemplo de
+  `.env.example` o uno de menos de 24 caracteres deja el panel cerrado. Un inquilino de baja no
+  entra en el suyo; cambiar su contraseña o darlo de baja cierra sus sesiones. Tope de 6 MB por
+  petición antes de autenticar, 5 MB por documento y 100 MB de índice por inquilino.
+- **Revisión adversarial** con tres revisores (seguridad, ciclo de vida de los bots, datos y
+  reglas), todos los hallazgos reproducidos contra el código: 6 + 5 + 17, ninguno alto; arreglados
+  los reproducibles, con un test que falla sin el arreglo. Entre ellos: un token revocado dejaba el
+  bot muerto en silencio (python-telegram-bot deja `updater.running` en True), `"varo\n"` pasaba
+  como id y creaba un inquilino gemelo, y la confirmación de la baja se podía romper con un
+  apóstrofo en el nombre.
+- Verificado en Chromium (panel en escritorio y móvil) y con el proceso real parándose con SIGTERM.
+  No verificado todavía en `madre`.
+- 417 tests en verde con las dependencias de la imagen (367 + 3 saltados sin `python-telegram-bot`).
