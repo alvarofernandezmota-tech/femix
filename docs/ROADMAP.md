@@ -3,7 +3,7 @@
 | Fase | Qué se hace | Estado |
 |---|---|---|
 | 1. Núcleo genérico | LLM + memoria + entender.py + voz + Telegram | En marcha |
-| 2. Estructura de inquilino | `inquilino/perfil.py`, `capacidades.py`, sin conectar al LLM | Pendiente |
+| 2. Estructura de inquilino | `inquilino/perfil.py`, `capacidades.py`, sin conectar al LLM | Hecha (2026-09-23): perfil, capacidades, datos por inquilino, un bot por inquilino y panel del dueño |
 | 3. Conexión inquilino → prompt | El perfil personaliza el PROMPT_SISTEMA dinámicamente | Pendiente |
 | 4. Persistencia real por inquilino | Postgres + aislamiento, migrado de `hugin` | Pendiente |
 | 5. Tool calling (function calling) | El LLM llama a funciones reales (`guardar_cita`, `consultar_disponibilidad`) sobre `puertos/repositorio.py` en vez de solo redactar texto | Pendiente — siguiente nivel tras la fase 4 |

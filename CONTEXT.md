@@ -4,6 +4,7 @@
 
 ## Fase actual del roadmap
 Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En marcha.
+Fase 2: estructura de inquilino. **Hecha** (2026-09-23), sin conectar al LLM. Siguiente: Fase 3.
 
 ## Qué funciona de verdad
 - Motor Ollama conectado vía `llm/router.py`.
@@ -99,8 +100,31 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
   errores de dominio (texto vacío, índice inválido) traducidos a 400/404 en vez de 500. 248 tests
   en verde.
 
+- Inquilinos (Fase 2, 2026-09-23). Un inquilino es una persona o una empresa con su propio bot:
+  - `inquilino/perfil.py`: `PerfilInquilino` (tipo, descripción, horario por franjas,
+    capacidades, token y permitidos de Telegram, alta/baja) en `datos/{id}/perfil.json` (0600,
+    lleva el token). `AlmacenPerfiles` valida, escribe atómico bajo lock global e impide dos
+    inquilinos con el mismo token. La baja no borra nada.
+  - `inquilino/capacidades.py`: catálogo. Se pueden encender las que existen (memoria, voz,
+    documentos) y deciden qué piezas lleva el bot; las pendientes del ROADMAP no se pueden encender.
+  - Datos por inquilino: tareas, diario, recordatorios y memoria en `datos/{id}/` (antes sueltos y
+    compartidos en `datos/`). `inquilino/migracion.py` los mueve al arrancar, sin pisar nada.
+  - Un bot por inquilino en un solo proceso (`conectores/telegram/flota.py`): relee los perfiles
+    cada 30 s y arranca/para/rearranca solo lo que cambió; permitidos en caliente. El `.env`
+    (`TELEGRAM_BOT_TOKEN`) sigue valiendo y manda sobre el perfil de su inquilino. El LLM y Whisper
+    corren en hilos para que un bot no pare a los demás.
+  - Control de acceso: cada bot solo atiende a sus IDs de Telegram permitidos (cerrado por
+    defecto), antes que cualquier otro handler.
+  - Panel del dueño (`/admin/login`): inquilinos y estado de sus bots, alta, perfil, baja/alta,
+    documentos RAG y contraseña de su panel. Cookie propia + CSRF; el token de ejemplo no abre nada.
+  - **Nada del perfil entra en el prompt del LLM** (eso es la Fase 3).
+
 ## Qué está a medias o pendiente
-- `inquilino/` no existe todavía como código (solo como concepto de diseño).
+- Fase 3: que el perfil (descripción, horario, tono) personalice el prompt del sistema. Los campos
+  ya existen en el perfil, pero no se usan con el LLM.
+- Probar en `madre` el paso a varios bots: al arrancar la versión nueva, los datos sueltos de
+  `datos/` pasan a `datos/varo/`, y hay que poner `FEMIX_TELEGRAM_PERMITIDOS` en el `.env` o el
+  bot no atenderá a nadie.
 - RAG **encendido** de punta a punta: `bot/fabrica.construir_femix()` enchufa
   `IndiceEmbeddingsBuscador` y lee `FEMIX_INQUILINO_ID`; CLI (`bot/main.py`) y Telegram
   (`conectores/telegram/bot.py`) lo usan. Verificado contra Ollama real: el modelo responde citando
@@ -116,16 +140,10 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
   producción: falta decidir qué modelo concreto va en cada carril con la CPU actual (ver la nota de
   rendimiento de `docs/ROADMAP.md`).
 - `recordatorios` no tiene scheduler ni notificación proactiva, solo cálculo de vencimiento y listado.
-- Los comandos de dominio personal usan solo `usuario_id` (sin `inquilino_id`) — no hay aislamiento
-  por inquilino todavía en `dominio/personal/`, a diferencia de `Memoria`. No es un problema hoy
-  (un único inquilino "default" en producción), pero habrá que revisarlo en la Fase 2 del roadmap
-  (estructura de inquilino).
-- Panel web (`src/femix/web/`): editar/borrar inquilino y `/usuario/config` (personalización del
-  bot) mencionados en `docs/ENCARGO_PANEL_WEB.md` pero no implementados — configurar el bot por
-  inquilino depende de la Fase 2/3 del roadmap (`inquilino/perfil.py`), que no existe todavía.
-  Sesiones en JSON local, no válidas si se despliega con varios workers/procesos sin un backend de
-  sesión compartido. El panel web está en pruebas: en Docker va tras el perfil `web`, no arranca
-  por defecto.
+- Panel web (`src/femix/web/`): `/usuario/config` (personalización del bot por el propio
+  inquilino) depende de la Fase 3. Sesiones en JSON local con lock de fichero: valen para varios
+  workers en la misma máquina, no para varias máquinas. El panel está en pruebas: en Docker va tras
+  el perfil `web`, no arranca por defecto.
 - Docker (`Dockerfile`, `docker-compose.yml`, `docs/docker.md`): bot de Telegram en contenedor con
   `network_mode: host` para llegar al Ollama de `madre` (que escucha solo en `127.0.0.1`), `datos/`
   y caché de Whisper en volúmenes. **Verificado en `madre` el 2026-09-23**: imagen construida, el
@@ -135,8 +153,9 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
   segundos, entrada y salida recortadas).
 
 ## Próximo paso concreto
-Crear `inquilino/perfil.py` y `inquilino/capacidades.py` como estructura de datos, antes de conectar
-personalización al prompt del LLM.
+Desplegar en `madre` y comprobar la migración y el bot de `varo` (con `FEMIX_TELEGRAM_PERMITIDOS`).
+Después, Fase 3: que el perfil personalice `PROMPT_SISTEMA` (vía `llm/personalidad.py`), sin que
+el LLM sepa nada del negocio más allá de lo que le pase el perfil.
 
 ## Repos relacionados
 - `hugin`: lógica de negocio a migrar (citas, Postgres, teléfono).

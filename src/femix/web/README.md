@@ -2,28 +2,30 @@
 
 ## Descripción
 
-Panel web multi-usuario para gestionar inquilinos y usuarios de Femix.
+Dos paneles en la misma app:
+
+- **El del dueño** (`/admin/`): todos los inquilinos (personas o empresas) y sus bots de Telegram.
+  Alta, perfil (horario, capacidades, token y permitidos del bot), baja sin borrar datos,
+  documentos de su RAG, contraseña de su panel y estado de cada bot.
+- **El de cada inquilino** (`/usuario/`): sus tareas, diario, recordatorios y documentos.
 
 ## Arquitectura
+
+```
 src/femix/web/
-├── app.py # Aplicación FastAPI principal
+├── app.py              # Aplicación FastAPI
+├── documentos.py       # Subida al RAG (compartida por los dos paneles)
 ├── rutas/
-│ ├── __init__.py
-│ ├── auth.py # Autenticación, sesiones, login/logout
-│ ├── admin.py # Rutas de administración (solo dueño)
-│ └── usuario.py # Rutas de usuario (cada inquilino)
+│   ├── auth.py         # Sesiones, login/logout del inquilino, token del dueño
+│   ├── admin.py        # Panel del dueño (login propio, formularios, API JSON)
+│   └── usuario.py      # Panel de cada inquilino
 ├── templates/
-│ ├── base.html # Template base
-│ ├── login.html # Login
-│ ├── admin/
-│ │ └── dashboard.html # Dashboard admin
-│ └── usuario/
-│ └── dashboard.html # Dashboard usuario
-└── static/
-  ├── css/
-  │ └── style.css
-  └── js/
-    └── app.js
+│   ├── base.html
+│   ├── login.html
+│   ├── admin/          # login.html, dashboard.html, inquilino.html
+│   └── usuario/        # dashboard.html
+└── static/css/style.css
+```
 
 ## Endpoints
 
@@ -34,11 +36,21 @@ src/femix/web/
 - `POST /login` — Autenticar (form `inquilino_id` + `password`)
 - `POST /logout` — Cerrar sesión
 
-### Admin (solo dueño, header `X-Admin-Token`)
-- `GET /admin/` — Dashboard admin
-- `GET /admin/inquilinos` — Lista de inquilinos
-- `POST /admin/inquilinos` — Crear inquilino (`id`, `nombre`, `password`)
-- `GET /admin/stats` — Estadísticas globales (tareas, diario y recordatorios de todos los inquilinos)
+### Dueño: navegador (cookie `femix_admin` + token CSRF en cada formulario)
+- `GET /admin/login` / `POST /admin/login` — Entrar con `FEMIX_WEB_ADMIN_TOKEN` (form `token`)
+- `POST /admin/logout` — Salir
+- `GET /admin/` — Inquilinos, estado de sus bots, alta y totales
+- `POST /admin/inquilinos/nuevo` — Alta (form `inquilino_id`, `nombre`, `tipo`, `password` opcional)
+- `GET /admin/inquilinos/{id}` — Ficha (HTML con `Accept: text/html`; JSON sin token si no)
+- `POST /admin/inquilinos/{id}/perfil` — Guardar perfil (lo crea si el inquilino no tenía)
+- `POST /admin/inquilinos/{id}/baja` / `.../alta` — Baja (para el bot, cierra su panel, no borra nada) / reactivar
+- `POST /admin/inquilinos/{id}/documentos` — Subir un documento a su RAG (multipart `archivo`, máx. 5 MB)
+- `POST /admin/inquilinos/{id}/password` — Dar o cambiar la contraseña de su panel
+
+### Dueño: API (cabecera `X-Admin-Token`, o cookie + cabecera `X-CSRF-Token`)
+- `GET /admin/inquilinos` — Lista con el estado de cada bot
+- `POST /admin/inquilinos` — Alta con perfil y acceso (`id`, `nombre`, `password`, `tipo`)
+- `GET /admin/stats` — Totales (tareas, diario y recordatorios de todos los inquilinos)
 
 ### Usuario (cada inquilino, cookie `session_id`)
 - `GET /usuario/` — Dashboard usuario
@@ -48,46 +60,66 @@ src/femix/web/
 - `GET /usuario/recordatorios` / `POST /usuario/recordatorios` — Ver / crear recordatorios
 - `GET /usuario/rag` / `POST /usuario/rag/documentos` — Ver documentos subidos / subir un documento de texto (multipart, campo `archivo`) al índice RAG del inquilino
 
-### Pendiente (mencionado en `docs/ENCARGO_PANEL_WEB.md`, no implementado en esta rama)
-- Editar/borrar inquilino desde el panel admin (hoy solo alta y listado).
-- `/usuario/config` (configurar modelo/personalidad del bot): bloqueado por la Fase 2/3 del roadmap — la personalización por inquilino todavía no está conectada al LLM (ver `CONTEXT.md`, `docs/ROADMAP.md`).
+### Pendiente
+- Personalizar el bot con el perfil (descripción, horario, tono): es la Fase 3 del roadmap. Hoy el
+  perfil decide qué bot arranca, quién puede hablarle y qué piezas lleva (memoria, voz,
+  documentos), pero nada del perfil entra en el prompt del LLM.
 - Borrar documentos RAG desde el panel (`IndiceEmbeddings` no tiene todavía un método para ello).
+- Borrar un inquilino del todo: a propósito no existe; la baja no borra nada.
 
 ## Ejecución
 
 ```bash
-# Desarrollo
-uvicorn src.femix.web.app:app --reload --host 0.0.0.0 --port 8000
+# Desarrollo (desde la raíz del repo; los módulos se importan como `femix.*`)
+PYTHONPATH=src uvicorn femix.web.app:app --reload --host 127.0.0.1 --port 8000
 
-# Producción
-uvicorn src.femix.web.app:app --host 0.0.0.0 --port 8000 --workers 4
+# En madre va en Docker: docker compose --profile web up -d (ver docs/docker.md)
 ```
 
 ## Variables de entorno
 
 ```bash
-FEMIX_WEB_ADMIN_TOKEN="token-para-admin"   # obligatorio para usar /admin/*
-FEMIX_WEB_DATOS_DIR="datos"                # opcional, por defecto "datos"
+FEMIX_WEB_ADMIN_TOKEN="..."   # panel del dueño; mínimo 24 caracteres: openssl rand -hex 32
+FEMIX_WEB_DATOS_DIR="datos"   # opcional, por defecto "datos"
 ```
+
+Si `FEMIX_WEB_ADMIN_TOKEN` falta, es el valor de ejemplo de `.env.example` o tiene menos de 24
+caracteres, el panel del dueño queda cerrado (el login lo explica).
 
 ## Autenticación
 
-- **Admin**: token en header `X-Admin-Token`, comparado contra `FEMIX_WEB_ADMIN_TOKEN` con `secrets.compare_digest`. Al ser un header y no una cookie, `/admin/*` no es navegable a pelo desde un navegador sin algo (JS, un cliente HTTP) que lo añada a la petición — pensado para llamadas API/una futura SPA de admin, no para escribir la URL directamente.
-- **Usuario (inquilino)**: sesión por cookie `session_id` (token opaco, 24h de validez, `httponly` + `secure`), creada en `POST /login` tras verificar `inquilino_id` + `password` contra `AlmacenInquilinos` (contraseñas con PBKDF2-HMAC-SHA256 + sal, nunca en claro; el hash se calcula siempre, exista o no el `inquilino_id`, para no filtrar por temporización qué inquilinos existen). Como la cookie es `secure`, el panel necesita servirse por HTTPS (o probarse con `TestClient(app, base_url="https://...")`); por HTTP puro el navegador no la guardará.
-- `inquilino_id` se valida con las mismas reglas que ya usaba RAG (`rag/rutas.py::validar_inquilino_id`: letras, dígitos, punto, guion y guion bajo) porque también se usa para nombrar ficheros en disco — sin esto, un id con `/` rompía las rutas de `dominio/personal/` con un 500, y en el peor caso permitía escribir fuera de `datos/`.
-- Los inquilinos los da de alta el admin vía `POST /admin/inquilinos`; no hay auto-registro.
-- `AlmacenInquilinos` y `AlmacenSesiones` serializan sus lecturas/escrituras con un lock de fichero (`fcntl.flock`) entre procesos: sin esto, altas de inquilino o logins concurrentes (el propio `uvicorn --workers 4` de "Ejecución") podían perderse en silencio (last-writer-wins sobre el JSON completo).
+- **Dueño, navegador**: `POST /admin/login` con el token deja una cookie `femix_admin`
+  (`httponly`, `secure`, `SameSite=Strict`, solo para `/admin`, 12 h). La sesión guarda un token
+  CSRF que va en un campo oculto de cada formulario y se comprueba en cada POST, y una huella del
+  token de admin: si se cambia `FEMIX_WEB_ADMIN_TOKEN`, las sesiones abiertas dejan de valer. Sin
+  sesión, el navegador va al login y la API recibe 403.
+- **Dueño, API**: cabecera `X-Admin-Token` en cada petición, comparada con
+  `secrets.compare_digest`. No necesita CSRF (un navegador no la añade solo).
+- **Inquilino**: sesión por cookie `session_id` (token opaco, 24 h, `httponly` + `secure`), creada en
+  `POST /login` tras verificar `inquilino_id` + `password` contra `AlmacenInquilinos` (PBKDF2-HMAC-
+  SHA256 con sal; el hash se calcula siempre, exista o no el inquilino, para no filtrar por
+  temporización cuáles existen). Un inquilino de baja no entra, ni con una sesión ya abierta.
+- Como las cookies son `secure`, fuera de `localhost` el panel necesita HTTPS; en tests,
+  `TestClient(app, base_url="https://testserver")`.
+- `inquilino_id` se valida como nombre de carpeta (`rag/rutas.py::validar_inquilino_id`: letras,
+  dígitos, punto, guion y guion bajo): con él se construyen rutas en disco.
+- Los almacenes JSON (`inquilinos.json`, `sesiones*.json`, perfiles) se escriben de forma atómica y
+  bajo un lock de fichero entre procesos (`infraestructura/ficheros.py`), porque el panel (con
+  varios workers) y el proceso de los bots escriben a la vez.
 
 ## Integración con Femix
 
-El panel web usa las mismas clases de dominio, tratando el `inquilino_id` del panel como el `usuario_id` de estas clases (el aislamiento por inquilino en `dominio/personal/` sigue pendiente de la Fase 2 del roadmap; hoy cada inquilino del panel ya obtiene su propio fichero por compartir la misma clave):
+- Perfiles: `femix.inquilino.perfil.AlmacenPerfiles`, en `datos/{id}/perfil.json` (permisos 0600:
+  lleva el token del bot). El panel nunca devuelve el token, ni en HTML ni en JSON.
+- Estado de los bots: el proceso de los bots (`conectores/telegram/flota.py`) escribe
+  `datos/.estado_bots.json` en cada vuelta; el panel solo lo lee (no importa nada de Telegram).
+- Datos del inquilino: las mismas clases de dominio que el bot, en su carpeta. El panel del
+  inquilino usa su `inquilino_id` como usuario (`datos/{id}/tareas_{id}.json`); el bot, el ID de
+  Telegram de quien le escribe (`datos/{id}/tareas_{telegram_id}.json`).
 
 ```python
 from femix.dominio.personal.tareas import Tareas
-from femix.dominio.personal.diario import Diario
-from femix.dominio.personal.recordatorios import Recordatorios
+from femix.rag.rutas import directorio_inquilino
 
-# Ejemplo: obtener tareas de un inquilino
-tareas = Tareas(usuario_id="acme", directorio_datos="datos")
-lista_tareas = tareas.listar()
+tareas = Tareas(usuario_id="acme", directorio_datos=directorio_inquilino("datos", "acme"))
 ```

@@ -139,14 +139,20 @@ proveedor de embeddings real por el puerto `MotorEmbeddings` (ver `CONTEXT.md`).
 ## Panel web (en pruebas)
 
 ```bash
+# En .env: FEMIX_WEB_ADMIN_TOKEN con al menos 24 caracteres (openssl rand -hex 32).
 docker compose --profile web up -d
 ```
 
 Escucha en `127.0.0.1:8000` de `madre` (cámbialo con `FEMIX_WEB_HOST`/`FEMIX_WEB_PORT`). Desde
-otra máquina: `ssh -L 8000:localhost:8000 madre` y abre `http://localhost:8000/login`. La cookie
-de sesión es `secure`: los navegadores la aceptan en `localhost` por HTTP, pero en cualquier otro
-host hace falta HTTPS (proxy inverso delante). Comparte el volumen `femix-datos` con el bot: lo que
-se sube desde el panel al RAG de un inquilino lo ve el bot si su `FEMIX_INQUILINO_ID` coincide.
+otra máquina: `ssh -L 8000:localhost:8000 madre` y abre **`http://localhost:8000/admin/login`**
+(panel del dueño: inquilinos, perfiles, bots, documentos) o `/login` (panel de un inquilino). Las
+cookies son `secure`: los navegadores las aceptan en `localhost` por HTTP, pero en cualquier otro
+host hace falta HTTPS (proxy inverso delante).
+
+Comparte el volumen `femix-datos` con el bot: un inquilino creado o editado en el panel lo recoge
+`femix-bot` en unos 30 s (arranca, para o rearranca su bot) sin reiniciar nada, y lo que se sube
+al RAG de un inquilino lo ve su bot en la siguiente pregunta. El panel enseña el estado de cada bot
+y avisa si `femix-bot` deja de dar señales.
 
 ## Volúmenes
 
