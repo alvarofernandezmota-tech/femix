@@ -11,5 +11,5 @@ def obtener_motor(configuracion: "ConfiguracionLLM | None" = None):
             url=config.ollama_url,
         )
     if config.proveedor == "openai":
-        return ProveedorOpenAI(api_key=config.openai_api_key)
+        return ProveedorOpenAI(modelo=config.modelo, api_key=config.openai_api_key)
     raise ValueError(f"Proveedor LLM no soportado: {config.proveedor}")

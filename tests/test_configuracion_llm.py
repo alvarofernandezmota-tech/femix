@@ -46,6 +46,19 @@ def test_obtener_motor_con_configuracion_explicita():
     assert motor._timeout_segundos == 10
     assert motor._url == "http://otro:1234/api/chat"
 
+def test_obtener_motor_openai_respeta_el_modelo_configurado(monkeypatch):
+    # Con Ollama detrás de su API compatible con OpenAI (OPENAI_BASE_URL=.../v1), pedir el
+    # modelo por defecto del proveedor ("gpt-4o-mini") en vez del configurado da "model not found".
+    capturado = {}
+
+    class ProveedorOpenAIFalso:
+        def __init__(self, **kwargs):
+            capturado.update(kwargs)
+
+    monkeypatch.setattr("femix.llm.router.ProveedorOpenAI", ProveedorOpenAIFalso)
+    obtener_motor(ConfiguracionLLM(proveedor="openai", modelo="qwen2.5:3b", openai_api_key="ollama"))
+    assert capturado == {"modelo": "qwen2.5:3b", "api_key": "ollama"}
+
 def test_obtener_motor_proveedor_no_soportado():
     config = ConfiguracionLLM(proveedor="inventado")
     try:
