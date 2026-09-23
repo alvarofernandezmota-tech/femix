@@ -403,3 +403,16 @@ nada del perfil entra en el prompt (eso es la Fase 3).
 - Sin `FEMIX_BASE_DATOS_URL` todo sigue en ficheros, como antes.
 - 454 tests en verde con Postgres 16 real (437 + 17 saltados sin él); uno recorre el panel entero
   sobre Postgres y comprueba que no se escribe nada en disco.
+
+## Fase 4 (tercera parte): reservas de negocio y agenda personal (2026-09-23)
+Dos cosas distintas, igual que en `hugin` (leído, no tocado):
+- **Reservas de un negocio** (`dominio/negocio/reservas.py`, comando `/reserva`, capacidad
+  `reservas`, apagada por defecto porque es de empresas): contra el horario del perfil; el solape
+  es en minutos; motivo de rechazo en orden pasado/cerrado/fuera/ocupado; sin horario no se
+  reserva; no se ofrecen huecos pasados; si no cabe, propone huecos; anular borra. Cada cliente
+  solo ve y anula sus reservas (no ve los nombres de los demás).
+- **Agenda personal** (`dominio/personal/agenda.py`, comando `/agenda`, para todos): citas
+  propias con fecha obligatoria y hora opcional; avisa de choques; cancelar la marca.
+- Las dos en el almacén del inquilino (JSON o Postgres, siempre con `inquilino_id`).
+- 18 tests nuevos (reglas de hugin, comandos, cableado en el bot, aislamiento en Postgres). 472 en
+  verde con Postgres real.

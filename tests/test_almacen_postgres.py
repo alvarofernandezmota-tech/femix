@@ -316,3 +316,24 @@ def test_copiar_accesos_del_panel(url, tmp_path):
     assert ("-", "accesos", "-", 1) in copiar(str(tmp_path), url)
     assert DocumentoEnPostgres(url, "inquilinos").leer([]) == accesos
     assert ("-", "accesos", "-", 1) not in copiar(str(tmp_path), url)
+
+
+@requiere_postgres
+def test_reservas_y_agenda_en_postgres_por_inquilino(url):
+    from datetime import datetime
+    from femix.dominio.negocio.reservas import Reservas
+    from femix.dominio.personal.agenda import AgendaPersonal
+    from femix.inquilino.perfil import Franja
+
+    class Reloj:
+        def ahora(self):
+            return datetime(2030, 1, 1, 8, 0)
+
+    horario = [Franja("lunes", "09:00", "12:00")]
+    a = Reservas(horario, AlmacenPostgres(url, "acme"), Reloj())
+    b = Reservas(horario, AlmacenPostgres(url, "globex"), Reloj())
+    a.reservar("2030-01-07", "09:00", "Ana")
+    b.reservar("2030-01-07", "09:00", "Luis")    # otro negocio: su hueco está libre
+    assert [c["nombre"] for c in a.citas()] == ["Ana"]
+    AgendaPersonal("7", almacen=AlmacenPostgres(url, "acme")).agregar("médico", "2030-01-10", "10:00")
+    assert AgendaPersonal("7", almacen=AlmacenPostgres(url, "globex")).activas() == []

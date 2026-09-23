@@ -6,9 +6,11 @@
 Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En marcha.
 Fase 2: estructura de inquilino. **Hecha** (2026-09-23).
 Fase 3: el perfil personaliza el prompt del sistema. **Hecha** (2026-09-23).
-Fase 4: Postgres por inquilino. **En marcha**: con `FEMIX_BASE_DATOS_URL` (opcional) van a
-Postgres tareas, diario, recordatorios, memoria, perfiles y accesos/sesiones del panel. Faltan las
-citas (a partir de `hugin`).
+Fase 4: Postgres por inquilino. **Hecha** (2026-09-23): con `FEMIX_BASE_DATOS_URL` (opcional) van a
+Postgres tareas, diario, recordatorios, agenda personal, reservas, memoria, perfiles y accesos/
+sesiones del panel. Reservas de negocio (`/reserva`, capacidad `reservas`) con las reglas de
+`hugin/negocio/agenda.py`; agenda personal (`/agenda`) con las de `hugin/personal/citas.py`.
+Siguiente: Fase 5 (tool calling).
 
 ## Qué funciona de verdad
 - Motor Ollama conectado vía `llm/router.py`.

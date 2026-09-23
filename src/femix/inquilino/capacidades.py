@@ -21,16 +21,18 @@ CATALOGO: dict[str, Capacidad] = {
         Capacidad("voz", "Entiende notas de voz (Whisper en local).", True),
         Capacidad("documentos", "Responde con los documentos del inquilino (RAG).", True),
         Capacidad("busqueda_web", "Busca en internet.", False),
-        Capacidad("postgres_citas", "Citas y disponibilidad en Postgres (migración desde hugin).", False),
+        Capacidad("reservas", "Reservas de clientes contra el horario del perfil (/reserva). Para empresas.", True),
         Capacidad("tool_calling", "El modelo opera el negocio llamando a funciones reales.", False),
     )
 }
 
 MEMORIA = "memoria_largo_plazo"
 VOZ = "voz"
+RESERVAS = "reservas"
 DOCUMENTOS = "documentos"
 
-POR_DEFECTO: tuple[str, ...] = tuple(n for n, c in CATALOGO.items() if c.disponible)
+# Reservas no va por defecto: es de empresas, se enciende en su perfil.
+POR_DEFECTO: tuple[str, ...] = tuple(n for n, c in CATALOGO.items() if c.disponible and n != "reservas")
 
 
 def validar_capacidades(nombres) -> list[str]:

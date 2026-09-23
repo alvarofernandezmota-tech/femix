@@ -38,6 +38,7 @@ class Femix:
         buscador=None,
         delegar: bool = True,
         almacen=None,
+        reservas=None,
     ):
         self._selector = selector_modelos or SelectorDeModelos()
         self._motor = motor or self._selector.motor(tipo_tarea=TAREA_RAPIDA)
@@ -46,6 +47,8 @@ class Femix:
         self._directorio_datos = directorio_datos
         # Dónde guarda tareas, diario y recordatorios (JSON o Postgres). None = JSON en directorio_datos.
         self._almacen = almacen
+        # Agenda del negocio (`dominio/negocio/reservas.py`) si el inquilino tiene la capacidad.
+        self._reservas = reservas
         if not delegar:
             self._subagente = None
         elif subagente is not None:
@@ -69,7 +72,9 @@ class Femix:
         inicio = time.monotonic()
         intencion = clasificar_intencion(texto)
         if intencion == "comando":
-            respuesta = ejecutar_comando(usuario_id, texto, directorio_datos=self._directorio_datos, almacen=self._almacen)
+            respuesta = ejecutar_comando(
+                usuario_id, texto, directorio_datos=self._directorio_datos, almacen=self._almacen, reservas=self._reservas
+            )
             self._registrar_mensaje(usuario_id, "comando", inicio, texto, respuesta)
             return respuesta
         contexto = self._memoria.contexto(self._inquilino_id, usuario_id)

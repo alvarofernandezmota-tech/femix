@@ -1,6 +1,7 @@
 import os
 
-from ..inquilino.capacidades import DOCUMENTOS, MEMORIA, POR_DEFECTO
+from ..dominio.negocio.reservas import Reservas
+from ..inquilino.capacidades import DOCUMENTOS, MEMORIA, POR_DEFECTO, RESERVAS
 from ..infraestructura.almacen_json import AlmacenJson
 from ..infraestructura.almacen_postgres import VARIABLE_URL, AlmacenPostgres
 from ..llm.modelos import SelectorDeModelos
@@ -90,4 +91,15 @@ def construir_femix(
         # inquilino (`inquilino/personalidad.py`). Sin prompt, el de Femix de siempre.
         extra["selector_modelos"] = SelectorDeModelos(prompt_sistema=prompt_sistema)
     buscador = IndiceEmbeddingsBuscador(directorio_datos=directorio_datos) if DOCUMENTOS in capacidades else None
+    if RESERVAS in capacidades and "reservas" not in extra:
+        extra["reservas"] = Reservas(_horario_del_perfil(directorio_datos, inquilino_id), almacen)
     return Femix(inquilino_id=inquilino_id, directorio_datos=carpeta, buscador=buscador, **extra)
+
+def _horario_del_perfil(directorio_datos: str, inquilino_id: str) -> list:
+    """Sin perfil legible, sin horario: y sin horario no se reserva (regla de las reservas)."""
+    from ..inquilino.perfil import AlmacenPerfiles
+    try:
+        perfil = AlmacenPerfiles(directorio_datos).obtener(inquilino_id)
+        return perfil.validado().horario if perfil is not None else []
+    except ValueError:
+        return []
