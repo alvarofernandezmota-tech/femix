@@ -5,8 +5,8 @@
 | 1. Núcleo genérico | LLM + memoria + entender.py + voz + Telegram | En marcha |
 | 2. Estructura de inquilino | `inquilino/perfil.py`, `capacidades.py`, sin conectar al LLM | Hecha (2026-09-23): perfil, capacidades, datos por inquilino, un bot por inquilino y panel del dueño |
 | 3. Conexión inquilino → prompt | El perfil personaliza el PROMPT_SISTEMA dinámicamente | Hecha (2026-09-23): `inquilino/personalidad.py`, un prompt por bot, vista previa en el panel |
-| 4. Persistencia real por inquilino | Postgres + aislamiento, migrado de `hugin` | Hecha (2026-09-23): todo lo del inquilino y del panel en Postgres (opcional), reservas de negocio y agenda personal. Queda en fichero el índice RAG (pgvector, con embeddings reales) |
-| 5. Tool calling (function calling) | El LLM llama a funciones reales (`guardar_cita`, `consultar_disponibilidad`) sobre `puertos/repositorio.py` en vez de solo redactar texto | Pendiente — siguiente nivel tras la fase 4 |
+| 4. Persistencia real por inquilino | Postgres + aislamiento, migrado de `hugin` | Hecha (2026-09-23; completa 2026-09-26): todo lo del inquilino y del panel en Postgres, también el índice RAG (tabla `fragmentos`); Postgres dentro de `docker-compose.yml` (`femix-db`) y subida automática de los JSON al arrancar |
+| 5. Tool calling (function calling) | El LLM llama a funciones reales (`guardar_cita`, `consultar_disponibilidad`) en vez de solo redactar texto | Hecha (2026-09-26): capacidad `tool_calling`, 10 herramientas (reservas, tareas, agenda, avisos) atadas a inquilino y usuario, Ollama y OpenAI |
 | 6. Escalado a SaaS de bots | Múltiples inquilinos reales (empresa propia, terceros) | Visión a futuro |
 
 ## Capacidades futuras (evitar el error de Perplexica)
@@ -14,7 +14,7 @@
 - `memoria_largo_plazo`: activa.
 - `voz`: activa.
 - `reservas`: activa (2026-09-23), reglas de `hugin/negocio/agenda.py`. Agenda personal (`/agenda`) para todos.
-- `tool_calling`: pendiente — es lo que convierte al chatbot en algo que opera el negocio, no solo que conversa.
+- `tool_calling`: activa (2026-09-26), se enciende por inquilino (no va por defecto: más lento en CPU).
 
 ## Nota de arquitectura — fase 5
 El tool calling es una capa de producción (vive dentro de `femix`, en cada mensaje de cada inquilino), distinta de la orquestación de agentes de Claude Code (que es una capa de desarrollo, para mantener el propio repo). No confundir ambas al planificar.

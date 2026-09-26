@@ -1,7 +1,7 @@
 import os
 
 from ..dominio.negocio.reservas import Reservas
-from ..inquilino.capacidades import DOCUMENTOS, MEMORIA, POR_DEFECTO, RESERVAS
+from ..inquilino.capacidades import DOCUMENTOS, MEMORIA, POR_DEFECTO, RESERVAS, TOOL_CALLING
 from ..infraestructura.almacen_json import AlmacenJson
 from ..infraestructura.almacen_postgres import VARIABLE_URL, AlmacenPostgres
 from ..llm.modelos import SelectorDeModelos
@@ -94,6 +94,13 @@ def construir_femix(
     buscador = IndiceEmbeddingsBuscador(directorio_datos=directorio_datos) if DOCUMENTOS in capacidades else None
     if RESERVAS in capacidades and "reservas" not in extra:
         extra["reservas"] = Reservas(_horario_del_perfil(directorio_datos, inquilino_id), almacen, reloj)
+    if TOOL_CALLING in capacidades and "herramientas" not in extra:
+        # Fase 5: el modelo llama a funciones reales, atadas a este inquilino y a cada usuario.
+        from .herramientas import herramientas_para
+        reservas = extra.get("reservas")
+        extra["herramientas"] = lambda usuario_id: herramientas_para(
+            usuario_id, carpeta, almacen=almacen, reservas=reservas, reloj=reloj,
+        )
     return Femix(inquilino_id=inquilino_id, directorio_datos=carpeta, buscador=buscador, reloj=reloj, **extra)
 
 def _horario_del_perfil(directorio_datos: str, inquilino_id: str) -> list:

@@ -1,6 +1,4 @@
-import json
 import os
-import tempfile
 from dataclasses import asdict
 
 from ..puertos.embeddings import MotorEmbeddings
@@ -8,6 +6,7 @@ from .documentos import Documento, Fragmento, ResultadoBusqueda
 from .embeddings_local import similitud_coseno
 from .embeddings_ollama import motor_embeddings_desde_entorno
 from .fragmentos import fragmentar
+from .persistencia import persistencia_desde_entorno
 from .rutas import directorio_rag, ruta_indice, ruta_indice_heredada, validar_inquilino_id
 
 class IndiceEmbeddings:
@@ -31,6 +30,7 @@ class IndiceEmbeddings:
         directorio_datos: str = "datos",
         motor_embeddings: "MotorEmbeddings | None" = None,
         migrar_heredado: bool = True,
+        persistencia=None,
     ):
         self._inquilino_id = validar_inquilino_id(inquilino_id)
         self._directorio_datos = directorio_datos
@@ -39,6 +39,8 @@ class IndiceEmbeddings:
         self._ruta = ruta_indice(directorio_datos, self._inquilino_id)
         os.makedirs(self._directorio, exist_ok=True)
         self.migrado_desde_heredado = self._migrar_heredado() if migrar_heredado else False
+        # Fase 4: el `indice.json` de siempre o la tabla `fragmentos` de Postgres (`rag/persistencia.py`).
+        self._persistencia = persistencia or persistencia_desde_entorno(self._inquilino_id, self._ruta)
         self.fragmentos_descartados = 0
         self._fragmentos: list[Fragmento] = self._cargar()
         self.reindexados = 0
@@ -74,10 +76,7 @@ class IndiceEmbeddings:
         return True
 
     def _cargar(self) -> list[Fragmento]:
-        if not os.path.exists(self._ruta):
-            return []
-        with open(self._ruta, "r", encoding="utf-8") as f:
-            bruto = json.load(f)
+        bruto = self._persistencia.cargar()
         fragmentos = []
         for item in bruto:
             datos = dict(item)
@@ -90,15 +89,7 @@ class IndiceEmbeddings:
         return fragmentos
 
     def _guardar(self):
-        bruto = [asdict(f) for f in self._fragmentos]
-        fd, ruta_temp = tempfile.mkstemp(dir=self._directorio)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(bruto, f, ensure_ascii=False, indent=2)
-            os.replace(ruta_temp, self._ruta)
-        except:
-            os.remove(ruta_temp)
-            raise
+        self._persistencia.guardar([asdict(f) for f in self._fragmentos])
 
     def ingerir(self, documento: Documento, tamano: int = 500, solapamiento: int = 50) -> int:
         if documento.inquilino_id != self._inquilino_id:

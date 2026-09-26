@@ -6,8 +6,12 @@
 # bridge (172.17.0.1), que un Ollama atado a 127.0.0.1 rechaza. Alternativa sin red del host
 # en docs/docker.md.
 #
-#   docker compose up -d --build              # solo el bot de Telegram
-#   docker compose --profile web up -d        # bot + panel web (en pruebas)
+# La base de datos (Fase 4) es el servicio femix-db: Postgres 16 en un contenedor, con sus datos en
+# el volumen femix-pg. Solo escucha en 127.0.0.1 del host (puerto FEMIX_DB_PUERTO, 5433 por defecto,
+# para no chocar con un Postgres que ya haya en madre). La clave sale de FEMIX_DB_CLAVE en .env.
+#
+#   docker compose up -d --build              # base de datos + bot de Telegram
+#   docker compose --profile web up -d        # + panel web (en pruebas)
 #   docker compose run --rm femix-bot python -m femix.bot.ingerir /app/documentos   # cargar RAG
 
 x-femix: &femix
@@ -17,6 +21,12 @@ x-femix: &femix
   image: femix:latest
   env_file:
     - .env
+  environment:
+    # Manda sobre lo que ponga .env: el bot y el panel usan siempre el Postgres de femix-db.
+    FEMIX_BASE_DATOS_URL: postgresql://femix:${FEMIX_DB_CLAVE:?pon FEMIX_DB_CLAVE en .env}@127.0.0.1:${FEMIX_DB_PUERTO:-5433}/femix
+  depends_on:
+    femix-db:
+      condition: service_healthy
   network_mode: host
   restart: unless-stopped
   volumes:
@@ -24,6 +34,26 @@ x-femix: &femix
     - ./documentos:/app/documentos:ro
 
 services:
+  femix-db:
+    image: postgres:16-alpine
+    container_name: femix-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: femix
+      POSTGRES_DB: femix
+      POSTGRES_PASSWORD: ${FEMIX_DB_CLAVE:?pon FEMIX_DB_CLAVE en .env}
+      # femix exige UTF8 (una base en SQL_ASCII rompe con la primera tilde).
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
+    ports:
+      - "127.0.0.1:${FEMIX_DB_PUERTO:-5433}:5432"
+    volumes:
+      - femix-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U femix -d femix"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
   femix-bot:
     <<: *femix
     container_name: femix-bot
@@ -48,3 +78,4 @@ services:
 volumes:
   femix-datos:
   femix-cache:
+  femix-pg:

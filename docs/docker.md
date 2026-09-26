@@ -7,9 +7,9 @@ Docker. El panel web va en la misma imagen, opcional, porque está en pruebas.
 
 ```bash
 cp .env.example .env
-# Edita .env: TELEGRAM_BOT_TOKEN, FEMIX_TELEGRAM_PERMITIDOS, FEMIX_INQUILINO_ID y
-# HUGIN_LLM_MODELO (uno que tengas en `ollama list`).
-docker compose up -d --build
+# Edita .env: TELEGRAM_BOT_TOKEN, FEMIX_TELEGRAM_PERMITIDOS, FEMIX_INQUILINO_ID,
+# HUGIN_LLM_MODELO (uno que tengas en `ollama list`) y FEMIX_DB_CLAVE (openssl rand -hex 24).
+docker compose up -d --build     # arranca femix-db (Postgres) y, cuando está sano, el bot
 docker compose logs -f femix-bot
 ```
 
@@ -121,33 +121,56 @@ y añadir el alias del host:
    ```
 3. En `.env`: `OLLAMA_URL=http://host.docker.internal:11434/api/chat`.
 
-## Postgres (Fase 4, opcional)
+## Postgres (Fase 4)
 
-Sin `FEMIX_BASE_DATOS_URL`, todo sigue en ficheros dentro de `datos/`. Con ella, van a Postgres:
+La base de datos va en el propio `docker-compose.yml`: el servicio `femix-db` (Postgres 16) con sus
+datos en el volumen `femix-pg`, escuchando solo en `127.0.0.1:5433` del host (`FEMIX_DB_PUERTO`).
+La clave es `FEMIX_DB_CLAVE` de `.env` (solo letras y números: va dentro de una URL). El bot y el
+panel reciben `FEMIX_BASE_DATOS_URL` ya montada y esperan a que la base esté sana para arrancar.
 
 | Qué | Tabla |
 |---|---|
-| Tareas, diario, recordatorios y memoria de cada inquilino | `registros` (toda consulta lleva `inquilino_id`) |
+| Tareas, diario, recordatorios, agenda, reservas y memoria de cada inquilino | `registros` |
+| Índice RAG de cada inquilino (fragmentos con su vector) | `fragmentos` |
 | Perfiles de inquilino (con el token de su bot) | `perfiles` |
 | Accesos y sesiones del panel | `documentos` |
 
-Siguen en ficheros el índice RAG (`datos/{inquilino}/rag/`) y el estado de los bots. `madre` ya tiene un Postgres nativo (el de `midgaror_diario`); femix usa en él una
-base y un rol propios, sin tocar los de midgaror:
+`registros` y `fragmentos` se consultan siempre con `inquilino_id` (regla de `AGENTS.md`). Solo el
+estado de los bots (`datos/estado_bots.json`) sigue en fichero.
+
+La primera vez que el bot arranca con Postgres sube lo que hubiera en los JSON de `datos/`
+(tareas, diario, recordatorios, memoria, perfiles y accesos al panel) y deja la marca
+`datos/.a_postgres.hecho` para no repetirlo. No pisa nada que ya esté en Postgres y deja los
+ficheros como respaldo; el índice RAG se sube la primera vez que se abre (y su `indice.json` se
+renombra a `indice.json.migrado`). Se puede repetir a mano:
 
 ```bash
-sudo -u postgres psql -c "CREATE ROLE femix LOGIN PASSWORD 'pon-una-clave-larga'"
-sudo -u postgres psql -c "CREATE DATABASE femix OWNER femix ENCODING 'UTF8' TEMPLATE template0"
-# en .env:
-# FEMIX_BASE_DATOS_URL=postgresql://femix:pon-una-clave-larga@localhost:5432/femix
-docker compose up -d --build                     # crea la tabla al arrancar
-docker compose run --rm femix-bot python -m femix.inquilino.a_postgres   # copia los JSON
+docker compose run --rm femix-bot python -m femix.inquilino.a_postgres
+docker compose exec femix-db psql -U femix -d femix -c '\dt'      # ver las tablas
 ```
 
-La copia (tareas, diario, recordatorios, memoria, perfiles y accesos al panel) no pisa nada que
-ya esté en Postgres y deja los ficheros como respaldo. Las sesiones del panel no se copian: basta
-con volver a entrar. Si Postgres pide
-contraseña por TCP y rechaza la conexión, revisa `pg_hba.conf` (`host femix femix 127.0.0.1/32
-scram-sha-256`). Para volver a JSON basta con quitar la variable.
+Copia de seguridad: `docker compose exec femix-db pg_dump -U femix femix > femix.sql`.
+
+Otro Postgres (por ejemplo el nativo de `madre`): quita `femix-db`, su `depends_on` y la línea
+`FEMIX_BASE_DATOS_URL` de `x-femix` en `docker-compose.yml`, y pon la URL en `.env`.
+
+## Tool calling (Fase 5)
+
+Con la capacidad `tool_calling`, los mensajes que hablan de reservas, citas, agenda, tareas o
+avisos van al modelo con herramientas reales (`bot/herramientas.py`): `consultar_disponibilidad`,
+`guardar_cita`, `mis_reservas`, `anular_reserva`, `crear_tarea`, `listar_tareas`,
+`completar_tarea`, `apuntar_en_agenda`, `ver_agenda` y `crear_recordatorio`. Las reglas son las de
+los comandos (una reserva no pisa otra ni cae fuera del horario) y cada herramienta va atada al
+inquilino y al usuario que escribe. La charla sigue por el camino rápido de siempre.
+
+```bash
+docker compose exec femix-bot python -m femix.inquilino.capacidad TU_INQUILINO                 # ver
+docker compose exec femix-bot python -m femix.inquilino.capacidad TU_INQUILINO +tool_calling   # encender
+docker compose exec femix-bot python -m femix.inquilino.capacidad TU_INQUILINO +reservas       # reservas de negocio
+```
+
+El bot lo coge solo en unos 30 s. El modelo tiene que soportar function calling (`qwen2.5` sí). En
+CPU, un mensaje con herramientas hace 2-3 llamadas al modelo: tarda más que uno de charla.
 
 ## RAG
 

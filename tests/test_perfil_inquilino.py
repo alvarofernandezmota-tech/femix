@@ -20,8 +20,9 @@ def _perfil(inquilino_id="varo", **extra):
 # --- Capacidades ---------------------------------------------------------------------------
 
 def test_por_defecto_son_las_que_existen():
-    # Todas las que existen menos reservas, que es de empresas y se enciende en su perfil.
-    assert set(POR_DEFECTO) == {n for n, c in CATALOGO.items() if c.disponible} - {"reservas"}
+    # Todas las que existen menos reservas (de empresas) y tool_calling (más lento en CPU), que se
+    # encienden en su perfil.
+    assert set(POR_DEFECTO) == {n for n, c in CATALOGO.items() if c.disponible} - {"reservas", "tool_calling"}
     assert set(POR_DEFECTO) == {"memoria_largo_plazo", "voz", "documentos"}
 
 

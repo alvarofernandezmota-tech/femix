@@ -5,14 +5,23 @@ from ..agentes.agente_tareas import AgenteTareas
 from ..agentes.cadena import CadenaDeAgentes
 from ..agentes.peticion import Peticion
 from ..agentes.subagente import Subagente
-from ..llm.modelos import TAREA_RAPIDA, SelectorDeModelos
-from ..mente.decidir import necesita_agente
+from ..llm.modelos import TAREA_COMPLEJA, TAREA_RAPIDA, SelectorDeModelos
+from ..mente.decidir import necesita_agente, necesita_herramientas
 from ..mente.entender import clasificar_intencion
 from ..mente.memoria import Memoria
 from ..dominio.personal.reloj import fecha_en_palabras
 from .comandos import ejecutar_comando
 
 RESPUESTA_VACIA = "No he conseguido generar una respuesta. ¿Puedes decirlo de otra forma?"
+
+# Fase 5: se añade al contexto cuando el modelo tiene herramientas. Sin esto, un modelo pequeño
+# tiende a contestar "te lo he apuntado" sin llamar a nada.
+AVISO_HERRAMIENTAS = (
+    "Tienes herramientas para consultar y cambiar datos reales (reservas, tareas, agenda, avisos). "
+    "Si el usuario pide algo de eso, llama a la herramienta: nunca digas que algo está hecho sin "
+    "haberla llamado. Las fechas van en AAAA-MM-DD y las horas en HH:MM; calcula \"mañana\" y los "
+    "días de la semana a partir de la fecha de hoy. Si falta un dato (nombre, hora), pregúntalo."
+)
 
 LONGITUD_LOG = 120
 
@@ -41,9 +50,14 @@ class Femix:
         almacen=None,
         reservas=None,
         reloj=None,
+        herramientas=None,
     ):
         self._selector = selector_modelos or SelectorDeModelos()
         self._motor = motor or self._selector.motor(tipo_tarea=TAREA_RAPIDA)
+        # Fase 5: `herramientas(usuario_id) -> [Herramienta]` si el inquilino tiene `tool_calling`.
+        # Con ellas, los mensajes que operan con datos van por function calling (modelo complejo).
+        self._herramientas = herramientas
+        self._motor_herramientas = motor
         self._memoria = memoria or Memoria()
         self._inquilino_id = inquilino_id
         self._directorio_datos = directorio_datos
@@ -108,8 +122,12 @@ class Femix:
         """Delega si toca, y si la delegación falla o no produce nada, responde como siempre.
 
         Un agente caído nunca debe dejar al usuario sin respuesta. Devuelve también el camino
-        que se tomó (`rápido`, `agente` o `agente→rápido`), para el registro de mensajes.
+        que se tomó (`herramientas`, `rápido`, `agente` o `agente→rápido`), para el registro de mensajes.
         """
+        if self._herramientas is not None and necesita_herramientas(texto):
+            respuesta = self._con_herramientas(usuario_id, texto, contexto)
+            if respuesta:
+                return respuesta, "herramientas"
         if self._subagente is not None and necesita_agente(texto, contexto):
             peticion = Peticion(
                 inquilino_id=self._inquilino_id,
@@ -127,3 +145,17 @@ class Femix:
                 return delegada, "agente"
             return self._motor.generar(contexto=contexto, entrada=texto), "agente→rápido"
         return self._motor.generar(contexto=contexto, entrada=texto), "rápido"
+
+    def _con_herramientas(self, usuario_id: str, texto: str, contexto: str) -> "str | None":
+        """El modelo con function calling. None si falla o no dice nada: responde el camino de siempre."""
+        motor = self._motor_herramientas or self._selector.motor(tipo_tarea=TAREA_COMPLEJA)
+        conversar = getattr(motor, "conversar", None)
+        if conversar is None:
+            return None
+        contexto = f"{AVISO_HERRAMIENTAS}\n{contexto}" if contexto else AVISO_HERRAMIENTAS
+        try:
+            respuesta = conversar(contexto=contexto, entrada=texto, herramientas=self._herramientas(usuario_id))
+        except Exception:
+            _log.warning("El modelo con herramientas falló; responde el camino de siempre", exc_info=True)
+            return None
+        return respuesta if respuesta and respuesta.strip() else None

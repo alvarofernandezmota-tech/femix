@@ -22,7 +22,7 @@ CATALOGO: dict[str, Capacidad] = {
         Capacidad("documentos", "Responde con los documentos del inquilino (RAG).", True),
         Capacidad("busqueda_web", "Busca en internet.", False),
         Capacidad("reservas", "Reservas de clientes contra el horario del perfil (/reserva). Para empresas.", True),
-        Capacidad("tool_calling", "El modelo opera el negocio llamando a funciones reales.", False),
+        Capacidad("tool_calling", "El modelo hace reservas, tareas, agenda y avisos llamando a funciones reales (más lento en CPU).", True),
     )
 }
 
@@ -30,9 +30,13 @@ MEMORIA = "memoria_largo_plazo"
 VOZ = "voz"
 RESERVAS = "reservas"
 DOCUMENTOS = "documentos"
+TOOL_CALLING = "tool_calling"
 
-# Reservas no va por defecto: es de empresas, se enciende en su perfil.
-POR_DEFECTO: tuple[str, ...] = tuple(n for n, c in CATALOGO.items() if c.disponible and n != "reservas")
+# Reservas no va por defecto: es de empresas, se enciende en su perfil. Tool calling tampoco: cada
+# mensaje que opera con datos hace varias llamadas al modelo, y en CPU eso se nota.
+POR_DEFECTO: tuple[str, ...] = tuple(
+    n for n, c in CATALOGO.items() if c.disponible and n not in ("reservas", "tool_calling")
+)
 
 
 def validar_capacidades(nombres) -> list[str]:

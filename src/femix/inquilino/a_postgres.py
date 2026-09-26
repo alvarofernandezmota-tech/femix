@@ -18,6 +18,21 @@ from ..rag.rutas import validar_inquilino_id
 
 _PATRON = re.compile(r"(%s)_(.+)\.json" % "|".join(COLECCIONES))
 
+# Marca de "ya se copió": la copia automática al arrancar el bot se hace UNA vez. Relanzarla en cada
+# arranque devolvería a Postgres las tareas de un JSON viejo cuando alguien las hubiera borrado todas.
+MARCA = ".a_postgres.hecho"
+
+
+def copiar_una_vez(directorio_datos: str, url: str) -> "list | None":
+    """La primera vez que el bot arranca con Postgres, sube lo que hubiera en JSON. None si ya se hizo."""
+    marca = os.path.join(directorio_datos, MARCA)
+    if os.path.exists(marca) or not os.path.isdir(directorio_datos):
+        return None
+    copiado = copiar(directorio_datos, url)
+    with open(marca, "w", encoding="utf-8") as f:
+        f.write(f"{len(copiado)} listas copiadas\n")
+    return copiado
+
 
 def copiar(directorio_datos: str, url: str) -> list:
     """Devuelve `(inquilino, coleccion, usuario, n)` de lo copiado."""

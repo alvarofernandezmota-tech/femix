@@ -15,6 +15,7 @@ load_dotenv()
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 from femix.bot.fabrica import DIRECTORIO_DATOS, inquilino_explicito
 from femix.infraestructura.almacen_postgres import VARIABLE_URL, crear_esquema
+from femix.inquilino.a_postgres import copiar_una_vez
 from femix.inquilino.migracion import migrar_datos_heredados
 from femix.inquilino.perfil import AlmacenPerfiles
 from .acceso import comprobar_acceso
@@ -127,6 +128,13 @@ def main():
         # Fase 4: sin la tabla no arranca ningún bot que guarde algo; mejor fallar aquí y claro.
         crear_esquema(url)
         logging.info("Tareas, diario y recordatorios en Postgres (%s).", VARIABLE_URL)
+        try:
+            copiado = copiar_una_vez(DIRECTORIO_DATOS, url)
+            if copiado is not None:
+                logging.info("Datos de los JSON subidos a Postgres: %d listas.", len(copiado))
+        except Exception:
+            # Los JSON siguen ahí: se puede repetir a mano con `python -m femix.inquilino.a_postgres`.
+            logging.exception("No se pudieron subir los JSON a Postgres; se sigue")
     entorno = bot_del_entorno()
     if entorno is None:
         logging.info("Sin TELEGRAM_BOT_TOKEN en el entorno: solo los bots de los perfiles de inquilino.")

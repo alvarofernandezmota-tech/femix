@@ -441,3 +441,22 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
 - Ollama: `num_predict` 300 (`HUGIN_LLM_MAX_TOKENS`) y `num_ctx` 4096 (`HUGIN_LLM_CONTEXTO`) —en
   CPU el tiempo va con lo que escribe y lo que lee—, `keep_alive` 30m en cada petición
   (`HUGIN_LLM_KEEP_ALIVE`) y límite de espera 120 s (`HUGIN_LLM_TIMEOUT`).
+
+## Fase 4 completa y Fase 5: tool calling (2026-09-26)
+- **Postgres en Docker**: servicio `femix-db` (Postgres 16, volumen `femix-pg`, solo en
+  `127.0.0.1:5433`) en `docker-compose.yml`. El bot y el panel reciben `FEMIX_BASE_DATOS_URL` y
+  esperan a que la base esté sana. Nueva variable obligatoria `FEMIX_DB_CLAVE`.
+- **Índice RAG en Postgres** (`rag/persistencia.py`): tabla `fragmentos`, cada consulta con
+  `inquilino_id`. `IndiceEmbeddings` no cambia de API; el `indice.json` de antes se sube la primera
+  vez y se renombra a `.migrado`.
+- **Subida automática de los JSON** al primer arranque con Postgres (`a_postgres.copiar_una_vez`,
+  marca `datos/.a_postgres.hecho`): no se repite, para no resucitar datos borrados.
+- **Fase 5, tool calling**: `llm/herramientas.py` (herramienta + ejecución segura: errores como
+  texto al modelo, sin argumentos inventados, resultado acotado), bucle de function calling en
+  `ProveedorOllama.conversar` (`tools` de `/api/chat`, máximo 4 rondas) y `ProveedorOpenAI`.
+  `bot/herramientas.py`: 10 herramientas sobre el dominio (reservas, tareas, agenda, avisos),
+  atadas a inquilino y usuario, con las mismas reglas que los comandos.
+- Capacidad `tool_calling` disponible (fuera de `POR_DEFECTO`, como `reservas`). CLI
+  `python -m femix.inquilino.capacidad ID +tool_calling -voz`.
+- Probado en Docker de verdad: `femix-db` + bot + panel, reserva por tool calling guardada en
+  Postgres, ingesta RAG en `fragmentos`. 872 tests en verde con Postgres real.

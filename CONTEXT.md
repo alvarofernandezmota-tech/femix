@@ -1,6 +1,6 @@
 # CONTEXT.md — femix
 
-Última actualización: 2026-09-23
+Última actualización: 2026-09-26
 
 ## Fase actual del roadmap
 Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En marcha.
@@ -10,7 +10,16 @@ Fase 4: Postgres por inquilino. **Hecha** (2026-09-23): con `FEMIX_BASE_DATOS_UR
 Postgres tareas, diario, recordatorios, agenda personal, reservas, memoria, perfiles y accesos/
 sesiones del panel. Reservas de negocio (`/reserva`, capacidad `reservas`) con las reglas de
 `hugin/negocio/agenda.py`; agenda personal (`/agenda`) con las de `hugin/personal/citas.py`.
-Siguiente: Fase 5 (tool calling).
+Completa el 2026-09-26: el índice RAG también en Postgres (tabla `fragmentos`), Postgres dentro de
+`docker-compose.yml` (servicio `femix-db`, clave `FEMIX_DB_CLAVE`) y subida automática de los JSON la
+primera vez que el bot arranca con Postgres.
+Fase 5: tool calling. **Hecha** (2026-09-26): capacidad `tool_calling` (se enciende por inquilino
+con el panel o `python -m femix.inquilino.capacidad ID +tool_calling`). Los mensajes que operan con
+datos (reservas, citas, agenda, tareas, avisos: `mente/decidir.necesita_herramientas`) van al
+modelo con 10 herramientas reales (`bot/herramientas.py`, `llm/herramientas.py`), atadas al
+inquilino y al usuario; la charla sigue por el camino rápido. Si el modelo con herramientas falla o
+no dice nada, responde el camino de siempre.
+Siguiente: Fase 6 (SaaS de bots: visión a futuro) y decidir el modelo en madre (velocidad en CPU).
 
 ## Qué funciona de verdad
 - Motor Ollama conectado vía `llm/router.py`.

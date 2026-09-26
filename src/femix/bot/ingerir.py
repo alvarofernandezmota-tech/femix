@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 
+from ..infraestructura.almacen_postgres import VARIABLE_URL
 from ..rag.documentos import Documento
 from ..rag.indice import IndiceEmbeddings
 from .fabrica import DIRECTORIO_DATOS, inquilino_desde_entorno
@@ -73,7 +74,9 @@ def main(argv: "list[str] | None" = None) -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
 
-    print(f"Inquilino {inquilino_id} → {os.path.join(args.datos, inquilino_id, 'rag', 'indice.json')}")
+    destino = "Postgres (tabla fragmentos)" if (os.environ.get(VARIABLE_URL) or "").strip() \
+        else os.path.join(args.datos, inquilino_id, "rag", "indice.json")
+    print(f"Inquilino {inquilino_id} → {destino}")
     for linea in informe:
         print(linea)
     return 0

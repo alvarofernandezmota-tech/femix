@@ -337,3 +337,18 @@ def test_reservas_y_agenda_en_postgres_por_inquilino(url):
     assert [c["nombre"] for c in a.citas()] == ["Ana"]
     AgendaPersonal("7", almacen=AlmacenPostgres(url, "acme")).agregar("médico", "2030-01-10", "10:00")
     assert AgendaPersonal("7", almacen=AlmacenPostgres(url, "globex")).activas() == []
+
+
+@requiere_postgres
+def test_los_json_se_suben_a_postgres_una_sola_vez_al_arrancar(url, tmp_path):
+    from femix.inquilino.a_postgres import MARCA, copiar_una_vez
+    datos = tmp_path / "datos"
+    AlmacenJson(str(datos / "varo")).guardar("tareas", "7", [{"descripcion": "vieja", "completada": False}])
+    copiado = copiar_una_vez(str(datos), url)
+    assert ("varo", "tareas", "7", 1) in copiado and (datos / MARCA).exists()
+    almacen = AlmacenPostgres(url, "varo")
+    assert almacen.cargar("tareas", "7")[0]["descripcion"] == "vieja"
+    # Borradas todas en Postgres, un segundo arranque no las resucita desde el JSON viejo.
+    almacen.guardar("tareas", "7", [])
+    assert copiar_una_vez(str(datos), url) is None
+    assert almacen.cargar("tareas", "7") == []
