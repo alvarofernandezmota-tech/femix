@@ -11,6 +11,9 @@
 - [aprendizaje.md](aprendizaje.md): qué aprende el bot y cómo lo aprueba el dueño.
 - [agentes.md](agentes.md): subagente, cadena de agentes y modelos rápido y complejo.
 - [saas.md](saas.md): planes, Stripe, alta pública, HTTPS y copias.
+- [whatsapp.md](whatsapp.md): canal de WhatsApp (Cloud API de Meta).
+- [mcp.md](mcp.md): conectores MCP (calendario, correo, Notion...).
+- [operacion.md](operacion.md): pasar a una persona, recordatorio de citas, avisos de fallos, correos y RGPD.
 
 ## Operación
 - [docker.md](docker.md): despliegue con Docker y Ollama en el host.

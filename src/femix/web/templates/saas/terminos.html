@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block titulo %}Términos del servicio — Femix{% endblock %}
+{% block content %}
+<section class="tarjeta">
+    <h2>Términos del servicio</h2>
+    <h3>El servicio</h3>
+    <p>Femix te da un asistente en Telegram para tu negocio o para ti, con un panel para configurarlo. Funciona con
+       inteligencia artificial: puede equivocarse. Revisa la información importante (precios, horarios, citas) en tu panel.</p>
+    <h3>Prueba y planes</h3>
+    <p>La prueba es gratuita durante {{ dias_prueba }} días, sin tarjeta. Los planes de pago se cobran cada mes por
+       adelantado a través de Stripe y se renuevan solos hasta que los canceles desde tu panel; al cancelar, sigues con
+       el plan hasta el final del periodo pagado. Cada plan tiene un número de mensajes al mes: al llegar al límite el bot
+       lo avisa y sigue atendiendo comandos.</p>
+    <h3>Uso aceptable</h3>
+    <p>No se puede usar el servicio para enviar spam, engañar a nadie, ni para nada ilegal. Eres responsable de lo que
+       tu bot dice a partir de la información que le das.</p>
+    <h3>Tus datos</h3>
+    <p>Son tuyos: puedes descargarlos o borrarlos desde tu panel cuando quieras. Más detalle en la
+       <a href="/privacidad">política de privacidad</a>.</p>
+    <h3>Disponibilidad</h3>
+    <p>Hacemos lo posible por que el servicio funcione siempre, pero puede haber cortes por mantenimiento o fallos.
+       Si un fallo nuestro te impide usarlo durante días, escríbenos y lo compensamos.</p>
+    <h3>Cambios</h3>
+    <p>Si cambian estos términos o los precios, te avisamos con 30 días de antelación.</p>
+</section>
+<p><a href="/">← Volver</a></p>
+{% endblock %}

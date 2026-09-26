@@ -1,6 +1,6 @@
 # CONTEXT.md — femix
 
-Última actualización: 2026-09-26
+Última actualización: 2026-09-26 (fases 7–11)
 
 ## Fase actual del roadmap
 Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En marcha.
@@ -30,8 +30,10 @@ Comprensión (2026-09-26): RAG con PDF/Word/Excel/web, troceo por apartados, bú
 Velocidad (router acciones/consultas, respuesta en directo, precalentado, diagnóstico), aprendizaje
 (del cliente y del negocio con aprobación) y repo ordenada (README, docs/arquitectura.md, CI local
 `scripts/ci.sh` con gancho pre-push, despliegue `scripts/desplegar.sh`): hechos el 2026-09-26.
-Siguiente: avisos de fallos al dueño, legal/emails, pasar a una persona, mensajes automáticos,
-WhatsApp y conectores MCP. Pendiente: medir en madre (`python -m femix.llm.diagnostico`).
+Operación (pasar a una persona, recordatorio de citas, avisos de fallos, correos, RGPD, restaurar
+copias), WhatsApp (Cloud API) y conectores MCP: hechos el 2026-09-26. Fases 1–11 en `docs/ROADMAP.md`.
+Siguiente: medir en madre (`python -m femix.llm.diagnostico`) y elegir modelo; plantillas de
+WhatsApp; teléfono (`gjallarhorn`); release v1.0.0.
 
 ## Qué funciona de verdad
 - Motor Ollama conectado vía `llm/router.py`.

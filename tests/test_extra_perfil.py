@@ -68,7 +68,7 @@ def _comprobar_invariantes(perfil: PerfilInquilino):
 def test_catalogo_coherente_con_sus_constantes():
     assert all(nombre == capacidad.nombre for nombre, capacidad in CATALOGO.items())
     # POR_DEFECTO va en el orden del catálogo y las constantes apuntan a capacidades disponibles.
-    assert list(POR_DEFECTO) == [n for n in CATALOGO if CATALOGO[n].disponible and n not in ("reservas", "busqueda_web")]
+    assert list(POR_DEFECTO) == [n for n in CATALOGO if CATALOGO[n].disponible and n not in ("reservas", "busqueda_web", "conectores_mcp")]
     assert {MEMORIA, VOZ, DOCUMENTOS, "tool_calling"} == set(POR_DEFECTO)
     with pytest.raises(FrozenInstanceError):
         CATALOGO[VOZ].disponible = False
@@ -492,7 +492,7 @@ def test_a_publico_lleva_todo_menos_el_token_y_no_toca_el_perfil(token):
     perfil = _perfil(telegram_token=token, horario=[Franja("lunes", "09:00", "10:00")],
                      telegram_permitidos=[5]).validado()
     publico = perfil.a_publico()
-    esperados = {f.name for f in fields(PerfilInquilino)} - {"telegram_token"} | {"telegram_configurado"}
+    esperados = {f.name for f in fields(PerfilInquilino)} - {"telegram_token", "whatsapp_token"} | {"telegram_configurado", "whatsapp_configurado"}
     assert set(publico) == esperados
     assert publico["telegram_configurado"] is bool(token)
     assert publico["horario"] == [{"dia": "lunes", "desde": "09:00", "hasta": "10:00"}]

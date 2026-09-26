@@ -63,6 +63,15 @@ class PerfilInquilino:
     # Fase 6: abierto = cualquiera puede escribirle (el bot de un negocio con sus clientes). Cerrado
     # (por defecto), solo los permitidos.
     telegram_abierto: bool = False
+    # ID de Telegram de quien atiende el negocio: recibe los "quiero hablar con una persona" y los
+    # contesta con /responder. 0 = nadie.
+    telegram_responsable: int = 0
+    # WhatsApp (Cloud API de Meta): el identificador del número y su token de acceso. Vacíos = sin WhatsApp.
+    whatsapp_telefono_id: str = ""
+    whatsapp_token: str = ""
+    # Conectores MCP (capacidad `conectores_mcp`): [{"nombre", "url", "cabecera"}]. Solo los pone el
+    # dueño de la plataforma; la cabecera (Authorization) es secreta y nunca se enseña.
+    mcp_servidores: list = field(default_factory=list)
     # Fase 3: cómo se presenta y habla su bot. Vacíos = los de Femix.
     nombre_asistente: str = ""
     tono: str = ""
@@ -72,10 +81,11 @@ class PerfilInquilino:
 
     def validado(self) -> "PerfilInquilino":
         """Copia normalizada, o `ValueError` diciendo qué campo está mal."""
-        for campo in ("nombre", "tipo", "descripcion", "telegram_token", "nombre_asistente", "tono"):
+        for campo in ("nombre", "tipo", "descripcion", "telegram_token", "nombre_asistente", "tono",
+                      "whatsapp_telefono_id", "whatsapp_token"):
             if not isinstance(getattr(self, campo) or "", str):
                 raise ValueError(f"{campo} tiene que ser texto")
-        for campo in ("horario", "capacidades", "telegram_permitidos"):
+        for campo in ("horario", "capacidades", "telegram_permitidos", "mcp_servidores"):
             if not isinstance(getattr(self, campo), (list, tuple)):
                 raise ValueError(f"{campo} tiene que ser una lista")
         # "false" (texto) contaría como activo: solo vale un booleano de verdad.
@@ -83,6 +93,15 @@ class PerfilInquilino:
             raise ValueError("activo tiene que ser true o false")
         if not isinstance(self.telegram_abierto, bool):
             raise ValueError("telegram_abierto tiene que ser true o false")
+        if isinstance(self.telegram_responsable, bool) or not isinstance(self.telegram_responsable, int) \
+                or self.telegram_responsable < 0:
+            raise ValueError(f"{self.telegram_responsable!r} no es un ID de usuario de Telegram (responsable)")
+        whatsapp_telefono_id = (self.whatsapp_telefono_id or "").strip()
+        whatsapp_token = (self.whatsapp_token or "").strip()
+        if whatsapp_telefono_id and not (whatsapp_telefono_id.isdigit() and len(whatsapp_telefono_id) <= 30):
+            raise ValueError("El identificador del número de WhatsApp son solo cifras (lo da Meta)")
+        if whatsapp_token and (len(whatsapp_token) > 1000 or any(c.isspace() for c in whatsapp_token)):
+            raise ValueError("El token de WhatsApp no parece válido")
         nombre = (self.nombre or "").strip()
         if not nombre:
             raise ValueError("El nombre no puede estar vacío")
@@ -113,6 +132,9 @@ class PerfilInquilino:
             telegram_permitidos=_validar_permitidos(self.telegram_permitidos),
             nombre_asistente=nombre_asistente,
             tono=tono,
+            whatsapp_telefono_id=whatsapp_telefono_id,
+            whatsapp_token=whatsapp_token,
+            mcp_servidores=_validar_mcp(self.mcp_servidores),
         )
 
     def a_dict(self) -> dict:
@@ -136,6 +158,9 @@ class PerfilInquilino:
         datos = self.a_dict()
         token = datos.pop("telegram_token")
         datos["telegram_configurado"] = bool(token)
+        datos["whatsapp_configurado"] = bool(datos.pop("whatsapp_token"))
+        datos["mcp_servidores"] = [{"nombre": m["nombre"], "url": m["url"], "cabecera_guardada": bool(m.get("cabecera"))}
+                                   for m in datos.get("mcp_servidores") or []]
         return datos
 
 
@@ -180,6 +205,30 @@ def leer_ids_telegram(texto: "str | None") -> list:
             raise ValueError(f"{trozo!r} no es un ID de Telegram (tiene que ser un número)")
         ids.append(int(trozo))
     return ids
+
+
+MAXIMO_MCP = 5
+
+
+def _validar_mcp(servidores) -> list:
+    validos, nombres = [], set()
+    for servidor in servidores:
+        if not isinstance(servidor, dict):
+            raise ValueError("Cada conector MCP tiene nombre y url")
+        nombre = str(servidor.get("nombre") or "").strip().lower()
+        url = str(servidor.get("url") or "").strip()
+        cabecera = str(servidor.get("cabecera") or "").strip()
+        if not re.fullmatch(r"[a-z0-9_-]{1,30}", nombre) or nombre in nombres:
+            raise ValueError(f"Nombre de conector MCP no válido o repetido: {nombre!r} (minúsculas, cifras, - y _)")
+        if not url.startswith(("https://", "http://")) or len(url) > 500 or any(c.isspace() for c in url):
+            raise ValueError(f"La url del conector MCP {nombre!r} tiene que empezar por https://")
+        if len(cabecera) > 1000 or "\n" in cabecera or "\r" in cabecera:
+            raise ValueError(f"La cabecera del conector MCP {nombre!r} no es válida")
+        nombres.add(nombre)
+        validos.append({"nombre": nombre, "url": url, "cabecera": cabecera})
+    if len(validos) > MAXIMO_MCP:
+        raise ValueError(f"Como mucho {MAXIMO_MCP} conectores MCP")
+    return validos
 
 
 def _validar_permitidos(permitidos) -> list:

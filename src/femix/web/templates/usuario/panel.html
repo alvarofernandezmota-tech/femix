@@ -49,6 +49,17 @@
             <label>IDs de Telegram permitidos <small>(separados por comas)</small>
                 <input name="permitidos" value="{{ perfil.telegram_permitidos|join(', ') if perfil else '' }}"></label>
             <label class="casilla"><input type="checkbox" name="abierto" value="true" {% if perfil and perfil.telegram_abierto %}checked{% endif %}> Abierto a cualquiera (clientes de tu negocio)</label>
+            <label>Tu ID de Telegram como responsable <small>(te llegan los clientes que piden hablar con una persona; contestas con /responder)</small>
+                <input name="responsable" inputmode="numeric" value="{{ perfil.telegram_responsable if perfil and perfil.telegram_responsable else '' }}"></label>
+        </fieldset>
+        <fieldset>
+            <legend>WhatsApp (opcional)</legend>
+            <p class="secundario">Con la API oficial de Meta (WhatsApp Cloud API). {% if perfil and perfil.whatsapp_token %}Token guardado (no se muestra).{% else %}Sin conectar.{% endif %}
+               Guía: docs/whatsapp.md.</p>
+            <label>Identificador del número <small>(Phone number ID, en Meta)</small>
+                <input name="whatsapp_telefono_id" inputmode="numeric" value="{{ perfil.whatsapp_telefono_id if perfil else '' }}"></label>
+            <label>Token de acceso <input name="whatsapp_token" type="password" autocomplete="off" placeholder="Déjalo vacío para no cambiarlo"></label>
+            <label class="casilla"><input type="checkbox" name="quitar_whatsapp" value="true"> Desconectar WhatsApp</label>
         </fieldset>
         <button type="submit">Guardar</button>
     </form>
@@ -58,4 +69,16 @@
 {% include "comun/_aprendizaje.html" %}
 {% include "comun/_reservas.html" %}
 {% include "comun/_actividad.html" %}
+
+<section class="tarjeta">
+    <h3>Tus datos</h3>
+    <p><a href="/usuario/datos">Descargar todos mis datos (JSON)</a></p>
+    <form method="post" action="/usuario/borrar-cuenta" class="formulario"
+          onsubmit="return confirm('Se borra tu bot, tus documentos, tus clientes y todo lo demás. No se puede deshacer. ¿Seguro?');">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Borrar mi cuenta y todos mis datos <small>(escribe <code>{{ inquilino.id }}</code> para confirmar)</small>
+            <input name="confirmacion" required autocomplete="off"></label>
+        <button type="submit">Borrar definitivamente</button>
+    </form>
+</section>
 {% endblock %}

@@ -1,74 +1,51 @@
-# Infraestructura de HUGIN (femix)
+# Infraestructura (madre)
 
 ## Máquina
 
-- Hostname: `madre`
-- Sistema: Arch Linux
-- Usuario: `varopc`
+- Hostname: `madre`. Sistema: Arch Linux. Usuario: `varopc`.
+- Repositorio local: `~/GitHub/personal/femix`, remoto `git@github.com:alvarofernandezmota-tech/femix.git`.
+- Rama de producción: `main`. `scripts/desplegar.sh` la deja igual que en GitHub y reconstruye.
 
-## Ubicación del proyecto
+## Qué corre
 
-- Repositorio local: `~/GitHub/personal/femix`
-- Repositorio remoto: `git@github.com:alvarofernandezmota-tech/femix.git`
-- Entorno virtual: `~/GitHub/personal/femix/.venv` (Python 3.14)
-- Rama activa de desarrollo: `feat/esqueleto-llm`
+| Pieza | Dónde | Cómo |
+|---|---|---|
+| **Ollama** (modelos de lenguaje) | Host, fuera de Docker, en `127.0.0.1:11434` | Servicio de Ollama; `ollama list`, `ollama pull <modelo>` |
+| **femix** (todos los bots de Telegram + panel web) | Contenedor `femix` | `docker compose up -d --build` |
+| **Postgres** | Contenedor `femix-db`, volumen `femix-pg`, `127.0.0.1:5433` | Arranca con el anterior |
+| HTTPS público (opcional) | Contenedor `femix-https` (Caddy) | `--profile publico` |
+| Copias diarias (opcional) | Contenedor `femix-copias` → `./copias` | `--profile copias` |
+| Buscador de internet (opcional) | Contenedor `femix-busqueda` (SearXNG) | `--profile busqueda` |
 
-## Servicios que corren en `madre`
+- Los contenedores usan `network_mode: host`, así que `localhost:11434` dentro del contenedor es el
+  Ollama del host. Los detalles están en `docs/docker.md`.
+- **Whisper** (voz): `faster-whisper` dentro del contenedor, con el modelo en caché en el volumen
+  `femix-cache`. Se carga con la primera nota de voz.
+- El servicio antiguo `hugin-telegram.service` (systemd) está **desactivado**: dos bots con el mismo
+  token se tumban mutuamente.
 
-### Bot de Telegram (systemd, usuario)
+## Datos persistentes (no versionados)
 
-- Unidad: `~/.config/systemd/user/hugin-telegram.service`
-- Comando: `.venv/bin/python -m conectores.telegram.bot`
-- Gestión:
-  ```bash
-  systemctl --user status hugin-telegram.service --no-pager
-  systemctl --user restart hugin-telegram.service
-  journalctl --user -u hugin-telegram -f
-  ```
-- Reinicio automático si falla (`Restart=on-failure`)
+- Volumen `femix-pg`: todo en Postgres (tareas, memoria, reservas, perfiles, documentos del RAG,
+  suscripciones, actividad…), siempre con `inquilino_id`.
+- Volumen `femix-datos`: `datos/` (ficheros de apoyo, estado de la flota, índices sin Postgres).
+- `./copias`: copias diarias de Postgres, de 14 días. Se restauran con `scripts/restaurar-copia.sh`.
+- `.env`: secretos y configuración (plantilla en `.env.example`). **Nunca** se sube.
 
-### Ollama (LLM local)
+## Revivirlo todo si madre se reinicia
 
-- Puerto: `11434` (API REST local, `http://localhost:11434/api/chat`)
-- Modelos descargados: `qwen2.5:3b`
-- Comandos útiles:
-  ```bash
-  ollama list
-  ollama pull <modelo>
-  ```
-
-### Whisper (transcripción de voz)
-
-- Modelo: `Systran/faster-whisper-base`
-- Ubicación local: `~/.cache/whisper-base`
-- Se carga de forma perezosa (solo al recibir la primera nota de voz)
-
-## Variables de entorno (`.env`, NO versionado)
-
-TELEGRAM_BOT_TOKEN=<token de @fenix_mibot, generado via BotFather>
-HUGIN_LLM_PROVEEDOR=ollama
-HUGIN_LLM_MODELO=qwen2.5:3b
-
-text
-
-## Bot de Telegram
-
-- Usuario: `@fenix_mibot`
-- Gestión de token/perfil: `@BotFather` → `/mybots`
-
-## Datos persistentes (NO versionados)
-
-- `datos/memoria.json` — historial de conversación por usuario/inquilino
-
-## Cómo revivir todo si `madre` se reinicia
-
-```bash
-ollama serve &            # si Ollama no arranca solo como servicio
-systemctl --user status hugin-telegram.service --no-pager
+```sh
+systemctl status ollama || ollama serve &     # Ollama primero
+cd ~/GitHub/personal/femix
+docker compose up -d                           # restart: unless-stopped ya lo hace solo
+docker compose ps && curl -s http://127.0.0.1:8000/health
 ```
 
-Si el servicio no arrancó solo tras el reinicio:
+## Comprobaciones útiles
 
-```bash
-systemctl --user enable --now hugin-telegram.service
+```sh
+docker compose logs -f femix                                   # una línea por mensaje
+docker compose exec femix python -m femix.llm.diagnostico      # velocidad del modelo
 ```
+
+El panel del dueño, en `/admin`, enseña el estado de cada bot, los mensajes y los fallos.

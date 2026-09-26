@@ -93,6 +93,15 @@ class AlmacenInquilinos:
     def listar(self) -> list[Inquilino]:
         return list(self._inquilinos.values())
 
+    def eliminar(self, inquilino_id: str) -> bool:
+        """Quita el acceso al panel (al borrar un inquilino por completo)."""
+        with self._documento.bloqueo():
+            self._inquilinos = self._cargar()
+            if self._inquilinos.pop(inquilino_id, None) is None:
+                return False
+            self._guardar()
+            return True
+
     def establecer_password(self, inquilino_id: str, nombre: str, password: str) -> Inquilino:
         """Da acceso al panel a un inquilino, o le cambia la contraseña si ya lo tenía."""
         inquilino_id = validar_inquilino_id(inquilino_id)

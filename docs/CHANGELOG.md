@@ -524,3 +524,32 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   `pre-push` (`scripts/instalar-hooks.sh`). El workflow de GitHub queda manual para no gastar cuota.
 - `scripts/desplegar.sh`: `madre` igual que `main` de GitHub y contenedores reconstruidos.
 - `pyproject.toml` (pytest y ruff), plantilla de PR.
+
+## 2026-09-26 — Operación: personas, avisos, correos y RGPD (`feat/panel-web`)
+- **Pasar a una persona**: responsable por bot (`telegram_responsable`), aviso por Telegram y
+  `/responder`. El formulario del dueño ya no pierde "abierto a cualquiera" al guardar.
+- **Recordatorio de citas** el día antes, una vez por cita.
+- **Avisos de fallos** al dueño de la plataforma por Telegram (`FEMIX_AVISOS_TELEGRAM`).
+- **Correos** opcionales por SMTP: bienvenida, fin de prueba y pago fallido.
+- **RGPD**: descargar y borrar todos los datos de un inquilino (ficheros y Postgres), desde los dos
+  paneles; página de términos.
+- Guía: `docs/operacion.md`. 963 tests en verde con Postgres real.
+
+## 2026-09-26 — WhatsApp (`feat/panel-web`)
+- **Canal WhatsApp** por la Cloud API oficial de Meta: webhook firmado (`/whatsapp/webhook`),
+  reparto por número al inquilino, mismo Femix que en Telegram, sin duplicados por reintentos.
+  Número y token por inquilino desde los dos paneles (el token nunca se muestra).
+- Guía: `docs/whatsapp.md`.
+
+## 2026-09-26 — Conectores MCP (`feat/panel-web`)
+- **Cliente MCP** (`llm/mcp.py`): las herramientas de servidores MCP (calendario, correo, Notion…)
+  se ofrecen al modelo como las propias. Capacidad `conectores_mcp` (plan Pro); los servidores los
+  configura solo el dueño y su cabecera secreta no se enseña ni la borra el cliente.
+- Router: calendario, correo, eventos y reuniones van al camino de herramientas.
+- Guía: `docs/mcp.md`.
+
+## 2026-09-26 — Copias restaurables y documentación al día (`feat/panel-web`)
+- Copias con `pg_dump --clean`; `scripts/restaurar-copia.sh` (guarda antes lo que hay). Probado de
+  punta a punta con Docker: copia, cambio, restauración y dato original de vuelta.
+- `docs/INFRAESTRUCTURA.md` reescrito (Docker, ya no el servicio systemd); `docker.md`,
+  `saas.md`, `agentes.md` y `PRODUCCION_MADRE.md` al día; ROADMAP con las fases 7–11.

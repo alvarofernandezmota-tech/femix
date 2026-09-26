@@ -8,7 +8,7 @@ inquilino lleva `WHERE inquilino_id = %s`. Listar todas es solo para el panel de
 encontrar de quién es un aviso de Stripe que no trae el id.
 """
 import os
-from dataclasses import asdict, dataclass, fields, replace
+from dataclasses import asdict, dataclass, field, fields, replace
 from datetime import datetime, timedelta
 
 from ..infraestructura.almacen_postgres import VARIABLE_URL
@@ -31,6 +31,8 @@ class Suscripcion:
     stripe_cliente: str = ""
     stripe_suscripcion: str = ""
     actualizada: str = ""
+    # Correos automáticos ya enviados (saas/correo.py), para no repetirlos: ["fin_prueba", ...].
+    correos: list = field(default_factory=list)
 
     def validada(self) -> "Suscripcion":
         if self.plan not in PLANES:

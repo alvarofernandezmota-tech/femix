@@ -2,6 +2,18 @@
 
 {% block titulo %}{{ nombre }} — Femix{% include "comun/_reservas.html" %}
 {% include "comun/_actividad.html" %}
+
+<section class="tarjeta">
+    <h3>Datos (RGPD)</h3>
+    <p><a href="/admin/inquilinos/{{ inquilino_id }}/datos">Descargar todos sus datos (JSON)</a></p>
+    <form method="post" action="/admin/inquilinos/{{ inquilino_id }}/borrar" class="formulario"
+          onsubmit="return confirm('Se borra todo lo de este inquilino. No se puede deshacer. ¿Seguro?');">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Borrar el inquilino y todos sus datos <small>(escribe <code>{{ inquilino_id }}</code>)</small>
+            <input name="confirmacion" required autocomplete="off"></label>
+        <button type="submit">Borrar definitivamente</button>
+    </form>
+</section>
 {% endblock %}
 
 {% block content %}
@@ -115,6 +127,25 @@
                 <input name="permitidos" value="{{ permitidos_texto }}" placeholder="123456789, 987654321">
             </label>
             {% endif %}
+            <label class="casilla"><input type="checkbox" name="abierto" value="true" {% if perfil and perfil.telegram_abierto %}checked{% endif %}>
+                Abierto a cualquiera (los clientes de un negocio)</label>
+            <label>ID de Telegram del responsable <small>(recibe los "quiero hablar con una persona" y contesta con /responder; vacío = nadie)</small>
+                <input name="responsable" inputmode="numeric" value="{{ perfil.telegram_responsable if perfil and perfil.telegram_responsable else '' }}"></label>
+        </fieldset>
+        <fieldset>
+            <legend>WhatsApp (opcional)</legend>
+            <p class="secundario">Con la API oficial de Meta (WhatsApp Cloud API). {% if perfil and perfil.whatsapp_token %}Token guardado (no se muestra).{% else %}Sin conectar.{% endif %}
+               Guía: docs/whatsapp.md.</p>
+            <label>Identificador del número <small>(Phone number ID, en Meta)</small>
+                <input name="whatsapp_telefono_id" inputmode="numeric" value="{{ perfil.whatsapp_telefono_id if perfil else '' }}"></label>
+            <label>Token de acceso <input name="whatsapp_token" type="password" autocomplete="off" placeholder="Déjalo vacío para no cambiarlo"></label>
+            <label class="casilla"><input type="checkbox" name="quitar_whatsapp" value="true"> Desconectar WhatsApp</label>
+        </fieldset>
+        <fieldset>
+            <legend>Conectores MCP (capacidad conectores_mcp)</legend>
+            <p class="secundario">Herramientas externas (calendario, correo, Notion...) de un servidor MCP. Una línea por conector:
+               <code>nombre | https://url-del-servidor/mcp | Bearer token</code>. Sin token se conserva el que tuviera. Guía: docs/mcp.md.</p>
+            <textarea name="mcp" rows="3" placeholder="calendario | https://mcp.ejemplo.com/mcp | Bearer abc123">{{ mcp_texto }}</textarea>
         </fieldset>
 
         <button type="submit">Guardar perfil</button>
@@ -143,4 +174,16 @@
 </section>
 {% include "comun/_reservas.html" %}
 {% include "comun/_actividad.html" %}
+
+<section class="tarjeta">
+    <h3>Datos (RGPD)</h3>
+    <p><a href="/admin/inquilinos/{{ inquilino_id }}/datos">Descargar todos sus datos (JSON)</a></p>
+    <form method="post" action="/admin/inquilinos/{{ inquilino_id }}/borrar" class="formulario"
+          onsubmit="return confirm('Se borra todo lo de este inquilino. No se puede deshacer. ¿Seguro?');">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Borrar el inquilino y todos sus datos <small>(escribe <code>{{ inquilino_id }}</code>)</small>
+            <input name="confirmacion" required autocomplete="off"></label>
+        <button type="submit">Borrar definitivamente</button>
+    </form>
+</section>
 {% endblock %}

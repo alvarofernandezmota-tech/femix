@@ -42,6 +42,7 @@ PALABRAS_HERRAMIENTAS = (
     "tarea", "tareas", "pendiente", "pendientes", "recuérdame", "recuerdame", "recordatorio", "avísame", "avisame",
     "hecha", "hecho", "completa", "completada", "diario", "apunta en el diario", "mañana", "manana",
     "internet", "google", "noticias", "noticia", "qué tiempo", "que tiempo", "el tiempo", "busca en internet",
+    "calendario", "correo", "correos", "email", "emails", "gmail", "notion", "evento", "eventos", "reunión", "reunion",
 )
 
 # Router: preguntas sobre el negocio o sus documentos. No necesitan herramientas (el modelo grande

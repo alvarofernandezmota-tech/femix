@@ -8,6 +8,12 @@
 | 4. Persistencia real por inquilino | Postgres + aislamiento, migrado de `hugin` | Hecha (2026-09-23; completa 2026-09-26): todo lo del inquilino y del panel en Postgres, también el índice RAG (tabla `fragmentos`); Postgres dentro de `docker-compose.yml` (`femix-db`) y subida automática de los JSON al arrancar |
 | 5. Tool calling (function calling) | El LLM llama a funciones reales (`guardar_cita`, `consultar_disponibilidad`) en vez de solo redactar texto | Hecha (2026-09-26): capacidad `tool_calling`, 10 herramientas (reservas, tareas, agenda, avisos) atadas a inquilino y usuario, Ollama y OpenAI |
 | 6. Escalado a SaaS de bots | Múltiples inquilinos reales (empresa propia, terceros) | **Hecha** (2026-09-26): planes, prueba de 14 días, límites, Stripe, alta pública, panel del cliente, actividad e incidencias, HTTPS con Caddy, copias. Ver `docs/saas.md` |
+| 7. Comprensión | Documentos de verdad y respuestas exactas | **Hecha** (2026-09-26): PDF/Word/Excel/web, troceo por apartados, búsqueda híbrida, seguimiento, citas y preguntas frecuentes. `docs/rag.md` |
+| 8. Velocidad | Que en CPU se note rápido | **Hecha** (2026-09-26): router acciones/consultas, respuesta en directo, precalentado, diagnóstico. `docs/velocidad.md` |
+| 9. Aprendizaje | Que el bot mejore con el uso | **Hecha** (2026-09-26): del cliente, del negocio con aprobación del dueño y preguntas sin respuesta. `docs/aprendizaje.md` |
+| 10. Operación | Poder dar el servicio | **Hecha** (2026-09-26): pasar a una persona, recordatorio de citas, avisos de fallos, correos, RGPD, restaurar copias. `docs/operacion.md` |
+| 11. Canales y conectores | Llegar a más sitios | **Hecha** (2026-09-26): WhatsApp (Cloud API) y conectores MCP. `docs/whatsapp.md`, `docs/mcp.md` |
+| 12. Siguiente | | Pendiente: medir y elegir modelo en madre; plantillas de WhatsApp (avisos fuera de 24 h); teléfono (`gjallarhorn`) y archivar `hugin`; release v1.0.0 |
 
 ## Capacidades futuras (evitar el error de Perplexica)
 - `busqueda_web`: activa (2026-09-26), herramienta `buscar_en_internet` sobre un SearXNG propio en madre (perfil `busqueda`); no va por defecto.
@@ -15,6 +21,7 @@
 - `voz`: activa.
 - `reservas`: activa (2026-09-23), reglas de `hugin/negocio/agenda.py`. Agenda personal (`/agenda`) para todos.
 - `tool_calling`: activa (2026-09-26), por defecto en todos los inquilinos.
+- `conectores_mcp`: activa (2026-09-26), la configura el dueño por inquilino (plan Pro).
 
 ## Nota de arquitectura — fase 5
 El tool calling es una capa de producción (vive dentro de `femix`, en cada mensaje de cada inquilino), distinta de la orquestación de agentes de Claude Code (que es una capa de desarrollo, para mantener el propio repo). No confundir ambas al planificar.

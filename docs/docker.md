@@ -1,7 +1,7 @@
 # Femix en Docker
 
 Bot de Telegram (con RAG y agentes) en Docker; **Ollama sigue en el host** (`madre`), fuera de
-Docker. El panel web va en la misma imagen, opcional, porque está en pruebas.
+Docker. El panel web corre en el mismo contenedor `femix` (`FEMIX_PANEL=0` para no arrancarlo).
 
 ## Puesta en marcha
 
@@ -174,10 +174,11 @@ CPU, un mensaje con herramientas hace 2-3 llamadas al modelo: tarda más que uno
 
 ## RAG
 
-El bot busca en `datos/{FEMIX_INQUILINO_ID}/rag/indice.json`, dentro del volumen `femix-datos`
-(sobrevive a reinicios y a `docker compose down`; solo `down -v` lo borra).
+Con Postgres, los documentos de cada inquilino van a la tabla `fragmentos`; sin Postgres, a
+`datos/{inquilino_id}/rag/indice.json` en el volumen `femix-datos`. Lo normal es subirlos desde el
+panel (PDF, Word, Excel, webs...). Ver `docs/rag.md`.
 
-Para cargar documentos, deja `.txt`/`.md` en `./documentos/` (se monta de solo lectura en
+Desde la terminal: deja PDF, Word, Excel, CSV, HTML, Markdown o texto en `./documentos/` (se monta de solo lectura en
 `/app/documentos`) y:
 
 ```bash
