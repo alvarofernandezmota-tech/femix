@@ -509,3 +509,10 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
 - **Precalentado** de los modelos al arrancar (`llm/precalentar.py`) y **diagnóstico** de velocidad
   (`python -m femix.llm.diagnostico`). Nueva variable `HUGIN_LLM_HILOS`.
 - Guía: `docs/velocidad.md`. 929 tests en verde con Postgres real.
+
+## 2026-09-26 — Aprendizaje (`feat/panel-web`)
+- **Memoria de aprendizaje** (`mente/aprendizaje.py`): lo que cada cliente cuenta de sí mismo se
+  guarda y se usa solo con él; lo que alguien dice del negocio espera a que el dueño lo apruebe; las
+  preguntas sin respuesta se agrupan para que el dueño las conteste y pasen a preguntas frecuentes.
+- Sección "Lo que el bot está aprendiendo" en los dos paneles. Guía: `docs/aprendizaje.md`.
+- 942 tests en verde con Postgres real.

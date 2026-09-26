@@ -151,6 +151,7 @@ AVISOS = {
     "web": "Página web añadida: tu bot ya la conoce.",
     "pregunta": "Pregunta frecuente guardada.",
     "quitada": "Pregunta frecuente quitada.",
+    "aprendizaje": "Hecho: tu bot ya lo tiene en cuenta.",
 }
 
 
@@ -173,6 +174,7 @@ def _contexto(inquilino: Inquilino, csrf: str, request: Request, **extra) -> dic
         "resumen": resumen,
         "actividad": panel_comun.actividad(directorio, inquilino.id, 20),
         "preguntas": panel_comun.preguntas_de(directorio, inquilino.id).listar(),
+        "aprendizaje": panel_comun.resumen_aprendizaje(directorio, inquilino.id),
         "reservas": panel_comun.proximas_reservas(directorio, inquilino.id),
         "catalogo": [c for c in CATALOGO.values() if c.disponible],
         "permitidas": set(resumen["plan"].capacidades),
@@ -330,3 +332,16 @@ async def volver_de_stripe(request: Request):
 
 
 _ = _plan  # (se usa en las plantillas vía resumen)
+
+
+
+@router.post("/aprendizaje/{accion}", dependencies=[Depends(comprobar_csrf)])
+async def decidir_aprendizaje(request: Request, accion: str, id_item: int = Form(0), texto: str = Form(""),
+                              inquilino: Inquilino = Depends(obtener_inquilino_actual), csrf: str = Depends(csrf_de_sesion)):
+    try:
+        aviso = panel_comun.accion_aprendizaje(directorio_datos_web(), inquilino.id, accion, id_item, texto)
+    except KeyError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe")
+    except ValueError as exc:
+        return await _pagina(request, inquilino, csrf, 400, error=str(exc))
+    return _hecho(aviso)

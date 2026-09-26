@@ -56,6 +56,7 @@ class Femix:
         selector_modelos: "SelectorDeModelos | None" = None,
         buscador=None,
         preguntas=None,
+        aprendizaje=None,
         delegar: bool = True,
         almacen=None,
         reservas=None,
@@ -92,6 +93,7 @@ class Femix:
             self._subagente = self._subagente_por_defecto(motor, buscador)
         self._preguntas = preguntas
         self._buscador = buscador
+        self._aprendizaje = aprendizaje
 
     def _subagente_por_defecto(self, motor, buscador) -> Subagente:
         """Cadena mínima: los agentes que resuelven; el de búsqueda lo monta el subagente.
@@ -134,6 +136,9 @@ class Femix:
             contexto = f"{ahora}\n{contexto}" if contexto else ahora
         if contexto_frecuente:
             contexto = f"{contexto_frecuente}\n{contexto}" if contexto else contexto_frecuente
+        aprendido = self._aprender(usuario_id, texto)
+        if aprendido:
+            contexto = f"{aprendido}\n{contexto}" if contexto else aprendido
         respuesta, camino = self._responder(usuario_id, texto, contexto, intencion, al_avanzar)
         # Un modelo local puede devolver la cadena vacía. Telegram rechaza un mensaje vacío
         # ("Message text is empty") y el usuario se quedaría sin nada; mejor decírselo.
@@ -218,6 +223,26 @@ class Femix:
             return self._generar(contexto, texto, al_avanzar), "agente→rápido"
         return self._generar(contexto, texto, al_avanzar), "rápido"
 
+    def _aprender(self, usuario_id: str, texto: str) -> str:
+        """Guarda lo que el mensaje enseña y devuelve lo aprendido que viene a cuento (mente/aprendizaje.py)."""
+        if self._aprendizaje is None:
+            return ""
+        try:
+            nota = self._aprendizaje.observar(usuario_id, texto)
+            sabido = self._aprendizaje.contexto(usuario_id, texto)
+        except Exception as exc:
+            _log.warning("El aprendizaje falló; se sigue sin él", exc_info=True)
+            self._incidencia("aprendizaje", f"{type(exc).__name__}: {exc}")
+            return ""
+        return "\n".join(p for p in (sabido, nota) if p)
+
+    def _sin_respuesta(self, texto: str) -> None:
+        if self._aprendizaje is not None:
+            try:
+                self._aprendizaje.sin_respuesta(texto)
+            except Exception:
+                _log.warning("No se pudo apuntar la pregunta sin respuesta", exc_info=True)
+
     def _consulta(self, texto: str, contexto: str, al_avanzar=None) -> "str | None":
         """Pregunta sobre el negocio: se buscan sus documentos y contesta el modelo rápido (en
         directo). None si no hay nada en los documentos: sigue el camino de siempre."""
@@ -229,6 +254,7 @@ class Femix:
             self._incidencia("busqueda", f"{type(exc).__name__}: {exc}")
             return None
         if not encontrado or not encontrado.strip():
+            self._sin_respuesta(texto)   # el dueño la verá en su panel para contestarla
             return None
         documentos = ("Información encontrada en los documentos del negocio (si la usas, di de qué documento "
                       f"sale, y no añadas datos que no estén aquí):\n{encontrado}")

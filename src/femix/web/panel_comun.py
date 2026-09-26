@@ -87,3 +87,45 @@ async def probar_bot(directorio: str, inquilino_id: str, usuario_id: str, texto:
 def preguntas_de(directorio: str, inquilino_id: str):
     from femix.inquilino.preguntas import PreguntasFrecuentes
     return PreguntasFrecuentes(almacen_dominio(directorio, inquilino_id))
+
+
+def aprendizaje_de(directorio: str, inquilino_id: str):
+    from femix.mente.aprendizaje import Aprendizaje
+    return Aprendizaje(almacen_dominio(directorio, inquilino_id))
+
+
+def resumen_aprendizaje(directorio: str, inquilino_id: str) -> dict:
+    aprendizaje = aprendizaje_de(directorio, inquilino_id)
+    return {"pendientes": aprendizaje.pendientes(), "negocio": aprendizaje.del_negocio(),
+            "sin_respuesta": aprendizaje.preguntas_sin_respuesta()[:30]}
+
+
+ACCIONES_APRENDIZAJE = ("aprobar", "descartar", "olvidar", "anadir", "responder", "ignorar")
+
+
+def accion_aprendizaje(directorio: str, inquilino_id: str, accion: str, id_item: int = 0, texto: str = "") -> str:
+    """Lo que el dueño decide sobre lo aprendido. Devuelve la clave del aviso; ValueError/KeyError si no."""
+    aprendizaje = aprendizaje_de(directorio, inquilino_id)
+    if accion == "aprobar":
+        hecho = aprendizaje.aprobar(id_item, texto.strip() or None)
+    elif accion == "descartar":
+        hecho = aprendizaje.descartar(id_item)
+    elif accion == "olvidar":
+        hecho = aprendizaje.olvidar_del_negocio(id_item)
+    elif accion == "anadir":
+        aprendizaje.anadir_del_negocio(texto)
+        hecho = True
+    elif accion == "responder":
+        # La pregunta sin respuesta pasa a pregunta frecuente con la respuesta del dueño.
+        pregunta = next((p for p in aprendizaje.preguntas_sin_respuesta() if p["id"] == id_item), None)
+        if pregunta is None:
+            raise KeyError(id_item)
+        preguntas_de(directorio, inquilino_id).anadir(pregunta["pregunta"], texto)
+        hecho = aprendizaje.quitar_sin_respuesta(id_item)
+    elif accion == "ignorar":
+        hecho = aprendizaje.quitar_sin_respuesta(id_item)
+    else:
+        raise KeyError(accion)
+    if not hecho:
+        raise KeyError(id_item)
+    return "aprendizaje"

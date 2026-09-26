@@ -6,7 +6,7 @@ la carpeta del inquilino. El dominio solo pide "la lista de tareas de este usuar
 """
 from typing import Protocol
 
-COLECCIONES = ("tareas", "diario", "recordatorios", "memoria", "reservas", "agenda", "preguntas")
+COLECCIONES = ("tareas", "diario", "recordatorios", "memoria", "reservas", "agenda", "preguntas", "aprendido")
 
 
 class AlmacenListas(Protocol):

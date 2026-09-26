@@ -63,6 +63,7 @@ AVISOS = {
     "web": "Página web añadida a sus documentos.",
     "pregunta": "Pregunta frecuente guardada.",
     "quitada": "Pregunta frecuente quitada.",
+    "aprendizaje": "Hecho: el bot ya lo tiene en cuenta.",
 }
 
 
@@ -318,6 +319,7 @@ def _contexto_detalle(inquilino_id: str, sesion: dict, documentos=(), **extra) -
         "estados": ESTADOS,
         "actividad": panel_comun.actividad(directorio, inquilino_id, 30),
         "preguntas": panel_comun.preguntas_de(directorio, inquilino_id).listar() if not ilegible else [],
+        "aprendizaje": panel_comun.resumen_aprendizaje(directorio, inquilino_id),
         "reservas": panel_comun.proximas_reservas(directorio, inquilino_id) if not ilegible else None,
         **extra,
     }
@@ -645,3 +647,17 @@ async def quitar_pregunta(inquilino_id: str, id_pregunta: int, sesion: dict = De
     if not panel_comun.preguntas_de(directorio_datos_web(), inquilino_id).quitar(id_pregunta):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Esa pregunta no existe")
     return _volver(inquilino_id, "quitada")
+
+
+@router.post("/inquilinos/{inquilino_id}/aprendizaje/{accion}")
+async def decidir_aprendizaje(request: Request, inquilino_id: str, accion: str, sesion: dict = Depends(requerir_admin),
+                              id_item: int = Form(0), texto: str = Form("")):
+    inquilino_id = _id_valido(inquilino_id)
+    _contexto_detalle(inquilino_id, sesion)
+    try:
+        aviso = panel_comun.accion_aprendizaje(directorio_datos_web(), inquilino_id, accion, id_item, texto)
+    except KeyError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe")
+    except ValueError as exc:
+        return await _detalle(request, inquilino_id, sesion, codigo=status.HTTP_400_BAD_REQUEST, error=str(exc))
+    return _volver(inquilino_id, aviso)

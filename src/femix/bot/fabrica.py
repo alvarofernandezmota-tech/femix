@@ -108,6 +108,10 @@ def construir_femix(
         # Respuestas exactas del dueño (panel): se contestan al momento, sin el modelo.
         from ..inquilino.preguntas import PreguntasFrecuentes
         extra["preguntas"] = PreguntasFrecuentes(almacen)
+    if "aprendizaje" not in extra and MEMORIA in capacidades:
+        # Lo que aprende con el uso: del cliente (al momento) y del negocio (si lo aprueba el dueño).
+        from ..mente.aprendizaje import Aprendizaje
+        extra["aprendizaje"] = Aprendizaje(almacen)
     if "actividad" not in extra:
         # Mensajes e incidencias para el panel del dueño y el del inquilino.
         from ..infraestructura.actividad import Actividad
