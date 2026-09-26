@@ -486,3 +486,16 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   (servicio opcional `femix-busqueda`, perfil `busqueda`, `FEMIX_BUSQUEDA_URL`). Sin claves de API.
 - El plan Básico incluye `tool_calling`.
 - 901 tests en verde con Postgres real; contenedor único probado en Docker.
+
+## 2026-09-26 — Comprensión: RAG mejorado y preguntas frecuentes (`feat/panel-web`)
+- **Lectores** (`rag/lectores.py`): PDF, Word, Excel, CSV, HTML, Markdown y texto; páginas web
+  públicas con protección SSRF. Dependencias nuevas: `pypdf`, `python-docx`, `openpyxl`.
+- **Troceo por apartados y frases**, con el título del apartado en cada trozo.
+- **Búsqueda híbrida**: embeddings + BM25 (`rag/palabras.py`) con fusión RRF; ya no cuela
+  documentos por palabras vacías.
+- **Preguntas de seguimiento** ("¿y los sábados?") se buscan con la anterior; el modelo cita el
+  documento del que saca cada dato.
+- **Preguntas frecuentes** por inquilino, desde los dos paneles: las casi idénticas se contestan al
+  momento sin el modelo.
+- Paneles: subir documentos y webs desde el del cliente, sección "Lo que sabe el bot" en ambos.
+- Guía: `docs/rag.md`. 920 tests en verde con Postgres real.

@@ -127,21 +127,7 @@
     <pre class="prompt">{{ prompt }}</pre>
 </section>
 
-<section class="tarjeta">
-    <h3>Documentos (RAG)</h3>
-    <ul>
-        {% for documento in documentos %}
-        <li>{{ documento.fuente }} <span class="secundario">({{ documento.fragmentos }} fragmentos)</span></li>
-        {% else %}
-        <li>Sin documentos.</li>
-        {% endfor %}
-    </ul>
-    <form method="post" action="/admin/inquilinos/{{ inquilino_id }}/documentos" enctype="multipart/form-data" class="formulario">
-        <input type="hidden" name="csrf" value="{{ csrf }}">
-        <input type="file" name="archivo" accept=".txt,.md,text/plain,text/markdown" required>
-        <button type="submit">Añadir documento</button>
-    </form>
-</section>
+{% include "comun/_conocimiento.html" %}
 
 <section class="tarjeta">
     <h3>Acceso a su panel</h3>

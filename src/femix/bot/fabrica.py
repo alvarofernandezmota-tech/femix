@@ -104,6 +104,10 @@ def construir_femix(
             usuario_id, carpeta, almacen=almacen, reservas=reservas, reloj=reloj,
             buscador=buscador, inquilino_id=inquilino_id, internet=internet,
         )
+    if "preguntas" not in extra:
+        # Respuestas exactas del dueño (panel): se contestan al momento, sin el modelo.
+        from ..inquilino.preguntas import PreguntasFrecuentes
+        extra["preguntas"] = PreguntasFrecuentes(almacen)
     if "actividad" not in extra:
         # Mensajes e incidencias para el panel del dueño y el del inquilino.
         from ..infraestructura.actividad import Actividad

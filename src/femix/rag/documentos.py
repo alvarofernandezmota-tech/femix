@@ -21,4 +21,5 @@ class Fragmento:
 @dataclass
 class ResultadoBusqueda:
     fragmento: Fragmento
-    puntuacion: float
+    puntuacion: float           # parecido de significado (coseno de los embeddings)
+    palabras: float = 0.0       # BM25: palabras útiles en común con la pregunta

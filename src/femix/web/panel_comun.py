@@ -82,3 +82,8 @@ async def probar_bot(directorio: str, inquilino_id: str, usuario_id: str, texto:
         raise ValueError("Escribe algo para probar el bot")
     # El modelo tarda: en un hilo, para no parar el panel de todos.
     return await asyncio.to_thread(_probar, directorio, inquilino_id, usuario_id, texto)
+
+
+def preguntas_de(directorio: str, inquilino_id: str):
+    from femix.inquilino.preguntas import PreguntasFrecuentes
+    return PreguntasFrecuentes(almacen_dominio(directorio, inquilino_id))

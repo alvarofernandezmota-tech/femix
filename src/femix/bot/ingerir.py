@@ -7,7 +7,7 @@ from ..rag.documentos import Documento
 from ..rag.indice import IndiceEmbeddings
 from .fabrica import DIRECTORIO_DATOS, inquilino_desde_entorno
 
-EXTENSIONES = (".txt", ".md")
+from ..rag.lectores import EXTENSIONES, extraer_texto
 
 
 def expandir(rutas: list[str]) -> list[str]:
@@ -37,8 +37,12 @@ def ingerir_ficheros(
         if fuente in ya_ingeridos:
             informe.append(f"= {fuente}: ya estaba en el índice, se omite")
             continue
-        with open(ruta, "r", encoding="utf-8", errors="ignore") as f:
-            texto = f.read()
+        with open(ruta, "rb") as f:
+            try:
+                texto = extraer_texto(fuente, f.read())
+            except ValueError as exc:
+                informe.append(f"- {fuente}: {exc}")
+                continue
         fragmentos = indice.ingerir(
             Documento(id=fuente, inquilino_id=inquilino_id, fuente=fuente, texto=texto)
         )

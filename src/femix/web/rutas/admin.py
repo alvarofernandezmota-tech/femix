@@ -32,7 +32,7 @@ from femix.saas.planes import PLANES
 from femix.saas.suscripciones import ESTADOS, AlmacenSuscripciones
 
 from .. import panel_comun
-from ..documentos import ingerir_subida, listar_documentos
+from ..documentos import ingerir_subida, ingerir_web, listar_documentos
 from .auth import (
     AlmacenInquilinos,
     AlmacenSesiones,
@@ -60,6 +60,9 @@ AVISOS = {
     "password": "Contraseña del panel del inquilino guardada.",
     "suscripcion": "Suscripción guardada.",
     "anulada": "Reserva anulada.",
+    "web": "Página web añadida a sus documentos.",
+    "pregunta": "Pregunta frecuente guardada.",
+    "quitada": "Pregunta frecuente quitada.",
 }
 
 
@@ -314,6 +317,7 @@ def _contexto_detalle(inquilino_id: str, sesion: dict, documentos=(), **extra) -
         "planes_todos": list(PLANES.values()),
         "estados": ESTADOS,
         "actividad": panel_comun.actividad(directorio, inquilino_id, 30),
+        "preguntas": panel_comun.preguntas_de(directorio, inquilino_id).listar() if not ilegible else [],
         "reservas": panel_comun.proximas_reservas(directorio, inquilino_id) if not ilegible else None,
         **extra,
     }
@@ -608,3 +612,36 @@ async def probar_bot(request: Request, inquilino_id: str, sesion: dict = Depends
     except ValueError as exc:
         return await _detalle(request, inquilino_id, sesion, codigo=status.HTTP_400_BAD_REQUEST, error=str(exc))
     return await _detalle(request, inquilino_id, sesion, prueba={"texto": texto, "respuesta": respuesta})
+
+
+# --- Lo que sabe su bot: webs y preguntas frecuentes ---------------------------------------------
+
+@router.post("/inquilinos/{inquilino_id}/web")
+async def anadir_web(request: Request, inquilino_id: str, sesion: dict = Depends(requerir_admin), url: str = Form(...)):
+    inquilino_id = _id_valido(inquilino_id)
+    _contexto_detalle(inquilino_id, sesion)
+    try:
+        await ingerir_web(inquilino_id, url, directorio_datos_web())
+    except HTTPException as exc:
+        return await _detalle(request, inquilino_id, sesion, codigo=exc.status_code, error=exc.detail)
+    return _volver(inquilino_id, "web")
+
+
+@router.post("/inquilinos/{inquilino_id}/preguntas")
+async def anadir_pregunta(request: Request, inquilino_id: str, sesion: dict = Depends(requerir_admin),
+                          pregunta: str = Form(...), respuesta: str = Form(...)):
+    inquilino_id = _id_valido(inquilino_id)
+    _contexto_detalle(inquilino_id, sesion)
+    try:
+        panel_comun.preguntas_de(directorio_datos_web(), inquilino_id).anadir(pregunta, respuesta)
+    except ValueError as exc:
+        return await _detalle(request, inquilino_id, sesion, codigo=status.HTTP_400_BAD_REQUEST, error=str(exc))
+    return _volver(inquilino_id, "pregunta")
+
+
+@router.post("/inquilinos/{inquilino_id}/preguntas/{id_pregunta}/quitar")
+async def quitar_pregunta(inquilino_id: str, id_pregunta: int, sesion: dict = Depends(requerir_admin)):
+    inquilino_id = _id_valido(inquilino_id)
+    if not panel_comun.preguntas_de(directorio_datos_web(), inquilino_id).quitar(id_pregunta):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Esa pregunta no existe")
+    return _volver(inquilino_id, "quitada")

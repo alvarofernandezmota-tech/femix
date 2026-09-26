@@ -55,6 +55,7 @@ class Femix:
         subagente=None,
         selector_modelos: "SelectorDeModelos | None" = None,
         buscador=None,
+        preguntas=None,
         delegar: bool = True,
         almacen=None,
         reservas=None,
@@ -89,6 +90,7 @@ class Femix:
             self._subagente = subagente
         else:
             self._subagente = self._subagente_por_defecto(motor, buscador)
+        self._preguntas = preguntas
 
     def _subagente_por_defecto(self, motor, buscador) -> Subagente:
         """Cadena mínima: los agentes que resuelven; el de búsqueda lo monta el subagente.
@@ -115,6 +117,11 @@ class Femix:
             )
             self._registrar_mensaje(usuario_id, "comando", inicio, texto, respuesta)
             return respuesta
+        frecuente, contexto_frecuente = self._pregunta_frecuente(texto)
+        if frecuente is not None:
+            self._memoria.registrar(self._inquilino_id, usuario_id, texto, frecuente)
+            self._registrar_mensaje(usuario_id, "frecuente", inicio, texto, frecuente)
+            return frecuente
         if self._control is not None and (aviso := self._control.gastar_mensaje()):
             self._registrar_mensaje(usuario_id, "límite", inicio, texto, aviso)
             return aviso
@@ -122,6 +129,8 @@ class Femix:
         if self._reloj is not None:
             ahora = f"Ahora es {fecha_en_palabras(self._reloj.ahora())} (hora local)."
             contexto = f"{ahora}\n{contexto}" if contexto else ahora
+        if contexto_frecuente:
+            contexto = f"{contexto_frecuente}\n{contexto}" if contexto else contexto_frecuente
         respuesta, camino = self._responder(usuario_id, texto, contexto, intencion)
         # Un modelo local puede devolver la cadena vacía. Telegram rechaza un mensaje vacío
         # ("Message text is empty") y el usuario se quedaría sin nada; mejor decírselo.
@@ -131,6 +140,25 @@ class Femix:
         self._memoria.registrar(self._inquilino_id, usuario_id, texto, respuesta)
         self._registrar_mensaje(usuario_id, camino, inicio, texto, respuesta)
         return respuesta
+
+    def _pregunta_frecuente(self, texto: str) -> "tuple[str | None, str]":
+        """(respuesta directa, "") si el mensaje es casi una pregunta frecuente; (None, dato para
+        el modelo) si se parece algo; (None, "") si no. Un fallo aquí nunca deja sin respuesta."""
+        if self._preguntas is None:
+            return None, ""
+        try:
+            from ..inquilino.preguntas import PARECIDO_CONTEXTO, PARECIDO_DIRECTO
+            pregunta, puntos = self._preguntas.mejor(texto)
+        except Exception as exc:
+            _log.warning("No se pudieron leer las preguntas frecuentes", exc_info=True)
+            self._incidencia("preguntas", f"{type(exc).__name__}: {exc}")
+            return None, ""
+        if pregunta is None or puntos < PARECIDO_CONTEXTO:
+            return None, ""
+        if puntos >= PARECIDO_DIRECTO:
+            return pregunta["respuesta"], ""
+        return None, (f"Respuesta oficial del negocio a la pregunta «{pregunta['pregunta']}»: "
+                      f"{pregunta['respuesta']} (úsala si viene a cuento; no la cambies).")
 
     def _registrar_mensaje(self, usuario_id: str, camino: str, inicio: float, texto: str, respuesta: str):
         segundos = time.monotonic() - inicio

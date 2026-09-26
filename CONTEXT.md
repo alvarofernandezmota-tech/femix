@@ -25,7 +25,10 @@ cliente (`/usuario/panel`), actividad e incidencias de todos los bots en `/admin
 copias diarias. `tool_calling` ya viene encendida por defecto. Ver `docs/saas.md`.
 Un solo contenedor `femix` (bots + panel, `conectores/arranque.py`) junto a `femix-db`; Ollama sigue
 en el host. Capacidad `busqueda_web` disponible con SearXNG opcional (perfil `busqueda`).
-Siguiente: decidir el modelo en madre (velocidad en CPU) y abrir el SaaS a los primeros clientes.
+Comprensión (2026-09-26): RAG con PDF/Word/Excel/web, troceo por apartados, búsqueda híbrida
+(embeddings + BM25), preguntas de seguimiento, citas y preguntas frecuentes. Ver `docs/rag.md`.
+Siguiente: velocidad y router del modelo, memoria de aprendizaje, orden de la repo y CI.
+Pendiente también: decidir el modelo en madre (velocidad en CPU) y abrir el SaaS a los primeros clientes.
 
 ## Qué funciona de verdad
 - Motor Ollama conectado vía `llm/router.py`.

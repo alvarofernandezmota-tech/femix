@@ -148,3 +148,30 @@ def test_admin_ve_planes_actividad_y_cambia_suscripcion(entorno):
     assert r.status_code == 303
     assert AlmacenSuscripciones(str(entorno)).obtener("acme").plan == "pro"
     assert "49 €/mes" in cliente.get("/admin/", headers={"Accept": "text/html"}).text
+
+
+def test_preguntas_y_documentos_desde_el_panel_del_cliente(entorno):
+    cliente, csrf = _cliente(entorno)
+    r = cliente.post("/usuario/preguntas", data={"csrf": csrf, "pregunta": "¿Tenéis wifi?", "respuesta": "Sí, gratis."},
+                     follow_redirects=False)
+    assert r.status_code == 303
+    assert "¿Tenéis wifi?" in cliente.get("/usuario/panel").text
+    r = cliente.post("/usuario/documentos", data={"csrf": csrf},
+                     files={"archivo": ("carta.md", "# Precios\nCorte 15 euros.".encode(), "text/markdown")},
+                     follow_redirects=False)
+    assert r.status_code == 303 and "carta.md" in cliente.get("/usuario/panel").text
+    r = cliente.post("/usuario/documentos", data={"csrf": csrf}, files={"archivo": ("virus.exe", b"x")})
+    assert r.status_code == 400 and "No sé leer" in r.text
+    assert cliente.post("/usuario/web", data={"csrf": csrf, "url": "http://127.0.0.1:8000/"}).status_code == 400
+    r = cliente.post("/usuario/preguntas/1/quitar", data={"csrf": csrf}, follow_redirects=False)
+    assert r.status_code == 303
+    assert cliente.post("/usuario/preguntas", data={"pregunta": "x", "respuesta": "y"}).status_code == 403
+
+
+def test_preguntas_desde_el_panel_del_dueno(entorno):
+    AlmacenPerfiles(str(entorno)).crear(PerfilInquilino("acme", "ACME", tipo="empresa"))
+    cliente, csrf, _ = _admin()
+    r = cliente.post("/admin/inquilinos/acme/preguntas", data={"csrf": csrf, "pregunta": "¿Horario?", "respuesta": "De 9 a 5."},
+                     follow_redirects=False)
+    assert r.status_code == 303
+    assert "De 9 a 5." in cliente.get("/admin/inquilinos/acme", headers={"Accept": "text/html"}).text

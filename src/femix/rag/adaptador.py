@@ -72,7 +72,9 @@ class IndiceEmbeddingsBuscador(Buscador):
         if not texto or not texto.strip():
             return ""
         resultados = self.indice(inquilino_id).buscar(texto, k=maximo)
-        relevantes = [r for r in resultados if r.puntuacion >= self._puntuacion_minima]
+        # Vale si se parece en significado o si comparte palabras útiles (BM25 > 0: sin palabras
+        # vacías, así que "de" o "la" ya no cuelan un documento cualquiera).
+        relevantes = [r for r in resultados if r.puntuacion >= self._puntuacion_minima or r.palabras > 0]
         if not relevantes:
             return ""
         return construir_contexto(relevantes, limite_caracteres=self._limite_caracteres)
