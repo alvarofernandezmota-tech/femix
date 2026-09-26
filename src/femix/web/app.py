@@ -17,6 +17,7 @@ from .rutas.auth import directorio_datos_web
 from .rutas.auth import router as auth_router
 from .rutas.saas import router as saas_router
 from .rutas.usuario import router as usuario_router
+from .rutas.whatsapp import router as whatsapp_router
 
 _DIRECTORIO_BASE = os.path.dirname(__file__)
 _DIRECTORIO_STATIC = os.path.join(_DIRECTORIO_BASE, "static")
@@ -47,6 +48,7 @@ app.include_router(usuario_router)
 app.include_router(admin_acceso_router)
 app.include_router(admin_router)
 app.include_router(saas_router)
+app.include_router(whatsapp_router)
 
 
 @app.get("/health")

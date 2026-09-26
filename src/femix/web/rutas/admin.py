@@ -432,6 +432,9 @@ async def guardar_perfil(
     permitidos: str = Form(""),
     abierto: bool = Form(False),
     responsable: str = Form(""),
+    whatsapp_telefono_id: str = Form(""),
+    whatsapp_token: str = Form(""),
+    quitar_whatsapp: bool = Form(False),
 ):
     inquilino_id = _id_valido(inquilino_id)
     contexto = _contexto_detalle(inquilino_id, sesion)  # 404 si no existe
@@ -441,6 +444,9 @@ async def guardar_perfil(
     def con_telegram(base: PerfilInquilino, actual: "PerfilInquilino | None") -> PerfilInquilino:
         """Token y permitidos según el formulario, a partir del perfil leído *dentro* del bloqueo."""
         token_actual = actual.telegram_token if actual else ""
+        whatsapp_actual = actual.whatsapp_token if actual else ""
+        base = replace(base, whatsapp_telefono_id="" if quitar_whatsapp else whatsapp_telefono_id,
+                       whatsapp_token="" if quitar_whatsapp else (whatsapp_token.strip() or whatsapp_actual))
         if del_entorno:
             # Los manda el .env: lo que venga del formulario no cuenta.
             return replace(base, telegram_token=token_actual,

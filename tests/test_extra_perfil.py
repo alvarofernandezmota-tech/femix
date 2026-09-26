@@ -492,7 +492,7 @@ def test_a_publico_lleva_todo_menos_el_token_y_no_toca_el_perfil(token):
     perfil = _perfil(telegram_token=token, horario=[Franja("lunes", "09:00", "10:00")],
                      telegram_permitidos=[5]).validado()
     publico = perfil.a_publico()
-    esperados = {f.name for f in fields(PerfilInquilino)} - {"telegram_token"} | {"telegram_configurado"}
+    esperados = {f.name for f in fields(PerfilInquilino)} - {"telegram_token", "whatsapp_token"} | {"telegram_configurado", "whatsapp_configurado"}
     assert set(publico) == esperados
     assert publico["telegram_configurado"] is bool(token)
     assert publico["horario"] == [{"dia": "lunes", "desde": "09:00", "hasta": "10:00"}]

@@ -275,6 +275,9 @@ async def guardar_bot(
     permitidos: str = Form(""),
     abierto: bool = Form(False),
     responsable: str = Form(""),
+    whatsapp_telefono_id: str = Form(""),
+    whatsapp_token: str = Form(""),
+    quitar_whatsapp: bool = Form(False),
 ):
     from .admin import leer_horario, leer_responsable
     directorio = directorio_datos_web()
@@ -295,7 +298,12 @@ async def guardar_bot(
 
         def con_token(anterior: "PerfilInquilino | None") -> PerfilInquilino:
             token_actual = anterior.telegram_token if anterior else ""
-            return _replace(base, telegram_token="" if quitar_token else (telegram_token.strip() or token_actual))
+            whatsapp_actual = anterior.whatsapp_token if anterior else ""
+            return _replace(
+                base, telegram_token="" if quitar_token else (telegram_token.strip() or token_actual),
+                whatsapp_telefono_id="" if quitar_whatsapp else whatsapp_telefono_id,
+                whatsapp_token="" if quitar_whatsapp else (whatsapp_token.strip() or whatsapp_actual),
+            )
 
         if actual is None:
             almacen.crear(con_token(None))

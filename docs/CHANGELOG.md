@@ -534,3 +534,9 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
 - **RGPD**: descargar y borrar todos los datos de un inquilino (ficheros y Postgres), desde los dos
   paneles; página de términos.
 - Guía: `docs/operacion.md`. 963 tests en verde con Postgres real.
+
+## 2026-09-26 — WhatsApp (`feat/panel-web`)
+- **Canal WhatsApp** por la Cloud API oficial de Meta: webhook firmado (`/whatsapp/webhook`),
+  reparto por número al inquilino, mismo Femix que en Telegram, sin duplicados por reintentos.
+  Número y token por inquilino desde los dos paneles (el token nunca se muestra).
+- Guía: `docs/whatsapp.md`.

@@ -66,6 +66,9 @@ class PerfilInquilino:
     # ID de Telegram de quien atiende el negocio: recibe los "quiero hablar con una persona" y los
     # contesta con /responder. 0 = nadie.
     telegram_responsable: int = 0
+    # WhatsApp (Cloud API de Meta): el identificador del número y su token de acceso. Vacíos = sin WhatsApp.
+    whatsapp_telefono_id: str = ""
+    whatsapp_token: str = ""
     # Fase 3: cómo se presenta y habla su bot. Vacíos = los de Femix.
     nombre_asistente: str = ""
     tono: str = ""
@@ -75,7 +78,8 @@ class PerfilInquilino:
 
     def validado(self) -> "PerfilInquilino":
         """Copia normalizada, o `ValueError` diciendo qué campo está mal."""
-        for campo in ("nombre", "tipo", "descripcion", "telegram_token", "nombre_asistente", "tono"):
+        for campo in ("nombre", "tipo", "descripcion", "telegram_token", "nombre_asistente", "tono",
+                      "whatsapp_telefono_id", "whatsapp_token"):
             if not isinstance(getattr(self, campo) or "", str):
                 raise ValueError(f"{campo} tiene que ser texto")
         for campo in ("horario", "capacidades", "telegram_permitidos"):
@@ -89,6 +93,12 @@ class PerfilInquilino:
         if isinstance(self.telegram_responsable, bool) or not isinstance(self.telegram_responsable, int) \
                 or self.telegram_responsable < 0:
             raise ValueError(f"{self.telegram_responsable!r} no es un ID de usuario de Telegram (responsable)")
+        whatsapp_telefono_id = (self.whatsapp_telefono_id or "").strip()
+        whatsapp_token = (self.whatsapp_token or "").strip()
+        if whatsapp_telefono_id and not (whatsapp_telefono_id.isdigit() and len(whatsapp_telefono_id) <= 30):
+            raise ValueError("El identificador del número de WhatsApp son solo cifras (lo da Meta)")
+        if whatsapp_token and (len(whatsapp_token) > 1000 or any(c.isspace() for c in whatsapp_token)):
+            raise ValueError("El token de WhatsApp no parece válido")
         nombre = (self.nombre or "").strip()
         if not nombre:
             raise ValueError("El nombre no puede estar vacío")
@@ -119,6 +129,8 @@ class PerfilInquilino:
             telegram_permitidos=_validar_permitidos(self.telegram_permitidos),
             nombre_asistente=nombre_asistente,
             tono=tono,
+            whatsapp_telefono_id=whatsapp_telefono_id,
+            whatsapp_token=whatsapp_token,
         )
 
     def a_dict(self) -> dict:
@@ -142,6 +154,7 @@ class PerfilInquilino:
         datos = self.a_dict()
         token = datos.pop("telegram_token")
         datos["telegram_configurado"] = bool(token)
+        datos["whatsapp_configurado"] = bool(datos.pop("whatsapp_token"))
         return datos
 
 
