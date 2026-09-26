@@ -1,0 +1,16 @@
+# Librerías pesadas (voz con Whisper, modelos) que casi nunca cambian. Docker las instala en un
+# paso propio: cambiar requirements.txt no obliga a volver a descargarlas.
+av==18.1.0
+ctranslate2==4.8.2
+faster-whisper==1.2.1
+filelock==4.0.1
+flatbuffers==25.12.19
+fsspec==2026.9.0
+hf-xet==1.6.0
+huggingface_hub==1.32.0
+numpy>=2.0,<2.5
+onnxruntime==1.30.0
+protobuf==7.36.2
+PyYAML==6.0.3
+tokenizers==0.23.2
+tqdm==4.70.1

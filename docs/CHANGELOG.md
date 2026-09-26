@@ -553,3 +553,10 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   punta a punta con Docker: copia, cambio, restauración y dato original de vuelta.
 - `docs/INFRAESTRUCTURA.md` reescrito (Docker, ya no el servicio systemd); `docker.md`,
   `saas.md`, `agentes.md` y `PRODUCCION_MADRE.md` al día; ROADMAP con las fases 7–11.
+
+## 2026-09-26 — Montajes de Docker rápidos (`feat/panel-web`)
+- Librerías pesadas (voz, modelos) en `requirements-base.txt`, en su propio paso del `Dockerfile`:
+  añadir o cambiar una librería ligera ya no vuelve a descargar las pesadas.
+- Caché de pip de BuildKit (`RUN --mount=type=cache`) entre montajes; necesita `docker-buildx`
+  (`scripts/desplegar.sh` lo comprueba).
+- Desplegado en madre (contenedor `femix` + `femix-db` en marcha).
