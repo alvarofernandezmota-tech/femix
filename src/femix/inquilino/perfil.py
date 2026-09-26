@@ -63,6 +63,9 @@ class PerfilInquilino:
     # Fase 6: abierto = cualquiera puede escribirle (el bot de un negocio con sus clientes). Cerrado
     # (por defecto), solo los permitidos.
     telegram_abierto: bool = False
+    # ID de Telegram de quien atiende el negocio: recibe los "quiero hablar con una persona" y los
+    # contesta con /responder. 0 = nadie.
+    telegram_responsable: int = 0
     # Fase 3: cómo se presenta y habla su bot. Vacíos = los de Femix.
     nombre_asistente: str = ""
     tono: str = ""
@@ -83,6 +86,9 @@ class PerfilInquilino:
             raise ValueError("activo tiene que ser true o false")
         if not isinstance(self.telegram_abierto, bool):
             raise ValueError("telegram_abierto tiene que ser true o false")
+        if isinstance(self.telegram_responsable, bool) or not isinstance(self.telegram_responsable, int) \
+                or self.telegram_responsable < 0:
+            raise ValueError(f"{self.telegram_responsable!r} no es un ID de usuario de Telegram (responsable)")
         nombre = (self.nombre or "").strip()
         if not nombre:
             raise ValueError("El nombre no puede estar vacío")

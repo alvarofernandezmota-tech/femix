@@ -1,4 +1,5 @@
 """Panel del cliente (`/usuario`): sus datos, su bot, lo que sabe, lo que aprende, su plan y su actividad."""
+import asyncio
 import os
 from datetime import datetime
 
@@ -273,8 +274,9 @@ async def guardar_bot(
     quitar_token: bool = Form(False),
     permitidos: str = Form(""),
     abierto: bool = Form(False),
+    responsable: str = Form(""),
 ):
-    from .admin import leer_horario
+    from .admin import leer_horario, leer_responsable
     directorio = directorio_datos_web()
     almacen = AlmacenPerfiles(directorio)
     # Solo las que permite su plan; las que tenga encendidas fuera del plan se conservan (vuelven
@@ -287,6 +289,7 @@ async def guardar_bot(
             inquilino_id=inquilino.id, nombre=nombre, tipo=tipo, descripcion=descripcion,
             horario=leer_horario(horario), capacidades=[c for c in capacidades if c in permitidas] + fuera_del_plan,
             nombre_asistente=nombre_asistente, tono=tono, telegram_abierto=abierto,
+            telegram_responsable=leer_responsable(responsable),
             telegram_permitidos=leer_ids_telegram(permitidos),
         )
 
@@ -346,3 +349,32 @@ async def decidir_aprendizaje(request: Request, accion: str, id_item: int = Form
     except ValueError as exc:
         return await _pagina(request, inquilino, csrf, 400, error=str(exc))
     return _hecho(aviso)
+
+
+
+# --- Sus datos (RGPD): descargarlos y borrar la cuenta ------------------------------------------
+
+@router.get("/datos")
+async def descargar_datos(inquilino: Inquilino = Depends(obtener_inquilino_actual)):
+    import json as _json
+    from fastapi.responses import Response
+    from femix.inquilino.datos import exportar
+    datos = await asyncio.to_thread(exportar, directorio_datos_web(), inquilino.id)
+    return Response(_json.dumps(datos, ensure_ascii=False, indent=2), media_type="application/json",
+                    headers={"Content-Disposition": f'attachment; filename="femix-{inquilino.id}.json"'})
+
+
+@router.post("/borrar-cuenta", dependencies=[Depends(comprobar_csrf)])
+async def borrar_cuenta(request: Request, confirmacion: str = Form(""),
+                        inquilino: Inquilino = Depends(obtener_inquilino_actual), csrf: str = Depends(csrf_de_sesion)):
+    from femix.inquilino.datos import SuscripcionActiva, borrar_todo
+    if confirmacion.strip() != inquilino.id:
+        return await _pagina(request, inquilino, csrf, 400,
+                             error=f"Para borrar la cuenta escribe exactamente tu identificador: {inquilino.id}")
+    try:
+        await asyncio.to_thread(borrar_todo, directorio_datos_web(), inquilino.id)
+    except SuscripcionActiva as exc:
+        return await _pagina(request, inquilino, csrf, 400, error=str(exc))
+    respuesta = RedirectResponse(url="/?borrada=1", status_code=status.HTTP_303_SEE_OTHER)
+    respuesta.delete_cookie("session_id")
+    return respuesta

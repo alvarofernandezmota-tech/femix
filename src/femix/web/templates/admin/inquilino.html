@@ -2,6 +2,18 @@
 
 {% block titulo %}{{ nombre }} — Femix{% include "comun/_reservas.html" %}
 {% include "comun/_actividad.html" %}
+
+<section class="tarjeta">
+    <h3>Datos (RGPD)</h3>
+    <p><a href="/admin/inquilinos/{{ inquilino_id }}/datos">Descargar todos sus datos (JSON)</a></p>
+    <form method="post" action="/admin/inquilinos/{{ inquilino_id }}/borrar" class="formulario"
+          onsubmit="return confirm('Se borra todo lo de este inquilino. No se puede deshacer. ¿Seguro?');">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Borrar el inquilino y todos sus datos <small>(escribe <code>{{ inquilino_id }}</code>)</small>
+            <input name="confirmacion" required autocomplete="off"></label>
+        <button type="submit">Borrar definitivamente</button>
+    </form>
+</section>
 {% endblock %}
 
 {% block content %}
@@ -115,6 +127,10 @@
                 <input name="permitidos" value="{{ permitidos_texto }}" placeholder="123456789, 987654321">
             </label>
             {% endif %}
+            <label class="casilla"><input type="checkbox" name="abierto" value="true" {% if perfil and perfil.telegram_abierto %}checked{% endif %}>
+                Abierto a cualquiera (los clientes de un negocio)</label>
+            <label>ID de Telegram del responsable <small>(recibe los "quiero hablar con una persona" y contesta con /responder; vacío = nadie)</small>
+                <input name="responsable" inputmode="numeric" value="{{ perfil.telegram_responsable if perfil and perfil.telegram_responsable else '' }}"></label>
         </fieldset>
 
         <button type="submit">Guardar perfil</button>
@@ -143,4 +159,16 @@
 </section>
 {% include "comun/_reservas.html" %}
 {% include "comun/_actividad.html" %}
+
+<section class="tarjeta">
+    <h3>Datos (RGPD)</h3>
+    <p><a href="/admin/inquilinos/{{ inquilino_id }}/datos">Descargar todos sus datos (JSON)</a></p>
+    <form method="post" action="/admin/inquilinos/{{ inquilino_id }}/borrar" class="formulario"
+          onsubmit="return confirm('Se borra todo lo de este inquilino. No se puede deshacer. ¿Seguro?');">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Borrar el inquilino y todos sus datos <small>(escribe <code>{{ inquilino_id }}</code>)</small>
+            <input name="confirmacion" required autocomplete="off"></label>
+        <button type="submit">Borrar definitivamente</button>
+    </form>
+</section>
 {% endblock %}

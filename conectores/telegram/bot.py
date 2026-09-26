@@ -25,6 +25,7 @@ from femix.inquilino.migracion import migrar_datos_heredados
 from femix.inquilino.perfil import AlmacenPerfiles
 from .acceso import comprobar_acceso
 from .directo import RespuestaEnDirecto
+from .persona import comando_responder, pasar_a_persona
 from .flota import FlotaDeBots, bot_del_entorno, sincronizar_entorno
 from .voz import manejar_nota_de_voz
 
@@ -32,6 +33,8 @@ SIN_VOZ = "Este bot no tiene activadas las notas de voz. Escríbeme, por favor."
 
 async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     femix = context.bot_data["femix"]
+    if await pasar_a_persona(update, context):   # "quiero hablar con una persona" → al responsable
+        return
     # El LLM tarda segundos: en un hilo, para no parar a los bots de otros inquilinos, que
     # comparten este bucle de eventos. Cada bot atiende sus mensajes de uno en uno, así que un
     # mismo Femix nunca corre en dos hilos a la vez.
@@ -81,6 +84,7 @@ def construir_aplicacion(token: str, femix, permitidos=frozenset(), voz: bool = 
     # Grupo -1: antes que cualquier otro handler. Sin permiso no se llega ni a /start.
     app.add_handler(TypeHandler(Update, comprobar_acceso), group=-1)
     app.add_handler(CommandHandler("start", comando_start))
+    app.add_handler(CommandHandler("responder", comando_responder))
     app.add_handler(MessageHandler(filters.VOICE, manejar_voz if voz else voz_desactivada))
     # filters.TEXT incluye los comandos (/tarea, /hoy...), que resuelve Femix.procesar. Con
     # `~filters.COMMAND` se descartaban sin respuesta. /start lo atiende antes su propio handler.

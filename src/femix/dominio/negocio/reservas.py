@@ -185,3 +185,19 @@ class Reservas:
             if quitada is not None:
                 self._guardar([c for c in citas if c["id"] != id_cita])
             return quitada
+
+    # -- recordatorio del día antes -----------------------------------------------------------
+
+    def por_recordar(self) -> list:
+        """Citas de mañana de clientes de Telegram (usuario_id numérico) que aún no se han recordado."""
+        manana = (self._reloj.ahora().date() + timedelta(days=1)).isoformat()
+        return [c for c in self.citas(manana)
+                if str(c.get("usuario_id") or "").isdigit() and not c.get("recordada")]
+
+    def marcar_recordada(self, id_cita: int) -> None:
+        with _ESCRIBIENDO:
+            citas = self._almacen.cargar(COLECCION, AGENDA)
+            for cita in citas:
+                if cita["id"] == id_cita:
+                    cita["recordada"] = True
+            self._guardar(citas)

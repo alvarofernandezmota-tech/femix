@@ -48,6 +48,7 @@ Opcionales: `--profile publico` (HTTPS con Caddy), `--profile copias` (copia dia
 | [docs/velocidad.md](docs/velocidad.md) | Router y trucos de velocidad en CPU |
 | [docs/aprendizaje.md](docs/aprendizaje.md) | Qué aprende el bot y cómo lo aprueba el dueño |
 | [docs/saas.md](docs/saas.md) | Planes, Stripe, alta pública, HTTPS y copias |
+| [docs/operacion.md](docs/operacion.md) | Pasar a una persona, avisos, correos y datos (RGPD) |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Fases del proyecto y estado |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Cómo trabajar en el repo (ramas, CI local, reglas) |
 

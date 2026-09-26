@@ -53,6 +53,11 @@ def _registro_disponible():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
 
 
+@router.get("/terminos")
+async def terminos(request: Request):
+    return _templates.TemplateResponse(request, "saas/terminos.html", _contexto())
+
+
 @router.get("/registro")
 async def formulario_registro(request: Request):
     _registro_disponible()
@@ -90,7 +95,7 @@ async def registrar(
     if tipo not in ("empresa", "persona"):
         tipo = "empresa"
     if not acepto:
-        return error("Tienes que aceptar la política de privacidad.")
+        return error("Tienes que aceptar los términos y la política de privacidad.")
     try:
         perfil = _crear_inquilino(inquilino_id.strip().lower(), nombre, tipo, password)
     except ValueError as exc:
@@ -98,6 +103,8 @@ async def registrar(
     _altas_por_ip.setdefault(ip, []).append(ahora)
     directorio = directorio_datos_web()
     AlmacenSuscripciones(directorio).guardar(nueva_prueba(perfil.inquilino_id, email, datetime.now()))
+    from femix.saas import correo
+    correo.enviar("bienvenida", email, inquilino_id=perfil.inquilino_id, dias=DIAS_PRUEBA)
     _log.info("Alta nueva: %s", perfil.inquilino_id)
     inquilino = AlmacenInquilinos(directorio).obtener(perfil.inquilino_id)
     return abrir_sesion(inquilino)

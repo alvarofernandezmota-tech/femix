@@ -15,7 +15,7 @@
         </select></label>
     <label>Email <input name="email" type="email" required maxlength="200" value="{{ previo.email if previo else '' }}"></label>
     <label>Contraseña <small>(mínimo 10 caracteres)</small> <input name="password" type="password" required minlength="10" autocomplete="new-password"></label>
-    <label class="casilla"><input type="checkbox" name="acepto" value="true" required> Acepto la <a href="/privacidad">política de privacidad</a></label>
+    <label class="casilla"><input type="checkbox" name="acepto" value="true" required> Acepto los <a href="/terminos">términos del servicio</a> y la <a href="/privacidad">política de privacidad</a></label>
     <button type="submit">Crear cuenta</button>
 </form>
 {% endblock %}

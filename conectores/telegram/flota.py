@@ -48,6 +48,8 @@ class ConfigBot:
     prompt_sistema: "str | None" = field(default=None, repr=False)
     # Fase 6: cualquiera puede escribirle (bot de un negocio).
     abierto: bool = False
+    # Quien atiende el negocio: recibe los "quiero hablar con una persona" (0 = nadie).
+    responsable: int = 0
 
 
 @dataclass(frozen=True)
@@ -131,6 +133,7 @@ def configuracion_deseada(perfiles, entorno: "BotDelEntorno | None", ilegibles=N
                 entorno.inquilino_id, entorno.token, frozenset(entorno.permitidos),
                 limitar(entorno.inquilino_id, capacidades), prompt_sistema,
                 abierto=bool(perfil is not None and perfil.telegram_abierto),
+                responsable=perfil.telegram_responsable if perfil is not None else 0,
             )
 
     duenos = {c.token: c.inquilino_id for c in deseado.values()}
@@ -147,6 +150,7 @@ def configuracion_deseada(perfiles, entorno: "BotDelEntorno | None", ilegibles=N
         deseado[inquilino_id] = ConfigBot(
             inquilino_id, perfil.telegram_token, frozenset(perfil.telegram_permitidos),
             limitar(inquilino_id, perfil.capacidades), prompt_sistema_de(perfil), abierto=perfil.telegram_abierto,
+            responsable=perfil.telegram_responsable,
         )
     return deseado, problemas
 
@@ -206,11 +210,33 @@ async def avisar_recordatorios(app, directorio_datos: str, inquilino_id: str, re
     return enviados
 
 
+async def recordar_citas(app, inquilino_id: str) -> int:
+    """Una pasada: a cada cliente con cita mañana, un recordatorio (una sola vez por cita)."""
+    reservas = getattr(app.bot_data.get("femix"), "_reservas", None)
+    if reservas is None:
+        return 0
+    enviados = 0
+    for cita in await asyncio.to_thread(reservas.por_recordar):
+        servicio = f" ({cita['servicio']})" if cita.get("servicio") else ""
+        texto = (f"📅 Te recuerdo tu cita de mañana a las {cita['hora']}{servicio}. "
+                 "Si no puedes venir, dímelo y la anulo.")
+        try:
+            await app.bot.send_message(chat_id=int(cita["usuario_id"]), text=texto)
+        except Exception as exc:
+            _log.warning("Bot de %s: no se pudo recordar la cita %s (%s); se reintenta",
+                         inquilino_id, cita["id"], type(exc).__name__)
+            continue
+        await asyncio.to_thread(reservas.marcar_recordada, cita["id"])
+        enviados += 1
+    return enviados
+
+
 async def _bucle_avisos(app, directorio_datos: str, inquilino_id: str) -> None:
     reloj = RelojZona()
     while True:
         try:
             await avisar_recordatorios(app, directorio_datos, inquilino_id, reloj)
+            await recordar_citas(app, inquilino_id)
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -303,6 +329,10 @@ class FlotaDeBots:
         # Último error de arranque de cada uno (se reintenta en la siguiente vuelta).
         self._errores: dict = {}
         self._problemas: dict = {}
+        # Avisos de fallos al dueño de la plataforma (FEMIX_AVISOS_TELEGRAM), si está configurado.
+        from .vigilancia import AvisosAlDueno, destinatario_de_avisos
+        destinatario = destinatario_de_avisos() if avisos else 0
+        self._vigilancia = AvisosAlDueno(directorio_datos, destinatario) if destinatario else None
 
     @property
     def en_marcha(self) -> dict:
@@ -326,9 +356,12 @@ class FlotaDeBots:
             elif not bot.app.updater.running or causa is not None:
                 detalle = _sin_token(f"{type(causa).__name__}: {causa}", bot.config.token) if causa else "parado"
                 por_parar[inquilino_id] = f"dejó de recibir mensajes ({detalle}); se rearranca"
-            elif (nuevo.permitidos, nuevo.abierto) != (bot.config.permitidos, bot.config.abierto):
+            elif (nuevo.permitidos, nuevo.abierto, nuevo.responsable) != (
+                bot.config.permitidos, bot.config.abierto, bot.config.responsable
+            ):
                 bot.app.bot_data["permitidos"] = nuevo.permitidos
                 bot.app.bot_data["abierto"] = nuevo.abierto
+                bot.app.bot_data["responsable"] = nuevo.responsable
                 bot.config = nuevo
                 _log.info("Bot de %s: acceso actualizado (%s)", inquilino_id,
                           "abierto a todos" if nuevo.abierto else f"{len(nuevo.permitidos)} permitidos")
@@ -381,12 +414,39 @@ class FlotaDeBots:
                 except Exception:
                     # Un fallo leyendo perfiles no puede tumbar los bots que ya funcionan.
                     _log.exception("Fallo revisando los bots; se reintenta en %.0f s", intervalo)
+                await self._correos_del_dia()
+                if self._vigilancia is not None:
+                    try:
+                        await self._vigilancia.revisar(self._bot_para_avisos())
+                    except Exception:
+                        _log.warning("Fallo revisando incidencias para avisar", exc_info=True)
                 try:
                     await asyncio.wait_for(parar.wait(), intervalo)
                 except asyncio.TimeoutError:
                     pass
         finally:
             await self.detener_todo()
+
+    async def _correos_del_dia(self) -> None:
+        """Una vez al día: correos de fin de prueba e impagos (saas/correo.py), si hay SMTP."""
+        from femix.saas import correo, saas_activo
+        hoy = datetime.now().date()
+        if not (self._avisos and saas_activo() and correo.configurado()) or getattr(self, "_correos_hechos", None) == hoy:
+            return
+        self._correos_hechos = hoy
+        try:
+            from femix.saas.suscripciones import AlmacenSuscripciones
+            enviados = await asyncio.to_thread(correo.revisar_suscripciones, AlmacenSuscripciones(self._directorio))
+            if enviados:
+                _log.info("Correos enviados: %s", enviados)
+        except Exception:
+            _log.warning("Fallo revisando los correos del día", exc_info=True)
+
+    def _bot_para_avisos(self):
+        """El bot que manda los avisos al dueño: el del .env si está en marcha; si no, el primero."""
+        if self._entorno is not None and self._entorno.inquilino_id in self._bots:
+            return self._bots[self._entorno.inquilino_id].app.bot
+        return next((b.app.bot for b in self._bots.values()), None)
 
     async def _arrancar(self, config: ConfigBot) -> None:
         inquilino_id = config.inquilino_id
@@ -400,6 +460,7 @@ class FlotaDeBots:
             app = self._construir_app(config.token, femix, config.permitidos, voz=VOZ in config.capacidades)
             app.bot_data["inquilino_id"] = inquilino_id
             app.bot_data["abierto"] = config.abierto
+            app.bot_data["responsable"] = config.responsable
             await app.initialize()
             # Como `run_polling`: los fallos al pedir mensajes a Telegram van al error handler del
             # bot (una línea por corte de red) en vez de a una traza entera en cada reintento.

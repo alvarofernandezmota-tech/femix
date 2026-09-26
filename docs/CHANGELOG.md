@@ -524,3 +524,13 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   `pre-push` (`scripts/instalar-hooks.sh`). El workflow de GitHub queda manual para no gastar cuota.
 - `scripts/desplegar.sh`: `madre` igual que `main` de GitHub y contenedores reconstruidos.
 - `pyproject.toml` (pytest y ruff), plantilla de PR.
+
+## 2026-09-26 — Operación: personas, avisos, correos y RGPD (`feat/panel-web`)
+- **Pasar a una persona**: responsable por bot (`telegram_responsable`), aviso por Telegram y
+  `/responder`. El formulario del dueño ya no pierde "abierto a cualquiera" al guardar.
+- **Recordatorio de citas** el día antes, una vez por cita.
+- **Avisos de fallos** al dueño de la plataforma por Telegram (`FEMIX_AVISOS_TELEGRAM`).
+- **Correos** opcionales por SMTP: bienvenida, fin de prueba y pago fallido.
+- **RGPD**: descargar y borrar todos los datos de un inquilino (ficheros y Postgres), desde los dos
+  paneles; página de términos.
+- Guía: `docs/operacion.md`. 963 tests en verde con Postgres real.

@@ -266,6 +266,17 @@ def leer_horario(texto: str) -> list:
     return franjas
 
 
+
+def leer_responsable(texto: str) -> int:
+    """El ID del responsable desde el formulario: vacío = nadie."""
+    texto = (texto or "").strip()
+    if not texto:
+        return 0
+    if not texto.isdigit() or int(texto) <= 0:
+        raise ValueError(f"{texto!r} no es un ID de usuario de Telegram (responsable)")
+    return int(texto)
+
+
 def escribir_horario(franjas) -> str:
     return "\n".join(f"{f.dia} {f.desde}-{f.hasta}" for f in franjas)
 
@@ -419,6 +430,8 @@ async def guardar_perfil(
     telegram_token: str = Form(""),
     quitar_token: bool = Form(False),
     permitidos: str = Form(""),
+    abierto: bool = Form(False),
+    responsable: str = Form(""),
 ):
     inquilino_id = _id_valido(inquilino_id)
     contexto = _contexto_detalle(inquilino_id, sesion)  # 404 si no existe
@@ -440,6 +453,7 @@ async def guardar_perfil(
             inquilino_id=inquilino_id, nombre=nombre, tipo=tipo, descripcion=descripcion,
             horario=leer_horario(horario), capacidades=capacidades,
             nombre_asistente=nombre_asistente, tono=tono,
+            telegram_abierto=abierto, telegram_responsable=leer_responsable(responsable),
         )
         if contexto["perfil_ilegible"]:
             almacen.reparar(con_telegram(base, None))
@@ -661,3 +675,36 @@ async def decidir_aprendizaje(request: Request, inquilino_id: str, accion: str, 
     except ValueError as exc:
         return await _detalle(request, inquilino_id, sesion, codigo=status.HTTP_400_BAD_REQUEST, error=str(exc))
     return _volver(inquilino_id, aviso)
+
+
+
+# --- Datos del inquilino (RGPD) ------------------------------------------------------------------
+
+@router.get("/inquilinos/{inquilino_id}/datos")
+async def descargar_datos(inquilino_id: str, sesion: dict = Depends(requerir_admin)):
+    import asyncio
+    import json as _json
+    from fastapi.responses import Response
+    from femix.inquilino.datos import exportar
+    inquilino_id = _id_valido(inquilino_id)
+    _contexto_detalle(inquilino_id, sesion)
+    datos = await asyncio.to_thread(exportar, directorio_datos_web(), inquilino_id)
+    return Response(_json.dumps(datos, ensure_ascii=False, indent=2), media_type="application/json",
+                    headers={"Content-Disposition": f'attachment; filename="femix-{inquilino_id}.json"'})
+
+
+@router.post("/inquilinos/{inquilino_id}/borrar")
+async def borrar_inquilino(request: Request, inquilino_id: str, sesion: dict = Depends(requerir_admin),
+                           confirmacion: str = Form("")):
+    import asyncio
+    from femix.inquilino.datos import SuscripcionActiva, borrar_todo
+    inquilino_id = _id_valido(inquilino_id)
+    _contexto_detalle(inquilino_id, sesion)
+    if confirmacion.strip() != inquilino_id:
+        return await _detalle(request, inquilino_id, sesion, codigo=status.HTTP_400_BAD_REQUEST,
+                              error=f"Para borrar escribe exactamente: {inquilino_id}")
+    try:
+        await asyncio.to_thread(borrar_todo, directorio_datos_web(), inquilino_id)
+    except SuscripcionActiva as exc:
+        return await _detalle(request, inquilino_id, sesion, codigo=status.HTTP_400_BAD_REQUEST, error=str(exc))
+    return RedirectResponse(url="/admin/", status_code=status.HTTP_303_SEE_OTHER)
