@@ -547,3 +547,9 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   configura solo el dueño y su cabecera secreta no se enseña ni la borra el cliente.
 - Router: calendario, correo, eventos y reuniones van al camino de herramientas.
 - Guía: `docs/mcp.md`.
+
+## 2026-09-26 — Copias restaurables y documentación al día (`feat/panel-web`)
+- Copias con `pg_dump --clean`; `scripts/restaurar-copia.sh` (guarda antes lo que hay). Probado de
+  punta a punta con Docker: copia, cambio, restauración y dato original de vuelta.
+- `docs/INFRAESTRUCTURA.md` reescrito (Docker, ya no el servicio systemd); `docker.md`,
+  `saas.md`, `agentes.md` y `PRODUCCION_MADRE.md` al día; ROADMAP con las fases 7–11.

@@ -4,6 +4,10 @@ Rama de origen: `feat/agentes-unificados`. Capa de **producción** (vive dentro 
 mensaje de cada inquilino), no la orquestación de agentes de Claude Code — ver la nota de
 arquitectura de `docs/ROADMAP.md`.
 
+> **Actualizado:** el router completo (preguntas frecuentes, acciones con herramientas, consultas con
+> documentos, subagente y charla) está en `docs/velocidad.md` y `docs/arquitectura.md`. Esta página
+> explica el subagente y la cadena de agentes.
+
 ## Los tres caminos de `Femix.procesar()`
 
 Un único punto de entrada, tres caminos de más barato a más caro:

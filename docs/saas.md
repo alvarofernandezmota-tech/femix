@@ -55,7 +55,7 @@ docker compose --profile publico --profile copias up -d --build
 
 - `femix-https` (Caddy) saca y renueva el certificado solo, y manda al panel en 127.0.0.1.
 - `femix-copias` hace `pg_dump` diario en `./copias` y guarda 14 días.
-  Restaurar: `gunzip -c copias/femix-FECHA.sql.gz | docker exec -i femix-db psql -U femix femix`.
+  Restaurar: `scripts/restaurar-copia.sh copias/femix-FECHA.sql.gz` (guarda antes lo que hay).
 
 ## Privacidad
 

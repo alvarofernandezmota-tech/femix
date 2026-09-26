@@ -81,7 +81,8 @@ python -m pytest tests/ -v
 
 ## Próximos pasos
 
-- [x] Panel web (FastAPI + Jinja2) — en pruebas
+- [x] Panel web (FastAPI + Jinja2), en el mismo contenedor que los bots
 - [x] Docker con panel web + bot
 - [x] Probar `docker compose up -d --build` en madre contra el Ollama real (2026-09-23)
-- [ ] Release v0.2.0
+- [x] SaaS, WhatsApp, MCP, aprendizaje y operación (ver docs/CHANGELOG.md)
+- [ ] Release v1.0.0 (etiqueta en `main` cuando se pruebe en madre)

@@ -124,7 +124,7 @@ services:
       - |
         while true; do
           f=/copias/femix-$$(date +%F).sql.gz
-          pg_dump -h 127.0.0.1 -U femix femix | gzip > "$$f.tmp" && mv "$$f.tmp" "$$f" && echo "copia: $$f"
+          pg_dump --clean --if-exists -h 127.0.0.1 -U femix femix | gzip > "$$f.tmp" && mv "$$f.tmp" "$$f" && echo "copia: $$f"
           find /copias -name 'femix-*.sql.gz' -mtime +14 -delete
           sleep 86400
         done
