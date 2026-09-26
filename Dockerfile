@@ -23,6 +23,5 @@ USER femix
 
 EXPOSE 8000
 
-# Por defecto, el bot de Telegram. El panel web usa la misma imagen con otro comando
-# (ver servicio femix-web en docker-compose.yml).
-CMD ["python", "-m", "conectores.telegram.bot"]
+# Un solo contenedor: bot de Telegram + panel web (FEMIX_PANEL=0 para solo el bot).
+CMD ["python", "-m", "conectores.arranque"]

@@ -1,0 +1,13 @@
+# SearXNG para la capacidad busqueda_web de femix (servicio femix-busqueda, perfil `busqueda`).
+use_default_settings: true
+server:
+  bind_address: "127.0.0.1"
+  port: 8888
+  limiter: false
+  image_proxy: false
+search:
+  safe_search: 1
+  default_lang: "es"
+  formats:
+    - html
+    - json

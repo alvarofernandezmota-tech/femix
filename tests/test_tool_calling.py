@@ -303,7 +303,7 @@ def test_cli_de_capacidades(tmp_path, capsys):
     assert capacidad.main(["varo", "+tool_calling", "-voz", "--datos", datos]) == 0
     guardadas = AlmacenPerfiles(datos).obtener("varo").capacidades
     assert TOOL_CALLING in guardadas and "voz" not in guardadas
-    assert capacidad.main(["varo", "+busqueda_web", "--datos", datos]) == 2
+    assert capacidad.main(["varo", "+teletransporte", "--datos", datos]) == 2
     assert capacidad.main(["varo", "tool_calling", "--datos", datos]) == 2
     assert capacidad.main(["nadie", "--datos", datos]) == 1
     assert AlmacenPerfiles(datos).obtener("varo").capacidades == guardadas
@@ -328,3 +328,33 @@ def test_diario_por_herramienta(tmp_path):
     assert ejecutar(h, "escribir_diario", {"texto_entrada": "hoy fui al gimnasio"}) == \
         "Entrada registrada el 2026-09-22T09:00:00: hoy fui al gimnasio"
     assert ejecutar(h, "escribir_diario", {"texto_entrada": "  "}).startswith("Error:")
+
+
+def test_busqueda_web(monkeypatch):
+    from femix.bot import busqueda_web
+    from femix.bot.herramientas import herramientas_para
+    from femix.llm.herramientas import ejecutar
+
+    pedidas = []
+
+    class Respuesta:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"results": [{"title": "El tiempo", "url": "https://x.es", "content": "Sol  y\n25 grados"}]}
+
+    monkeypatch.setattr(busqueda_web.requests, "get", lambda url, params, timeout: pedidas.append((url, params)) or Respuesta())
+    lista = herramientas_para("7", "/tmp/nada", internet="http://127.0.0.1:8888")
+    resultado = ejecutar(lista, "buscar_en_internet", {"consulta": "tiempo en Madrid"})
+    assert "El tiempo (https://x.es): Sol y 25 grados" in resultado
+    assert pedidas[0][0] == "http://127.0.0.1:8888/search" and pedidas[0][1]["format"] == "json"
+    assert "buscar_en_internet" not in [h.nombre for h in herramientas_para("7", "/tmp/nada")]
+
+
+def test_busqueda_web_sin_configurar(monkeypatch):
+    import pytest
+    from femix.bot import busqueda_web
+    monkeypatch.delenv("FEMIX_BUSQUEDA_URL", raising=False)
+    with pytest.raises(ValueError, match="no está configurada"):
+        busqueda_web.buscar("algo")

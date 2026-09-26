@@ -98,9 +98,11 @@ def construir_femix(
         # Fase 5: el modelo llama a funciones reales, atadas a este inquilino y a cada usuario.
         from .herramientas import herramientas_para
         reservas = extra.get("reservas")
+        from .busqueda_web import url_busqueda
+        internet = url_busqueda() if "busqueda_web" in capacidades else None
         extra["herramientas"] = lambda usuario_id: herramientas_para(
             usuario_id, carpeta, almacen=almacen, reservas=reservas, reloj=reloj,
-            buscador=buscador, inquilino_id=inquilino_id,
+            buscador=buscador, inquilino_id=inquilino_id, internet=internet,
         )
     if "actividad" not in extra:
         # Mensajes e incidencias para el panel del dueño y el del inquilino.

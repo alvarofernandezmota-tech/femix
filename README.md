@@ -35,20 +35,16 @@ Pensado para `madre`: el bot de Telegram en Docker y Ollama en el host (fuera de
 ```bash
 cp .env.example .env        # rellena TELEGRAM_BOT_TOKEN y FEMIX_TELEGRAM_PERMITIDOS, revisa HUGIN_LLM_MODELO
 docker compose up -d --build
-docker compose logs -f femix-bot
+docker compose logs -f femix
 ```
 
 Cargar documentos en el RAG del bot (`.txt`/`.md` en `./documentos/`):
 
 ```bash
-docker compose run --rm femix-bot python -m femix.bot.ingerir /app/documentos
+docker compose run --rm femix python -m femix.bot.ingerir /app/documentos
 ```
 
-Panel web (en pruebas, opcional):
-
-```bash
-docker compose --profile web up -d
-```
+El panel web arranca en el mismo contenedor `femix` (en `127.0.0.1:8000`).
 
 Por qué `network_mode: host`, cómo comprobar que llega a Ollama, alternativas y problemas
 frecuentes: [docs/docker.md](docs/docker.md).

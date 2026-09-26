@@ -50,7 +50,7 @@ tarjeta. Sin Stripe configurado, el dueño cambia planes a mano desde `/admin`.
 
 ```sh
 # .env: FEMIX_DOMINIO=femix.tudominio.es (DNS apuntando a madre, puertos 80 y 443 abiertos)
-docker compose --profile web --profile publico --profile copias up -d --build
+docker compose --profile publico --profile copias up -d --build
 ```
 
 - `femix-https` (Caddy) saca y renueva el certificado solo, y manda al panel en 127.0.0.1.
