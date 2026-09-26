@@ -1,3 +1,4 @@
+"""Panel del cliente (`/usuario`): sus datos, su bot, lo que sabe, lo que aprende, su plan y su actividad."""
 import os
 from datetime import datetime
 
@@ -12,7 +13,7 @@ from femix.rag.rutas import directorio_inquilino
 
 from femix.bot.fabrica import almacen_dominio
 
-from ..documentos import ingerir_subida, listar_documentos
+from ..documentos import ingerir_subida, ingerir_web, listar_documentos
 from .auth import Inquilino, directorio_datos_web, obtener_inquilino_actual
 
 router = APIRouter(prefix="/usuario", tags=["usuario"])
@@ -147,6 +148,11 @@ AVISOS = {
     "anulada": "Reserva anulada.",
     "ok": "Pago recibido. Tu plan se activa en unos segundos.",
     "cancelado": "Pago cancelado: no se ha cobrado nada.",
+    "documento": "Documento añadido: tu bot ya lo conoce.",
+    "web": "Página web añadida: tu bot ya la conoce.",
+    "pregunta": "Pregunta frecuente guardada.",
+    "quitada": "Pregunta frecuente quitada.",
+    "aprendizaje": "Hecho: tu bot ya lo tiene en cuenta.",
 }
 
 
@@ -168,6 +174,8 @@ def _contexto(inquilino: Inquilino, csrf: str, request: Request, **extra) -> dic
         "prefijo": "/usuario",
         "resumen": resumen,
         "actividad": panel_comun.actividad(directorio, inquilino.id, 20),
+        "preguntas": panel_comun.preguntas_de(directorio, inquilino.id).listar(),
+        "aprendizaje": panel_comun.resumen_aprendizaje(directorio, inquilino.id),
         "reservas": panel_comun.proximas_reservas(directorio, inquilino.id),
         "catalogo": [c for c in CATALOGO.values() if c.disponible],
         "permitidas": set(resumen["plan"].capacidades),
@@ -178,9 +186,56 @@ def _contexto(inquilino: Inquilino, csrf: str, request: Request, **extra) -> dic
     }
 
 
+async def _pagina(request: Request, inquilino: Inquilino, csrf: str, codigo: int = 200, **extra):
+    contexto = _contexto(inquilino, csrf, request, **extra)
+    contexto["documentos"] = await listar_documentos(inquilino.id, directorio_datos_web())
+    return _templates.TemplateResponse(request, "usuario/panel.html", contexto, status_code=codigo)
+
+
 @router.get("/panel")
 async def panel(request: Request, inquilino: Inquilino = Depends(obtener_inquilino_actual), csrf: str = Depends(csrf_de_sesion)):
-    return _templates.TemplateResponse(request, "usuario/panel.html", _contexto(inquilino, csrf, request))
+    return await _pagina(request, inquilino, csrf)
+
+
+def _hecho(aviso: str) -> RedirectResponse:
+    return RedirectResponse(url=f"/usuario/panel?hecho={aviso}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/documentos", dependencies=[Depends(comprobar_csrf)])
+async def subir_documento_panel(request: Request, archivo: UploadFile = File(...),
+                                inquilino: Inquilino = Depends(obtener_inquilino_actual), csrf: str = Depends(csrf_de_sesion)):
+    try:
+        await ingerir_subida(inquilino.id, archivo, directorio_datos_web())
+    except HTTPException as exc:
+        return await _pagina(request, inquilino, csrf, exc.status_code, error=exc.detail)
+    return _hecho("documento")
+
+
+@router.post("/web", dependencies=[Depends(comprobar_csrf)])
+async def anadir_web(request: Request, url: str = Form(...), inquilino: Inquilino = Depends(obtener_inquilino_actual),
+                     csrf: str = Depends(csrf_de_sesion)):
+    try:
+        await ingerir_web(inquilino.id, url, directorio_datos_web())
+    except HTTPException as exc:
+        return await _pagina(request, inquilino, csrf, exc.status_code, error=exc.detail)
+    return _hecho("web")
+
+
+@router.post("/preguntas", dependencies=[Depends(comprobar_csrf)])
+async def anadir_pregunta(request: Request, pregunta: str = Form(...), respuesta: str = Form(...),
+                          inquilino: Inquilino = Depends(obtener_inquilino_actual), csrf: str = Depends(csrf_de_sesion)):
+    try:
+        panel_comun.preguntas_de(directorio_datos_web(), inquilino.id).anadir(pregunta, respuesta)
+    except ValueError as exc:
+        return await _pagina(request, inquilino, csrf, 400, error=str(exc))
+    return _hecho("pregunta")
+
+
+@router.post("/preguntas/{id_pregunta}/quitar", dependencies=[Depends(comprobar_csrf)])
+async def quitar_pregunta(id_pregunta: int, inquilino: Inquilino = Depends(obtener_inquilino_actual)):
+    if not panel_comun.preguntas_de(directorio_datos_web(), inquilino.id).quitar(id_pregunta):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Esa pregunta no existe")
+    return _hecho("quitada")
 
 
 @router.post("/probar", dependencies=[Depends(comprobar_csrf)])
@@ -191,7 +246,7 @@ async def probar(request: Request, texto: str = Form(""), inquilino: Inquilino =
         extra = {"prueba": {"texto": texto, "respuesta": respuesta}}
     except ValueError as exc:
         extra = {"error": str(exc)}
-    return _templates.TemplateResponse(request, "usuario/panel.html", _contexto(inquilino, csrf, request, **extra))
+    return await _pagina(request, inquilino, csrf, **extra)
 
 
 @router.post("/reservas/{id_cita}/anular", dependencies=[Depends(comprobar_csrf)])
@@ -244,8 +299,7 @@ async def guardar_bot(
         else:
             almacen.modificar(inquilino.id, con_token)
     except (ValueError, KeyError) as exc:
-        return _templates.TemplateResponse(request, "usuario/panel.html",
-                                           _contexto(inquilino, csrf, request, error=str(exc)), status_code=400)
+        return await _pagina(request, inquilino, csrf, 400, error=str(exc))
     return RedirectResponse(url="/usuario/panel?hecho=bot", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -257,8 +311,7 @@ async def pagar(request: Request, plan: str = Form(...), inquilino: Inquilino = 
     try:
         url = pagos.crear_checkout(inquilino.id, plan, email, pagos.url_publica(str(request.base_url)))
     except pagos.ErrorDePago as exc:
-        return _templates.TemplateResponse(request, "usuario/panel.html",
-                                           _contexto(inquilino, csrf, request, error=str(exc)), status_code=400)
+        return await _pagina(request, inquilino, csrf, 400, error=str(exc))
     return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -268,8 +321,7 @@ async def portal(request: Request, inquilino: Inquilino = Depends(obtener_inquil
     try:
         url = pagos.crear_portal(cliente, pagos.url_publica(str(request.base_url)))
     except pagos.ErrorDePago as exc:
-        return _templates.TemplateResponse(request, "usuario/panel.html",
-                                           _contexto(inquilino, csrf, request, error=str(exc)), status_code=400)
+        return await _pagina(request, inquilino, csrf, 400, error=str(exc))
     return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -281,3 +333,16 @@ async def volver_de_stripe(request: Request):
 
 
 _ = _plan  # (se usa en las plantillas vía resumen)
+
+
+
+@router.post("/aprendizaje/{accion}", dependencies=[Depends(comprobar_csrf)])
+async def decidir_aprendizaje(request: Request, accion: str, id_item: int = Form(0), texto: str = Form(""),
+                              inquilino: Inquilino = Depends(obtener_inquilino_actual), csrf: str = Depends(csrf_de_sesion)):
+    try:
+        aviso = panel_comun.accion_aprendizaje(directorio_datos_web(), inquilino.id, accion, id_item, texto)
+    except KeyError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe")
+    except ValueError as exc:
+        return await _pagina(request, inquilino, csrf, 400, error=str(exc))
+    return _hecho(aviso)

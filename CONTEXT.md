@@ -25,7 +25,13 @@ cliente (`/usuario/panel`), actividad e incidencias de todos los bots en `/admin
 copias diarias. `tool_calling` ya viene encendida por defecto. Ver `docs/saas.md`.
 Un solo contenedor `femix` (bots + panel, `conectores/arranque.py`) junto a `femix-db`; Ollama sigue
 en el host. Capacidad `busqueda_web` disponible con SearXNG opcional (perfil `busqueda`).
-Siguiente: decidir el modelo en madre (velocidad en CPU) y abrir el SaaS a los primeros clientes.
+Comprensión (2026-09-26): RAG con PDF/Word/Excel/web, troceo por apartados, búsqueda híbrida
+(embeddings + BM25), preguntas de seguimiento, citas y preguntas frecuentes. Ver `docs/rag.md`.
+Velocidad (router acciones/consultas, respuesta en directo, precalentado, diagnóstico), aprendizaje
+(del cliente y del negocio con aprobación) y repo ordenada (README, docs/arquitectura.md, CI local
+`scripts/ci.sh` con gancho pre-push, despliegue `scripts/desplegar.sh`): hechos el 2026-09-26.
+Siguiente: avisos de fallos al dueño, legal/emails, pasar a una persona, mensajes automáticos,
+WhatsApp y conectores MCP. Pendiente: medir en madre (`python -m femix.llm.diagnostico`).
 
 ## Qué funciona de verdad
 - Motor Ollama conectado vía `llm/router.py`.
@@ -101,7 +107,7 @@ Siguiente: decidir el modelo en madre (velocidad en CPU) y abrir el SaaS a los p
   al contexto de `Memoria` en el prompt. Sin `buscador`, comportamiento idéntico al anterior.
   186 tests en verde (`python3 -m pytest tests/ -v`).
 - Panel web multi-usuario (`src/femix/web/`, rama `feat/panel-web`, base
-  `integracion/femix-completa`, encargo en `docs/ENCARGO_PANEL_WEB.md`): FastAPI con
+  `integracion/femix-completa`, encargo en `docs/historico/ENCARGO_PANEL_WEB.md`): FastAPI con
   `rutas/auth.py` (login/logout, `AlmacenInquilinos` y `AlmacenSesiones` en JSON local,
   contraseñas con PBKDF2-HMAC-SHA256 + sal, sesión por cookie `session_id`), `rutas/usuario.py`
   (tareas, diario, recordatorios y subida/listado de documentos RAG del inquilino autenticado,
@@ -174,8 +180,7 @@ Siguiente: decidir el modelo en madre (velocidad en CPU) y abrir el SaaS a los p
 - `recordatorios`: avisan por Telegram al vencer (bucle de la flota, cada minuto).
 - Panel web (`src/femix/web/`): `/usuario/config` (personalización del bot por el propio
   inquilino) depende de la Fase 3. Sesiones en JSON local con lock de fichero: valen para varios
-  workers en la misma máquina, no para varias máquinas. El panel está en pruebas: en Docker va tras
-  el perfil `web`, no arranca por defecto.
+  workers en la misma máquina, no para varias máquinas. El panel arranca con el bot en el contenedor `femix`.
 - Docker (`Dockerfile`, `docker-compose.yml`, `docs/docker.md`): bot de Telegram en contenedor con
   `network_mode: host` para llegar al Ollama de `madre` (que escucha solo en `127.0.0.1`), `datos/`
   y caché de Whisper en volúmenes. **Verificado en `madre` el 2026-09-23**: imagen construida, el

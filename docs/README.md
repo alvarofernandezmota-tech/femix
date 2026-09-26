@@ -1,30 +1,23 @@
-# Documentación de Femix
+# Documentación de femix
 
-## Guías principales
+## Empezar
+- [../README.md](../README.md): qué es y cómo arrancarlo.
+- [arquitectura.md](arquitectura.md): capas, carpetas, cómo viaja un mensaje y dónde van los datos.
+- [../CONTRIBUTING.md](../CONTRIBUTING.md): ramas, CI local, despliegue y reglas.
 
-- **[docker.md](docker.md)**: Plan de dockerización del chatbot
-- **[CHANGELOG_DOCKER.md](CHANGELOG_DOCKER.md)**: Historial de cambios de la dockerización
+## Funcionamiento
+- [rag.md](rag.md): documentos (PDF, Word, Excel, webs), búsqueda híbrida y preguntas frecuentes.
+- [velocidad.md](velocidad.md): router, respuesta en directo, precalentado y diagnóstico.
+- [aprendizaje.md](aprendizaje.md): qué aprende el bot y cómo lo aprueba el dueño.
+- [agentes.md](agentes.md): subagente, cadena de agentes y modelos rápido y complejo.
+- [saas.md](saas.md): planes, Stripe, alta pública, HTTPS y copias.
 
-## Tareas y planificación
+## Operación
+- [docker.md](docker.md): despliegue con Docker y Ollama en el host.
+- [PRODUCCION_MADRE.md](PRODUCCION_MADRE.md): la máquina de producción.
+- [INFRAESTRUCTURA.md](INFRAESTRUCTURA.md): servicios y cómo revivirlo todo.
 
-- **[TAREAS_CHATBOT.md](TAREAS_CHATBOT.md)**: Funcionalidades del chatbot (RAG, LLM, inquilinos)
-- **[TAREAS_REPO.md](TAREAS_REPO.md)**: Mantenimiento del repositorio (Docker, releases, CI/CD)
-
-## Estructura del proyecto
-
-- **Arquitectura**: Ver `README.md` en la raíz
-- **Contexto**: Ver `CONTEXT.md`
-- **Agentes**: Ver `AGENTS.md`
-
-## Ejecución rápida
-
-```bash
-# Docker
-docker compose up --build
-
-# Ver logs
-docker compose logs -f
-
-# Detener
-docker compose down
-```
+## Proyecto
+- [ROADMAP.md](ROADMAP.md): fases y estado.
+- [CHANGELOG.md](CHANGELOG.md): historial de cambios.
+- [historico/](historico/): encargos, bitácoras y planes antiguos (solo consulta).

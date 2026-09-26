@@ -1,3 +1,4 @@
+"""Personalidad base de Femix y montaje del prompt del sistema a partir de una personalidad."""
 from dataclasses import dataclass, field
 
 @dataclass

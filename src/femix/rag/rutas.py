@@ -1,3 +1,4 @@
+"""Rutas de datos del RAG y validación del `inquilino_id` como nombre de carpeta."""
 import os
 import re
 

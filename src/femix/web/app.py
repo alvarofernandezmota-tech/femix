@@ -1,3 +1,4 @@
+"""Aplicación FastAPI del panel: rutas, estáticos y preparación de datos al arrancar."""
 import logging
 import os
 from contextlib import asynccontextmanager

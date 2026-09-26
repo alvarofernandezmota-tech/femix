@@ -1,3 +1,4 @@
+"""Convierte resultados de búsqueda en el texto que recibe el modelo, con su fuente."""
 from .documentos import ResultadoBusqueda
 
 def construir_contexto(resultados: "list[ResultadoBusqueda]", limite_caracteres: int = 2000) -> str:

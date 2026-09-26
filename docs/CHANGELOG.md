@@ -486,3 +486,41 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   (servicio opcional `femix-busqueda`, perfil `busqueda`, `FEMIX_BUSQUEDA_URL`). Sin claves de API.
 - El plan Básico incluye `tool_calling`.
 - 901 tests en verde con Postgres real; contenedor único probado en Docker.
+
+## 2026-09-26 — Comprensión: RAG mejorado y preguntas frecuentes (`feat/panel-web`)
+- **Lectores** (`rag/lectores.py`): PDF, Word, Excel, CSV, HTML, Markdown y texto; páginas web
+  públicas con protección SSRF. Dependencias nuevas: `pypdf`, `python-docx`, `openpyxl`.
+- **Troceo por apartados y frases**, con el título del apartado en cada trozo.
+- **Búsqueda híbrida**: embeddings + BM25 (`rag/palabras.py`) con fusión RRF; ya no cuela
+  documentos por palabras vacías.
+- **Preguntas de seguimiento** ("¿y los sábados?") se buscan con la anterior; el modelo cita el
+  documento del que saca cada dato.
+- **Preguntas frecuentes** por inquilino, desde los dos paneles: las casi idénticas se contestan al
+  momento sin el modelo.
+- Paneles: subir documentos y webs desde el del cliente, sección "Lo que sabe el bot" en ambos.
+- Guía: `docs/rag.md`. 920 tests en verde con Postgres real.
+
+## 2026-09-26 — Velocidad y router (`feat/panel-web`)
+- **Router nuevo**: las consultas sobre el negocio (precios, horario, servicios, documentos) van al
+  modelo rápido con los documentos ya buscados, en vez de al modelo grande con herramientas; las
+  herramientas quedan para acciones. Camino `consulta` en la actividad.
+- **Respuesta en directo en Telegram** ("escribiendo…" y el texto creciendo): `conectores/telegram/directo.py`
+  y `ProveedorOllama.generar_en_directo`.
+- **Precalentado** de los modelos al arrancar (`llm/precalentar.py`) y **diagnóstico** de velocidad
+  (`python -m femix.llm.diagnostico`). Nueva variable `HUGIN_LLM_HILOS`.
+- Guía: `docs/velocidad.md`. 929 tests en verde con Postgres real.
+
+## 2026-09-26 — Aprendizaje (`feat/panel-web`)
+- **Memoria de aprendizaje** (`mente/aprendizaje.py`): lo que cada cliente cuenta de sí mismo se
+  guarda y se usa solo con él; lo que alguien dice del negocio espera a que el dueño lo apruebe; las
+  preguntas sin respuesta se agrupan para que el dueño las conteste y pasen a preguntas frecuentes.
+- Sección "Lo que el bot está aprendiendo" en los dos paneles. Guía: `docs/aprendizaje.md`.
+- 942 tests en verde con Postgres real.
+
+## 2026-09-26 — Repo profesional: documentación, CI local y despliegue (`feat/panel-web`)
+- README reescrito, `docs/arquitectura.md`, índice `docs/README.md`, `CONTRIBUTING.md`; documentos
+  antiguos a `docs/historico/`. Cabecera de documentación en todos los módulos.
+- CI local `scripts/ci.sh` (ruff + tests con Postgres de usar y tirar + build de Docker) y gancho
+  `pre-push` (`scripts/instalar-hooks.sh`). El workflow de GitHub queda manual para no gastar cuota.
+- `scripts/desplegar.sh`: `madre` igual que `main` de GitHub y contenedores reconstruidos.
+- `pyproject.toml` (pytest y ruff), plantilla de PR.

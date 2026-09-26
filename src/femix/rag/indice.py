@@ -1,3 +1,4 @@
+"""Índice RAG de un inquilino: ingesta y búsqueda híbrida (embeddings + BM25)."""
 import os
 from dataclasses import asdict
 
@@ -5,7 +6,8 @@ from ..puertos.embeddings import MotorEmbeddings
 from .documentos import Documento, Fragmento, ResultadoBusqueda
 from .embeddings_local import similitud_coseno
 from .embeddings_ollama import motor_embeddings_desde_entorno
-from .fragmentos import fragmentar
+from .fragmentos import fragmentar, fragmentar_por_secciones
+from .palabras import bm25, fusionar
 from .persistencia import persistencia_desde_entorno
 from .rutas import directorio_rag, ruta_indice, ruta_indice_heredada, validar_inquilino_id
 
@@ -91,10 +93,12 @@ class IndiceEmbeddings:
     def _guardar(self):
         self._persistencia.guardar([asdict(f) for f in self._fragmentos])
 
-    def ingerir(self, documento: Documento, tamano: int = 500, solapamiento: int = 50) -> int:
+    def ingerir(self, documento: Documento, tamano: "int | None" = None, solapamiento: int = 50) -> int:
+        """Trocea por apartados y frases; con `tamano` explícito, a tamaño fijo como antes."""
         if documento.inquilino_id != self._inquilino_id:
             raise ValueError("El documento pertenece a otro inquilino_id")
-        trozos = fragmentar(documento.texto, tamano, solapamiento)
+        trozos = (fragmentar(documento.texto, tamano, solapamiento) if tamano is not None
+                  else fragmentar_por_secciones(documento.texto))
         for indice, trozo in enumerate(trozos):
             vector = self._motor.embed(trozo)
             self._fragmentos.append(
@@ -137,9 +141,12 @@ class IndiceEmbeddings:
         vector_consulta = self._motor.embed(consulta)
         self._reindexar_si_hace_falta(vector_consulta)
         propios = [f for f in self._fragmentos if f.inquilino_id == self._inquilino_id]
-        resultados = [
-            ResultadoBusqueda(fragmento, similitud_coseno(vector_consulta, fragmento.vector))
-            for fragmento in propios
-        ]
-        resultados.sort(key=lambda r: r.puntuacion, reverse=True)
-        return resultados[:k]
+        # Búsqueda híbrida: por significado (embeddings) y por palabras exactas (BM25), y se
+        # juntan los dos órdenes (RRF). Cada resultado lleva las dos puntuaciones.
+        cosenos = [similitud_coseno(vector_consulta, f.vector) for f in propios]
+        palabras = bm25(consulta, [f.texto for f in propios])
+        por_significado = sorted(range(len(propios)), key=lambda i: cosenos[i], reverse=True)
+        por_palabras = [i for i in sorted(range(len(propios)), key=lambda i: palabras[i], reverse=True) if palabras[i] > 0]
+        puntos = fusionar(por_significado, por_palabras)
+        orden = sorted(puntos, key=lambda i: puntos[i], reverse=True)[:k]
+        return [ResultadoBusqueda(propios[i], cosenos[i], palabras[i]) for i in orden]

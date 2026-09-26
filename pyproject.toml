@@ -1,0 +1,19 @@
+# Configuración de herramientas del proyecto (femix no se publica como paquete: se despliega con Docker).
+[project]
+name = "femix"
+description = "Plataforma de asistentes (bots) por inquilino con LLM local (Ollama): Telegram, panel web y SaaS."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning:starlette.*"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 130
+src = ["src", "conectores"]
+extend-exclude = ["datos", "documentos", "copias"]
+
+[tool.ruff.lint]
+# Errores reales (nombres sin definir, imports sin usar, sintaxis). El estilo se revisa en las PR.
+select = ["F", "E9"]

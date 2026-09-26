@@ -1,3 +1,8 @@
+"""Router por reglas: qué camino toma cada mensaje, sin gastar una llamada al modelo.
+
+Acciones → herramientas; consultas del negocio → modelo rápido con documentos; mensajes largos
+o de análisis → subagente; el resto, charla. Ver `docs/velocidad.md`.
+"""
 import re
 
 PALABRAS_AGENTE = (
@@ -35,15 +40,30 @@ PALABRAS_HERRAMIENTAS = (
     "disponible", "disponibles", "disponibilidad", "libre", "libres", "anula", "anular", "cancela",
     "cancelar", "agenda", "apunta", "apúntame", "apuntame", "anota", "anótame", "anotame",
     "tarea", "tareas", "pendiente", "pendientes", "recuérdame", "recuerdame", "recordatorio", "avísame", "avisame",
-    "hecha", "hecho", "completa", "completada", "diario", "apunta en el diario",
-    "busca", "búscame", "buscame", "documento", "documentos", "según", "segun", "precio", "precios",
-    "horario", "cuánto cuesta", "cuanto cuesta", "abierto", "abrís", "abris", "mañana", "manana",
+    "hecha", "hecho", "completa", "completada", "diario", "apunta en el diario", "mañana", "manana",
     "internet", "google", "noticias", "noticia", "qué tiempo", "que tiempo", "el tiempo", "busca en internet",
 )
 
+# Router: preguntas sobre el negocio o sus documentos. No necesitan herramientas (el modelo grande
+# con 10 funciones es el camino más lento en CPU): se buscan los documentos y contesta el modelo
+# rápido, en directo.
+PALABRAS_CONSULTA = (
+    "busca", "búscame", "buscame", "documento", "documentos", "según", "segun", "precio", "precios",
+    "horario", "horarios", "cuánto cuesta", "cuanto cuesta", "cuánto vale", "cuanto vale", "abierto", "abrís",
+    "abris", "cerráis", "cerrais", "dónde", "donde", "dirección", "direccion", "tarifa", "tarifas",
+    "servicio", "servicios", "ofrecéis", "ofreceis", "hacéis", "haceis", "carta", "menú", "menu",
+)
+
 _PATRON_HERRAMIENTAS = re.compile(r"\b(?:%s)\b" % "|".join(PALABRAS_HERRAMIENTAS))
+_PATRON_CONSULTA = re.compile(r"\b(?:%s)\b" % "|".join(PALABRAS_CONSULTA))
 
 def necesita_herramientas(texto: "str | None") -> bool:
     """¿Pide el mensaje consultar o cambiar datos reales? Reglas, sin gastar una llamada al LLM."""
     limpio = (texto or "").strip().lower()
     return bool(limpio) and bool(_PATRON_HERRAMIENTAS.search(limpio))
+
+
+def es_consulta(texto: "str | None") -> bool:
+    """¿Pregunta por el negocio o sus documentos (precios, horario, servicios...)?"""
+    limpio = (texto or "").strip().lower()
+    return bool(limpio) and bool(_PATRON_CONSULTA.search(limpio))

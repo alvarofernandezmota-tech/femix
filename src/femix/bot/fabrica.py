@@ -1,3 +1,8 @@
+"""Fábrica de `Femix`: arma el bot de un inquilino según sus capacidades.
+
+Memoria, documentos (RAG), reservas, herramientas, preguntas frecuentes, aprendizaje, actividad
+y límites del plan salen de aquí; el resto del código recibe las piezas ya montadas.
+"""
 import os
 
 from ..dominio.negocio.reservas import Reservas
@@ -91,7 +96,7 @@ def construir_femix(
         # Fase 3: todos los motores de este bot (rápido y complejo) hablan con la personalidad del
         # inquilino (`inquilino/personalidad.py`). Sin prompt, el de Femix de siempre.
         extra["selector_modelos"] = SelectorDeModelos(prompt_sistema=prompt_sistema)
-    buscador = IndiceEmbeddingsBuscador(directorio_datos=directorio_datos) if DOCUMENTOS in capacidades else None
+    buscador = extra.pop("buscador", None) or (IndiceEmbeddingsBuscador(directorio_datos=directorio_datos) if DOCUMENTOS in capacidades else None)
     if RESERVAS in capacidades and "reservas" not in extra:
         extra["reservas"] = Reservas(_horario_del_perfil(directorio_datos, inquilino_id), almacen, reloj)
     if TOOL_CALLING in capacidades and "herramientas" not in extra:
@@ -104,6 +109,14 @@ def construir_femix(
             usuario_id, carpeta, almacen=almacen, reservas=reservas, reloj=reloj,
             buscador=buscador, inquilino_id=inquilino_id, internet=internet,
         )
+    if "preguntas" not in extra:
+        # Respuestas exactas del dueño (panel): se contestan al momento, sin el modelo.
+        from ..inquilino.preguntas import PreguntasFrecuentes
+        extra["preguntas"] = PreguntasFrecuentes(almacen)
+    if "aprendizaje" not in extra and MEMORIA in capacidades:
+        # Lo que aprende con el uso: del cliente (al momento) y del negocio (si lo aprueba el dueño).
+        from ..mente.aprendizaje import Aprendizaje
+        extra["aprendizaje"] = Aprendizaje(almacen)
     if "actividad" not in extra:
         # Mensajes e incidencias para el panel del dueño y el del inquilino.
         from ..infraestructura.actividad import Actividad

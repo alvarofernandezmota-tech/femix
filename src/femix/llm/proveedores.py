@@ -1,3 +1,5 @@
+"""Proveedores LLM: Ollama (`/api/chat`, en directo y con function calling) y OpenAI."""
+import json
 import os
 import requests
 from ..puertos.llm import MotorLLM
@@ -22,21 +24,29 @@ class ProveedorOllama(MotorLLM):
         self._timeout_segundos = timeout_segundos
         self._url = url or os.environ.get("OLLAMA_URL", "http://localhost:11434/api/chat")
 
-    def _pedir(self, mensajes: list, herramientas=None) -> dict:
-        cuerpo = {
+    def _cuerpo(self, mensajes: list, stream: bool = False) -> dict:
+        opciones_extra = {}
+        if os.environ.get("HUGIN_LLM_HILOS"):
+            # Hilos de CPU para el modelo (por defecto Ollama usa los núcleos físicos).
+            opciones_extra["num_thread"] = int(os.environ["HUGIN_LLM_HILOS"])
+        return {
             "model": self._modelo,
             "messages": mensajes,
-            "stream": False,
+            "stream": stream,
             "options": {
                 "temperature": self._temperatura,
                 # En CPU el tiempo es casi proporcional a lo que escribe y a lo que lee: se
                 # limitan las dos cosas (las respuestas ya se piden breves en el prompt).
                 "num_predict": int(os.environ.get("HUGIN_LLM_MAX_TOKENS") or 300),
                 "num_ctx": int(os.environ.get("HUGIN_LLM_CONTEXTO") or 4096),
+                **opciones_extra,
             },
             # El modelo se queda cargado aunque no se haya configurado OLLAMA_KEEP_ALIVE.
             "keep_alive": os.environ.get("HUGIN_LLM_KEEP_ALIVE") or "30m",
         }
+
+    def _pedir(self, mensajes: list, herramientas=None) -> dict:
+        cuerpo = self._cuerpo(mensajes)
         if herramientas:
             cuerpo["tools"] = [h.esquema() for h in herramientas]
         resp = requests.post(self._url, json=cuerpo, timeout=self._timeout_segundos)
@@ -56,6 +66,44 @@ class ProveedorOllama(MotorLLM):
     def generar(self, contexto: str, entrada: str) -> str:
         mensajes = _mensajes_iniciales(self._prompt_sistema, contexto, entrada)
         return self._con_errores_amables(lambda: self._pedir(mensajes)["content"])
+
+    def generar_en_directo(self, contexto: str, entrada: str, al_avanzar) -> str:
+        """Como `generar`, pero llama a `al_avanzar(texto_hasta_ahora)` según el modelo escribe.
+
+        En CPU una respuesta tarda decenas de segundos: verla crecer en Telegram hace la espera
+        mucho más llevadera. Si `al_avanzar` falla, se sigue sin él (nunca rompe la respuesta).
+        """
+        mensajes = _mensajes_iniciales(self._prompt_sistema, contexto, entrada)
+
+        def leer() -> str:
+            partes = []
+            with requests.post(self._url, json=self._cuerpo(mensajes, stream=True),
+                               timeout=self._timeout_segundos, stream=True) as resp:
+                resp.raise_for_status()
+                for linea in resp.iter_lines():
+                    if not linea:
+                        continue
+                    trozo = json.loads(linea)
+                    partes.append((trozo.get("message") or {}).get("content") or "")
+                    try:
+                        al_avanzar("".join(partes))
+                    except Exception:
+                        pass
+                    if trozo.get("done"):
+                        break
+            return "".join(partes)
+
+        return self._con_errores_amables(leer)
+
+    def precalentar(self) -> bool:
+        """Carga el modelo en memoria sin generar nada, para que el primer mensaje no espere."""
+        try:
+            requests.post(self._url, json={"model": self._modelo, "messages": [],
+                                           "keep_alive": os.environ.get("HUGIN_LLM_KEEP_ALIVE") or "30m"},
+                          timeout=max(self._timeout_segundos, 300)).raise_for_status()
+            return True
+        except Exception:
+            return False
 
     def conversar(self, contexto: str, entrada: str, herramientas: list) -> str:
         """Bucle de function calling de Ollama: mientras el modelo pida herramientas, se ejecutan y

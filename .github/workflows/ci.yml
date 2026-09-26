@@ -1,0 +1,55 @@
+# CI en GitHub: lint + tests (con Postgres real) + que la imagen de Docker se construye.
+# Solo manual (pestaña Actions → CI → Run workflow) para no gastar minutos ni espacio de la cuenta.
+# El CI de cada día es local: scripts/ci.sh (hace exactamente lo mismo).
+name: CI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: femix
+          POSTGRES_PASSWORD: femix
+          POSTGRES_DB: femix_pruebas
+          POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U femix -d femix_pruebas"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      FEMIX_PRUEBAS_POSTGRES_URL: postgresql://femix:femix@127.0.0.1:5432/femix_pruebas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Dependencias
+        run: pip install -r requirements.txt ruff reportlab
+      - name: Lint (ruff)
+        run: ruff check src conectores tests
+      - name: Tests
+        run: python -m pytest -q
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: La imagen se construye
+        run: docker build -t femix:ci .
+      - name: docker-compose es válido
+        run: FEMIX_DB_CLAVE=ci docker compose --env-file /dev/null --profile publico --profile copias --profile busqueda config -q

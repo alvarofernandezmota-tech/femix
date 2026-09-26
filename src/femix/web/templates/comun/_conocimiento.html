@@ -1,0 +1,42 @@
+{# Lo que sabe el bot: documentos, webs y preguntas frecuentes. Necesita: documentos, preguntas, csrf, prefijo. #}
+<section class="tarjeta">
+    <h3>Documentos que conoce el bot</h3>
+    <ul>
+        {% for documento in documentos %}
+        <li>{{ documento.fuente }} <span class="secundario">({{ documento.fragmentos }} fragmentos)</span></li>
+        {% else %}
+        <li>Sin documentos.</li>
+        {% endfor %}
+    </ul>
+    <form method="post" action="{{ prefijo }}/documentos" enctype="multipart/form-data" class="formulario">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Fichero <small>(PDF, Word, Excel, CSV, HTML, Markdown o texto; 5 MB como mucho)</small>
+            <input type="file" name="archivo" accept=".pdf,.docx,.xlsx,.csv,.html,.htm,.md,.txt" required></label>
+        <button type="submit">Añadir documento</button>
+    </form>
+    <form method="post" action="{{ prefijo }}/web" class="formulario">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>O una página web <small>(la del negocio, la carta...)</small>
+            <input type="url" name="url" required placeholder="https://www.minegocio.es/precios"></label>
+        <button type="submit">Añadir web</button>
+    </form>
+</section>
+
+<section class="tarjeta">
+    <h3>Preguntas frecuentes</h3>
+    <p class="secundario">Si alguien pregunta casi lo mismo, el bot contesta exactamente esto, al momento y sin usar el modelo.</p>
+    <table class="tabla">
+        <tr><th>Pregunta</th><th>Respuesta</th><th></th></tr>
+        {% for p in preguntas %}
+        <tr><td>{{ p.pregunta }}</td><td>{{ p.respuesta }}</td>
+            <td><form method="post" action="{{ prefijo }}/preguntas/{{ p.id }}/quitar">
+                <input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit">Quitar</button></form></td></tr>
+        {% else %}<tr><td colspan="3">Sin preguntas frecuentes.</td></tr>{% endfor %}
+    </table>
+    <form method="post" action="{{ prefijo }}/preguntas" class="formulario">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Pregunta <input name="pregunta" required maxlength="300" placeholder="¿Tenéis aparcamiento?"></label>
+        <label>Respuesta <textarea name="respuesta" required maxlength="2000" rows="3" placeholder="Sí, gratuito para clientes en la calle de atrás."></textarea></label>
+        <button type="submit">Añadir pregunta</button>
+    </form>
+</section>

@@ -1,7 +1,6 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-import time
 from concurrent.futures import ThreadPoolExecutor
 
 from femix.web.rutas.auth import (

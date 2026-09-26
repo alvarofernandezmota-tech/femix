@@ -7,3 +7,4 @@ datos/
 documentos/*
 !documentos/.gitkeep
 copias/
+.venv-ci/

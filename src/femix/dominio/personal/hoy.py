@@ -1,3 +1,4 @@
+"""`/hoy`: la fecha de hoy en palabras ("Hoy es lunes, 5 de octubre de 2026.")."""
 from femix.dominio.personal.reloj import Reloj, RelojSistema
 
 _DIAS = [

@@ -1,0 +1,49 @@
+{# Lo que el bot aprende con el uso. Necesita: aprendizaje, csrf, prefijo. #}
+{% macro boton(accion, id, texto, confirmar="") %}
+<form method="post" action="{{ prefijo }}/aprendizaje/{{ accion }}" {% if confirmar %}onsubmit="return confirm('{{ confirmar }}');"{% endif %}>
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="id_item" value="{{ id }}">
+    <button type="submit">{{ texto }}</button>
+</form>
+{% endmacro %}
+<section class="tarjeta">
+    <h3>Lo que el bot está aprendiendo</h3>
+    <p class="secundario">Lo que cada cliente cuenta de sí mismo se guarda solo para él. Lo que alguien dice del
+       negocio espera aquí a que lo apruebes: hasta entonces el bot no lo da por cierto.</p>
+
+    <h4>Pendiente de aprobar</h4>
+    <table class="tabla">
+        <tr><th>Dato</th><th>Fecha</th><th></th></tr>
+        {% for p in aprendizaje.pendientes %}
+        <tr><td>
+            <form method="post" action="{{ prefijo }}/aprendizaje/aprobar" class="en-linea">
+                <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="id_item" value="{{ p.id }}">
+                <input name="texto" value="{{ p.dato }}" maxlength="400"> <button type="submit">Aprobar</button>
+            </form></td>
+            <td>{{ p.fecha }}</td><td>{{ boton("descartar", p.id, "Descartar") }}</td></tr>
+        {% else %}<tr><td colspan="3">Nada pendiente.</td></tr>{% endfor %}
+    </table>
+
+    <h4>Preguntas que no supo contestar</h4>
+    <table class="tabla">
+        <tr><th>Pregunta</th><th>Veces</th><th>Tu respuesta (pasa a preguntas frecuentes)</th><th></th></tr>
+        {% for p in aprendizaje.sin_respuesta %}
+        <tr><td>{{ p.pregunta }}</td><td>{{ p.veces }}</td>
+            <td><form method="post" action="{{ prefijo }}/aprendizaje/responder" class="en-linea">
+                <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="id_item" value="{{ p.id }}">
+                <input name="texto" required maxlength="2000"> <button type="submit">Responder</button></form></td>
+            <td>{{ boton("ignorar", p.id, "Ignorar") }}</td></tr>
+        {% else %}<tr><td colspan="4">Ninguna por ahora.</td></tr>{% endfor %}
+    </table>
+
+    <h4>Datos del negocio que ya sabe</h4>
+    <ul>
+        {% for h in aprendizaje.negocio %}
+        <li>{{ h.dato }} {{ boton("olvidar", h.id, "Olvidar") }}</li>
+        {% else %}<li>Ninguno todavía.</li>{% endfor %}
+    </ul>
+    <form method="post" action="{{ prefijo }}/aprendizaje/anadir" class="formulario">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Enséñale algo <input name="texto" required maxlength="400" placeholder="En agosto cerramos por vacaciones."></label>
+        <button type="submit">Guardar</button>
+    </form>
+</section>

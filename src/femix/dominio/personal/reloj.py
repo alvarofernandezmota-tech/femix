@@ -1,3 +1,4 @@
+"""Reloj: la hora local del inquilino, inyectable para poder probar sin depender de la hora real."""
 from abc import ABC, abstractmethod
 from datetime import datetime
 
