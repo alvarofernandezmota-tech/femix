@@ -477,3 +477,12 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
 - **Infra**: Caddy con HTTPS automático (perfil `publico`, `FEMIX_DOMINIO`), copias diarias de
   Postgres (perfil `copias`), uvicorn con `--proxy-headers`. Guía en `docs/saas.md`.
 - 894 tests en verde con Postgres real.
+
+## 2026-09-26 — Un solo contenedor y búsqueda en internet (`feat/panel-web`)
+- **Un solo contenedor `femix`** en madre (antes `femix-bot` y `femix-web`): `conectores/arranque.py`
+  lanza los bots de Telegram y el panel web; si uno se cae, se para todo y Docker lo rearranca.
+  `FEMIX_PANEL=0` para solo el bot. Ollama sigue fuera de Docker, en el host.
+- **Capacidad `busqueda_web`** disponible: herramienta `buscar_en_internet` sobre SearXNG
+  (servicio opcional `femix-busqueda`, perfil `busqueda`, `FEMIX_BUSQUEDA_URL`). Sin claves de API.
+- El plan Básico incluye `tool_calling`.
+- 901 tests en verde con Postgres real; contenedor único probado en Docker.

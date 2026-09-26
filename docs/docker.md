@@ -10,14 +10,14 @@ cp .env.example .env
 # Edita .env: TELEGRAM_BOT_TOKEN, FEMIX_TELEGRAM_PERMITIDOS, FEMIX_INQUILINO_ID,
 # HUGIN_LLM_MODELO (uno que tengas en `ollama list`) y FEMIX_DB_CLAVE (openssl rand -hex 24).
 docker compose up -d --build     # arranca femix-db (Postgres) y, cuando está sano, el bot
-docker compose logs -f femix-bot
+docker compose logs -f femix
 ```
 
 Debe aparecer `Bot de <inquilino> en marcha: @<tu_bot> (texto + voz; N permitidos)`.
 
 ## Un bot por inquilino
 
-El contenedor `femix-bot` lleva **todos** los bots, uno por inquilino, en el mismo proceso. Cada
+El contenedor `femix` lleva **todos** los bots, uno por inquilino, en el mismo proceso. Cada
 uno con su `Femix`: sus tareas, diario, memoria y RAG en `datos/{inquilino_id}/`, sus capacidades
 (memoria, voz, documentos) y sus permitidos. Salen de dos sitios:
 
@@ -52,7 +52,7 @@ le puede escribir, y detrás están el RAG, las tareas y el diario del inquilino
 Para autorizarte la primera vez:
 
 1. Escríbele al bot. Te contesta *"Este bot es privado. Tu ID de Telegram es 123456…"*, y en
-   `docker compose logs femix-bot` sale `Acceso denegado a usuario=123456 (@tu_usuario)`.
+   `docker compose logs femix` sale `Acceso denegado a usuario=123456 (@tu_usuario)`.
 2. Pon ese número en `.env`: `FEMIX_TELEGRAM_PERMITIDOS=123456` (varios: `123456,789012`).
 3. `docker compose up -d` (recrea el contenedor con el `.env` nuevo; `restart` no lo relee).
 
@@ -78,7 +78,7 @@ panel web abre directamente el puerto 8000 del host.
 ### Comprobar la conexión desde el contenedor
 
 ```bash
-docker compose run --rm femix-bot python -c "
+docker compose run --rm femix python -c "
 import requests, os
 print(requests.get(os.environ['OLLAMA_URL'].replace('/api/chat', '/api/tags'), timeout=5).json())"
 ```
@@ -145,7 +145,7 @@ ficheros como respaldo; el índice RAG se sube la primera vez que se abre (y su 
 renombra a `indice.json.migrado`). Se puede repetir a mano:
 
 ```bash
-docker compose run --rm femix-bot python -m femix.inquilino.a_postgres
+docker compose run --rm femix python -m femix.inquilino.a_postgres
 docker compose exec femix-db psql -U femix -d femix -c '\dt'      # ver las tablas
 ```
 
@@ -164,9 +164,9 @@ los comandos (una reserva no pisa otra ni cae fuera del horario) y cada herramie
 inquilino y al usuario que escribe. La charla sigue por el camino rápido de siempre.
 
 ```bash
-docker compose exec femix-bot python -m femix.inquilino.capacidad TU_INQUILINO                 # ver
-docker compose exec femix-bot python -m femix.inquilino.capacidad TU_INQUILINO +tool_calling   # encender
-docker compose exec femix-bot python -m femix.inquilino.capacidad TU_INQUILINO +reservas       # reservas de negocio
+docker compose exec femix python -m femix.inquilino.capacidad TU_INQUILINO                 # ver
+docker compose exec femix python -m femix.inquilino.capacidad TU_INQUILINO +tool_calling   # encender
+docker compose exec femix python -m femix.inquilino.capacidad TU_INQUILINO +reservas       # reservas de negocio
 ```
 
 El bot lo coge solo en unos 30 s. El modelo tiene que soportar function calling (`qwen2.5` sí). En
@@ -181,7 +181,7 @@ Para cargar documentos, deja `.txt`/`.md` en `./documentos/` (se monta de solo l
 `/app/documentos`) y:
 
 ```bash
-docker compose run --rm femix-bot python -m femix.bot.ingerir /app/documentos
+docker compose run --rm femix python -m femix.bot.ingerir /app/documentos
 ```
 
 Relanzarlo es inocuo: los ficheros ya cargados (por nombre) se omiten. Para otro inquilino:
@@ -193,12 +193,10 @@ pregunta repite sus palabras. Para buscar por sentido ("¿a qué hora abrís?" �
 atención"), con el Ollama de `madre`: `ollama pull nomic-embed-text` y en `.env`
 `FEMIX_EMBEDDINGS=ollama`. Los índices que ya había se recalculan solos en la primera búsqueda.
 
-## Panel web (en pruebas)
+## Panel web
 
-```bash
-# En .env: FEMIX_WEB_ADMIN_TOKEN con al menos 24 caracteres (openssl rand -hex 32).
-docker compose --profile web up -d
-```
+Arranca solo, en el mismo contenedor `femix` que los bots (`FEMIX_PANEL=0` en `.env` para no
+arrancarlo). Hace falta `FEMIX_WEB_ADMIN_TOKEN` con al menos 24 caracteres (`openssl rand -hex 32`).
 
 Escucha en `127.0.0.1:8000` de `madre` (cámbialo con `FEMIX_WEB_HOST`/`FEMIX_WEB_PORT`). Desde
 otra máquina: `ssh -L 8000:localhost:8000 madre` y abre **`http://localhost:8000/admin/login`**
@@ -207,9 +205,9 @@ cookies son `secure`: los navegadores las aceptan en `localhost` por HTTP, pero 
 host hace falta HTTPS (proxy inverso delante).
 
 Comparte el volumen `femix-datos` con el bot: un inquilino creado o editado en el panel lo recoge
-`femix-bot` en unos 30 s (arranca, para o rearranca su bot) sin reiniciar nada, y lo que se sube
+`femix` en unos 30 s (arranca, para o rearranca su bot) sin reiniciar nada, y lo que se sube
 al RAG de un inquilino lo ve su bot en la siguiente pregunta. El panel enseña el estado de cada bot
-y avisa si `femix-bot` deja de dar señales.
+y avisa si `femix` deja de dar señales.
 
 ## Volúmenes
 
@@ -265,7 +263,7 @@ el layout de la imagen y un Ollama falso.
 
 ## Logs
 
-`docker compose logs -f femix-bot` muestra una línea por mensaje:
+`docker compose logs -f femix` muestra una línea por mensaje:
 
 ```
 2026-09-23 17:02:11 INFO femix.bot.femix: inquilino=varo usuario=123 camino=rápido 6.4s | entrada: hola | salida: ¡Hola! Soy FEMIX…

@@ -200,7 +200,7 @@ def test_el_token_vacio_no_borra_el_que_habia_y_quitarlo_si(entorno):
     ({"horario": "lunes de 9 a 14"}, "no es"),
     ({"horario": "funday 09:00-10:00"}, "Día"),
     ({"permitidos": "7, @varo"}, "no es un ID"),
-    ({"capacidades": ["busqueda_web"]}, "todavía no existe"),
+    ({"capacidades": ["teletransporte"]}, "desconocida"),
     ({"telegram_token": "pegado-a-medias"}, "BotFather"),
     ({"tipo": "cooperativa"}, "Tipo"),
 ])

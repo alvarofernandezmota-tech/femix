@@ -38,6 +38,7 @@ PALABRAS_HERRAMIENTAS = (
     "hecha", "hecho", "completa", "completada", "diario", "apunta en el diario",
     "busca", "búscame", "buscame", "documento", "documentos", "según", "segun", "precio", "precios",
     "horario", "cuánto cuesta", "cuanto cuesta", "abierto", "abrís", "abris", "mañana", "manana",
+    "internet", "google", "noticias", "noticia", "qué tiempo", "que tiempo", "el tiempo", "busca en internet",
 )
 
 _PATRON_HERRAMIENTAS = re.compile(r"\b(?:%s)\b" % "|".join(PALABRAS_HERRAMIENTAS))

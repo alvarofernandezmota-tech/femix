@@ -61,7 +61,7 @@ Con Docker (recomendado):
 ```bash
 cd ~/GitHub/personal/femix
 docker compose up -d --build
-docker compose logs -f femix-bot
+docker compose logs -f femix
 ```
 
 Sin Docker:

@@ -178,11 +178,27 @@ def herramienta_documentos(inquilino_id: str, buscador) -> Herramienta:
                        buscar_en_documentos)
 
 
+def herramienta_internet(url: str) -> Herramienta:
+    from .busqueda_web import buscar
+
+    def buscar_en_internet(consulta: str) -> str:
+        return buscar(consulta, url)
+
+    return Herramienta("buscar_en_internet",
+                       "Busca en internet información actual o pública (noticias, el tiempo, datos generales). "
+                       "Cita de dónde sale lo que respondas.",
+                       objeto({"consulta": texto("Qué buscar, con palabras clave.")}, ["consulta"]),
+                       buscar_en_internet)
+
+
 def herramientas_para(usuario_id: str, directorio_datos: str, almacen=None, reservas=None, reloj=None,
-                      buscador=None, inquilino_id: "str | None" = None) -> list:
+                      buscador=None, inquilino_id: "str | None" = None, internet: "str | None" = None) -> list:
     """Las herramientas de este usuario en este bot: las personales siempre, las de reservas si el
-    inquilino tiene la capacidad `reservas` y la de documentos si tiene `documentos`."""
+    inquilino tiene la capacidad `reservas`, la de documentos si tiene `documentos` y la de internet
+    si tiene `busqueda_web` (y hay un SearXNG configurado: `internet` es su URL)."""
     lista = herramientas_personales(usuario_id, directorio_datos, almacen, reloj)
+    if internet:
+        lista = lista + [herramienta_internet(internet)]
     if reservas is not None:
         lista = herramientas_reservas(usuario_id, reservas) + lista
     if buscador is not None and inquilino_id:

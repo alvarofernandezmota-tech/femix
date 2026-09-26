@@ -32,7 +32,7 @@ PLANES = {
         Plan("interno", "Interno", 0, None, _TODAS, publico=False),
         Plan("prueba", f"Prueba ({DIAS_PRUEBA} días)", 0, 300,
              ("memoria_largo_plazo", "documentos", "reservas", "tool_calling")),
-        Plan("basico", "Básico", 19, 2000, ("memoria_largo_plazo", "documentos", "reservas"), de_pago=True),
+        Plan("basico", "Básico", 19, 2000, ("memoria_largo_plazo", "documentos", "reservas", "tool_calling"), de_pago=True),
         Plan("pro", "Pro", 49, 10000, _TODAS, de_pago=True),
     )
 }

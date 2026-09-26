@@ -569,8 +569,10 @@ def test_el_bot_del_env_no_arranca_si_activo_no_es_true():
     assert deseado == {} and "baja" in problemas["varo"]
 
 
-def test_capacidades_de_versiones_futuras_no_encienden_las_demas():
-    futuro = _perfil("varo", capacidades=["voz", "busqueda_web"])
+def test_capacidades_de_versiones_futuras_no_encienden_las_demas(monkeypatch):
+    from femix.inquilino.capacidades import CATALOGO, Capacidad
+    monkeypatch.setitem(CATALOGO, "futura", Capacidad("futura", "de una versión futura", False))
+    futuro = _perfil("varo", capacidades=["voz", "futura"])
     deseado, _ = configuracion_deseada([futuro], BotDelEntorno("varo", TOKEN_VARO, frozenset({7})))
     assert deseado["varo"].capacidades == ("voz",)
 

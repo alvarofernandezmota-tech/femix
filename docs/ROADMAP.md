@@ -10,11 +10,11 @@
 | 6. Escalado a SaaS de bots | Múltiples inquilinos reales (empresa propia, terceros) | **Hecha** (2026-09-26): planes, prueba de 14 días, límites, Stripe, alta pública, panel del cliente, actividad e incidencias, HTTPS con Caddy, copias. Ver `docs/saas.md` |
 
 ## Capacidades futuras (evitar el error de Perplexica)
-- `busqueda_web`: pendiente.
+- `busqueda_web`: activa (2026-09-26), herramienta `buscar_en_internet` sobre un SearXNG propio en madre (perfil `busqueda`); no va por defecto.
 - `memoria_largo_plazo`: activa.
 - `voz`: activa.
 - `reservas`: activa (2026-09-23), reglas de `hugin/negocio/agenda.py`. Agenda personal (`/agenda`) para todos.
-- `tool_calling`: activa (2026-09-26), se enciende por inquilino (no va por defecto: más lento en CPU).
+- `tool_calling`: activa (2026-09-26), por defecto en todos los inquilinos.
 
 ## Nota de arquitectura — fase 5
 El tool calling es una capa de producción (vive dentro de `femix`, en cada mensaje de cada inquilino), distinta de la orquestación de agentes de Claude Code (que es una capa de desarrollo, para mantener el propio repo). No confundir ambas al planificar.

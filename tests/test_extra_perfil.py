@@ -68,7 +68,7 @@ def _comprobar_invariantes(perfil: PerfilInquilino):
 def test_catalogo_coherente_con_sus_constantes():
     assert all(nombre == capacidad.nombre for nombre, capacidad in CATALOGO.items())
     # POR_DEFECTO va en el orden del catálogo y las constantes apuntan a capacidades disponibles.
-    assert list(POR_DEFECTO) == [n for n in CATALOGO if CATALOGO[n].disponible and n != "reservas"]
+    assert list(POR_DEFECTO) == [n for n in CATALOGO if CATALOGO[n].disponible and n not in ("reservas", "busqueda_web")]
     assert {MEMORIA, VOZ, DOCUMENTOS, "tool_calling"} == set(POR_DEFECTO)
     with pytest.raises(FrozenInstanceError):
         CATALOGO[VOZ].disponible = False
@@ -364,7 +364,7 @@ def test_validado_no_toca_el_perfil_original_ni_comparte_sus_franjas():
 _RAROS = [
     None, 0, 1, -1, True, False, 1.5, float("nan"), 2 ** 70, "", " ", "\n", "x", "lunes", "09:00", "persona",
     "empresa", "varo", "a" * 101, "ñ" * 2001, "😀", "\x00", "‮", "None", [], [1], [[]], [None], {}, {"a": 1},
-    (), ("voz",), b"x", set(), "voz", ["voz"], [VOZ, "busqueda_web"], TOKEN, " " + TOKEN, [5, 5, 1],
+    (), ("voz",), b"x", set(), "voz", ["voz"], [VOZ, "teletransporte"], TOKEN, " " + TOKEN, [5, 5, 1],
     {"dia": "lunes", "desde": "09:00", "hasta": "10:00"}, [{"dia": "lunes", "desde": "09:00", "hasta": "10:00"}],
     Franja("lunes", "09:00", "10:00"), [Franja("lunes", "09:00", "10:00")], Franja(None, None, None),
     [Franja([], {}, 5)], [{"dia": ["lunes"]}], [["lunes", "09:00", "10:00"]], "lunes 09:00-10:00",

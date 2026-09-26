@@ -21,11 +21,13 @@ def _perfil(inquilino_id="varo", **extra):
 
 def test_por_defecto_son_las_que_existen():
     # Todas las que existen menos reservas, que es de empresas y se enciende en su perfil.
-    assert set(POR_DEFECTO) == {n for n, c in CATALOGO.items() if c.disponible} - {"reservas"}
+    assert set(POR_DEFECTO) == {n for n, c in CATALOGO.items() if c.disponible} - {"reservas", "busqueda_web"}
     assert set(POR_DEFECTO) == {"memoria_largo_plazo", "voz", "documentos", "tool_calling"}
 
 
-def test_no_se_puede_encender_una_capacidad_que_no_existe_todavia():
+def test_no_se_puede_encender_una_capacidad_que_no_existe_todavia(monkeypatch):
+    from femix.inquilino.capacidades import Capacidad
+    monkeypatch.setitem(CATALOGO, "busqueda_web", Capacidad("busqueda_web", "futura", False))
     with pytest.raises(ValueError, match="todavía no existe"):
         validar_capacidades(["voz", "busqueda_web"])
     with pytest.raises(ValueError, match="desconocida"):
