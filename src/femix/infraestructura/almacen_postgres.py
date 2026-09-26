@@ -62,6 +62,9 @@ CREATE INDEX IF NOT EXISTS incidencias_por_inquilino ON incidencias (inquilino_i
 """
 
 
+CERROJO_ESQUEMA = 7_246_319   # número fijo cualquiera: identifica el cerrojo de crear las tablas
+
+
 def crear_esquema(url: str) -> None:
     import psycopg
     with psycopg.connect(url) as conexion:
@@ -73,6 +76,10 @@ def crear_esquema(url: str) -> None:
                 f"La base de datos está en {codificacion}; femix necesita UTF8 "
                 "(CREATE DATABASE ... ENCODING 'UTF8' TEMPLATE template0)"
             )
+        # El bot y el panel arrancan a la vez en el mismo contenedor y los dos crean las tablas:
+        # sin este cerrojo, dos CREATE TABLE IF NOT EXISTS simultáneos chocan en el catálogo
+        # (UniqueViolation en pg_type) y tumbaban el panel. Se suelta solo al terminar.
+        conexion.execute("SELECT pg_advisory_xact_lock(%s)", (CERROJO_ESQUEMA,))
         conexion.execute(ESQUEMA)
 
 

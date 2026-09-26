@@ -352,3 +352,38 @@ def test_los_json_se_suben_a_postgres_una_sola_vez_al_arrancar(url, tmp_path):
     almacen.guardar("tareas", "7", [])
     assert copiar_una_vez(str(datos), url) is None
     assert almacen.cargar("tareas", "7") == []
+
+
+@requiere_postgres
+def test_crear_esquema_a_la_vez_no_choca():
+    # El bot y el panel arrancan juntos en el contenedor y los dos crean las tablas en una base
+    # vacía: sin cerrojo, chocaban (UniqueViolation en pg_type) y se caía el panel.
+    import threading
+    import psycopg
+    from urllib.parse import urlsplit, urlunsplit
+    partes = urlsplit(URL)
+    base_vacia = urlunsplit(partes._replace(path="/femix_carrera"))
+    with psycopg.connect(URL, autocommit=True) as c:
+        c.execute("DROP DATABASE IF EXISTS femix_carrera")
+        c.execute("CREATE DATABASE femix_carrera ENCODING 'UTF8' TEMPLATE template0")
+    try:
+        for _ in range(3):
+            with psycopg.connect(base_vacia, autocommit=True) as c:
+                c.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public")
+            errores, salida = [], threading.Barrier(8)
+
+            def crear():
+                salida.wait()
+                try:
+                    almacen_postgres.crear_esquema(base_vacia)
+                except Exception as exc:
+                    errores.append(exc)
+            hilos = [threading.Thread(target=crear) for _ in range(8)]
+            for h in hilos:
+                h.start()
+            for h in hilos:
+                h.join()
+            assert errores == []
+    finally:
+        with psycopg.connect(URL, autocommit=True) as c:
+            c.execute("DROP DATABASE IF EXISTS femix_carrera")
