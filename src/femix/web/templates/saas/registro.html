@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block titulo %}Crear cuenta — Femix{% endblock %}
+{% block content %}
+<h2>Crear cuenta</h2>
+<p class="secundario">{{ dias_prueba }} días de prueba gratis, sin tarjeta.</p>
+{% if error %}<p class="aviso aviso-error">{{ error }}</p>{% endif %}
+<form method="post" action="/registro" class="formulario">
+    <label>Identificador <small>(minúsculas, números y guiones; será tu usuario)</small>
+        <input name="inquilino_id" required maxlength="40" pattern="[a-z0-9][a-z0-9-]*" value="{{ previo.inquilino_id if previo else '' }}"></label>
+    <label>Nombre del negocio <input name="nombre" required maxlength="100" value="{{ previo.nombre if previo else '' }}"></label>
+    <label>Tipo
+        <select name="tipo">
+            <option value="empresa">empresa</option>
+            <option value="persona" {% if previo and previo.tipo == 'persona' %}selected{% endif %}>persona</option>
+        </select></label>
+    <label>Email <input name="email" type="email" required maxlength="200" value="{{ previo.email if previo else '' }}"></label>
+    <label>Contraseña <small>(mínimo 10 caracteres)</small> <input name="password" type="password" required minlength="10" autocomplete="new-password"></label>
+    <label class="casilla"><input type="checkbox" name="acepto" value="true" required> Acepto la <a href="/privacidad">política de privacidad</a></label>
+    <button type="submit">Crear cuenta</button>
+</form>
+{% endblock %}

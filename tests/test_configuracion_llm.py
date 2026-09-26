@@ -10,7 +10,7 @@ def test_configuracion_por_defecto():
     assert config.proveedor == "ollama"
     assert config.modelo == "qwen2.5:3b"
     assert config.temperatura == 0.5
-    assert config.timeout_segundos == 60
+    assert config.timeout_segundos == 120
 
 def test_configuracion_desde_entorno_usa_valores_por_defecto_si_no_hay_env(monkeypatch):
     monkeypatch.delenv("HUGIN_LLM_PROVEEDOR", raising=False)
@@ -35,7 +35,7 @@ def test_obtener_motor_sin_argumentos_usa_entorno_igual_que_antes(monkeypatch):
     assert isinstance(motor, ProveedorOllama)
     assert motor._modelo == "qwen2.5:3b"
     assert motor._temperatura == 0.5
-    assert motor._timeout_segundos == 60
+    assert motor._timeout_segundos == 120
 
 def test_obtener_motor_con_configuracion_explicita():
     config = ConfiguracionLLM(proveedor="ollama", modelo="modelo-x", temperatura=0.9, timeout_segundos=10, ollama_url="http://otro:1234/api/chat")
@@ -45,6 +45,19 @@ def test_obtener_motor_con_configuracion_explicita():
     assert motor._temperatura == 0.9
     assert motor._timeout_segundos == 10
     assert motor._url == "http://otro:1234/api/chat"
+
+def test_obtener_motor_openai_respeta_el_modelo_configurado(monkeypatch):
+    # Con Ollama detrás de su API compatible con OpenAI (OPENAI_BASE_URL=.../v1), pedir el
+    # modelo por defecto del proveedor ("gpt-4o-mini") en vez del configurado da "model not found".
+    capturado = {}
+
+    class ProveedorOpenAIFalso:
+        def __init__(self, **kwargs):
+            capturado.update(kwargs)
+
+    monkeypatch.setattr("femix.llm.router.ProveedorOpenAI", ProveedorOpenAIFalso)
+    obtener_motor(ConfiguracionLLM(proveedor="openai", modelo="qwen2.5:3b", openai_api_key="ollama"))
+    assert capturado == {"modelo": "qwen2.5:3b", "api_key": "ollama", "prompt_sistema": None}
 
 def test_obtener_motor_proveedor_no_soportado():
     config = ConfiguracionLLM(proveedor="inventado")
@@ -57,3 +70,46 @@ def test_obtener_motor_proveedor_no_soportado():
 def test_proveedor_ollama_usa_temperatura_configurada():
     motor = ProveedorOllama(temperatura=0.1)
     assert motor._temperatura == 0.1
+
+
+def test_el_proveedor_manda_el_prompt_que_le_dan(monkeypatch):
+    enviado = {}
+
+    class Respuesta:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"message": {"content": "hola"}}
+
+    def post(url, json, timeout):
+        enviado.update(json)
+        return Respuesta()
+
+    monkeypatch.setattr("femix.llm.proveedores.requests.post", post)
+    ProveedorOllama(prompt_sistema="Eres el asistente de ACME.").generar("", "hola")
+    assert enviado["messages"][0] == {"role": "system", "content": "Eres el asistente de ACME."}
+    ProveedorOllama().generar("", "hola")
+    assert "Femix" in enviado["messages"][0]["content"]  # sin prompt, el de siempre
+
+
+def test_ollama_limita_tokens_contexto_y_deja_el_modelo_cargado(monkeypatch):
+    enviado = {}
+
+    class Respuesta:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"message": {"content": "ok"}}
+
+    def post(url, json, timeout):
+        enviado.update(json, timeout=timeout)
+        return Respuesta()
+
+    monkeypatch.setattr("femix.llm.proveedores.requests.post", post)
+    monkeypatch.setenv("HUGIN_LLM_TIMEOUT", "180")
+    motor = obtener_motor(configuracion_desde_entorno())
+    motor.generar("", "hola")
+    assert enviado["options"]["num_predict"] == 300 and enviado["options"]["num_ctx"] == 4096
+    assert enviado["keep_alive"] == "30m" and enviado["timeout"] == 180

@@ -11,6 +11,10 @@ class MotorEmbeddingsHash(MotorEmbeddings):
     sustituible: cualquier proveedor real (Ollama/OpenAI embeddings, etc.)
     puede reemplazarlo implementando el mismo puerto MotorEmbeddings."""
 
+    nombre = f"hash-{DIMENSIONES}"
+    # Compara palabras, no sentido: solo se descarta con fiabilidad lo que no comparte ninguna.
+    puntuacion_minima = 0.05
+
     def embed(self, texto: str) -> list[float]:
         vector = [0.0] * DIMENSIONES
         palabras = texto.lower().split()

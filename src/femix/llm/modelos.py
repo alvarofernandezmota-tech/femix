@@ -51,9 +51,16 @@ class SelectorDeModelos:
     Un motor por combinación (proveedor, modelo): cambiar de modelo no reabre conexiones
     ni reconstruye clientes en cada mensaje.
     """
-    def __init__(self, configuracion: "ConfiguracionModelos | None" = None, fabrica=obtener_motor):
+    def __init__(
+        self,
+        configuracion: "ConfiguracionModelos | None" = None,
+        fabrica=obtener_motor,
+        prompt_sistema: "str | None" = None,
+    ):
         self._configuracion = configuracion or configuracion_modelos_desde_entorno()
         self._fabrica = fabrica
+        # El mismo prompt para todos los motores que entregue (rápido y complejo): el de su bot.
+        self._prompt_sistema = prompt_sistema
         self._motores: dict[tuple[str, str], object] = {}
 
     @property
@@ -64,5 +71,8 @@ class SelectorDeModelos:
         config = self._configuracion.para(tipo_tarea=tipo_tarea, usuario_id=usuario_id)
         clave = (config.proveedor, config.modelo)
         if clave not in self._motores:
-            self._motores[clave] = self._fabrica(config)
+            if self._prompt_sistema is None:
+                self._motores[clave] = self._fabrica(config)
+            else:
+                self._motores[clave] = self._fabrica(config, prompt_sistema=self._prompt_sistema)
         return self._motores[clave]

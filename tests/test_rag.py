@@ -128,6 +128,24 @@ def test_inquilino_id_vacio_lanza(tmp_path):
     except ValueError:
         pass
 
+# --- listar_documentos ---
+
+def test_listar_documentos_vacio(tmp_path):
+    indice = IndiceEmbeddings("inquilino1", directorio_datos=str(tmp_path))
+    assert indice.listar_documentos() == []
+
+def test_listar_documentos_agrupa_por_documento_id(tmp_path):
+    indice = IndiceEmbeddings("inquilino1", directorio_datos=str(tmp_path))
+    indice.ingerir(Documento(id="d1", inquilino_id="inquilino1", fuente="a.txt", texto="a" * 120), tamano=50, solapamiento=10)
+    indice.ingerir(Documento(id="d2", inquilino_id="inquilino1", fuente="b.txt", texto="contenido corto"))
+
+    documentos = indice.listar_documentos()
+    assert {d["documento_id"] for d in documentos} == {"d1", "d2"}
+    por_id = {d["documento_id"]: d for d in documentos}
+    assert por_id["d1"]["fuente"] == "a.txt"
+    assert por_id["d1"]["fragmentos"] > 1
+    assert por_id["d2"]["fragmentos"] == 1
+
 # --- construir_contexto ---
 
 def test_construir_contexto_incluye_fuente():

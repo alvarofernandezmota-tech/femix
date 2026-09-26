@@ -202,3 +202,278 @@
   `.env.example`, que vive en `release/docker-chatbot-base` (no en esta rama). Sin ella el bot sigue
   arrancando como inquilino `default`. El resto del proyecto usa el prefijo `HUGIN_` en sus
   variables (`HUGIN_LLM_*`); esta se llama `FEMIX_` por petición explícita.
+
+## feat/panel-web
+- Añadido `src/femix/web/rutas/`: `auth.py` (`AlmacenInquilinos`, `AlmacenSesiones`, hashing de
+  contraseñas con PBKDF2-HMAC-SHA256 + sal, dependencias `obtener_inquilino_actual`/`requerir_admin`,
+  y las rutas `GET`/`POST /login` + `POST /logout`), `usuario.py` (dashboard y tareas/diario/
+  recordatorios del inquilino autenticado) y `admin.py` (dashboard, alta y listado de inquilinos,
+  estadísticas globales), todo protegido por router (`dependencies=[Depends(requerir_admin)]` en
+  admin, `Depends(obtener_inquilino_actual)` en usuario). `app.py` monta los tres routers y
+  `/static`. Templates Jinja2 (`base.html`, `login.html`, `usuario/dashboard.html`,
+  `admin/dashboard.html`) y `static/css/style.css`.
+- Persistencia igual que el resto del dominio: JSON local con escritura atómica
+  (`datos/inquilinos.json`, `datos/sesiones.json`), sin dependencias nuevas más allá de las ya
+  previstas en `requirements.txt` (`fastapi`, `jinja2`, `python-multipart`). Se actualizaron las
+  versiones pineadas de `fastapi`/`uvicorn`/`jinja2`/`python-multipart`/`itsdangerous` (las que
+  había el README original ya no soportan la firma actual de
+  `Jinja2Templates.TemplateResponse`) y se eliminó un bloque duplicado.
+- Se trata `inquilino_id` del panel como el `usuario_id` de `dominio/personal/` (`Tareas`, `Diario`,
+  `Recordatorios`): cada inquilino ya obtiene su propio fichero por compartir la misma clave, pero
+  el aislamiento real por inquilino en `dominio/personal/` sigue sin existir como tal — se hereda la
+  limitación descrita en `CONTEXT.md` (Fase 2 del roadmap, pendiente).
+- Añadido `Diario.listar()` (no existía; solo tenía `registrar()`), necesario para el panel.
+- 33 tests nuevos (`tests/test_web_auth.py`, `tests/test_web_login.py`, `tests/test_web_usuario.py`,
+  `tests/test_web_admin.py`, más los añadidos a `tests/test_diario.py`): credenciales inválidas,
+  contraseña nunca en claro, sesión inexistente/expirada, aislamiento de datos entre dos inquilinos,
+  token de admin ausente/incorrecto, alta de inquilino duplicado o con campos vacíos, y estadísticas
+  agregadas con datos reales de varios inquilinos. Suite completa: 196 tests en verde
+  (`python3 -m pytest tests/ -v`).
+- Las sesiones se guardan en JSON local (no aptas para múltiples workers/procesos sin un backend
+  compartido); `itsdangerous` sigue en `requirements.txt` sin usarse (reservado por si se pasa a
+  cookies firmadas).
+- No se tocó `llm/`, `mente/`, `agentes/`, `rag/`, `conectores/`, `bot/` ni
+  `dominio/personal/tareas.py`/`recordatorios.py`.
+- **Corrección posterior:** el PR de esta rama se había abierto contra `main`, pero
+  `docs/ENCARGO_PANEL_WEB.md` (que no se encontró al empezar porque solo existía en
+  `integracion/femix-completa`, que es la base real de `feat/panel-web` según el propio encargo)
+  apareció al mergear esa rama. Se corrigió la base del PR y se mergeó `integracion/femix-completa`
+  (traía el adaptador `rag/adaptador.py` que conecta RAG a `Femix.procesar()`). El encargo real pide
+  además subir documentos RAG desde el panel: añadido `GET/POST /usuario/rag(/documentos)` e
+  `IndiceEmbeddings.listar_documentos()` (no existía). Editar/borrar inquilino y `/usuario/config`
+  quedan pendientes (ver `CONTEXT.md`). 28 tests nuevos más. Suite completa: 224 tests en verde.
+- **Revisión adversarial (seguridad/correctitud/tests) sobre este mismo PR:** 14 hallazgos, los 14
+  confirmados tras verificación escéptica independiente (con reproducción real, no solo lectura).
+  Corregidos en `rutas/auth.py` y `rutas/usuario.py`:
+  - `AlmacenInquilinos.crear()` no validaba `inquilino_id` (podía romper `dominio/personal/` con un
+    500, o en el peor caso escribir fuera de `datos/`) — ahora reutiliza
+    `rag/rutas.py::validar_inquilino_id`.
+  - `POST /login` filtraba por temporización qué `inquilino_id` existen (el hash PBKDF2 solo se
+    calculaba si el inquilino existía) — ahora se calcula siempre, contra un hash de referencia fijo
+    si no existe.
+  - Cookie de sesión sin `secure` — añadido (rompe pruebas por HTTP puro a propósito; los tests usan
+    `TestClient(app, base_url="https://...")`).
+  - `AlmacenInquilinos`/`AlmacenSesiones` sin ningún lock: altas/logins concurrentes podían perderse
+    en silencio (reproducido con hilos: 19 de 20 altas perdidas). Añadido lock de fichero
+    (`fcntl.flock`) alrededor de cada ciclo leer-modificar-escribir.
+  - `POST /usuario/tareas/{i}/completar` con índice inválido devolvía 200 con el error como texto
+    — ahora 404.
+  - `cuando` de `POST /usuario/recordatorios` no se validaba como fecha (quedaba persistido y
+    reventaba luego cualquier lectura con 500) — validación Pydantic, ahora 422.
+  - `POST /usuario/diario` con texto vacío devolvía 500 en vez de 400 (a diferencia del mismo patrón
+    ya usado en `admin.py`) — ahora captura el `ValueError` del dominio.
+  - Huecos de cobertura cerrados con tests: las 6 rutas de `/usuario/*` que no comprobaban 401 sin
+    sesión, la rama "inquilino no encontrado" de `obtener_inquilino_actual`, y el `except` de
+    limpieza del fichero temporal en `Diario._guardar()`/`AlmacenInquilinos._guardar()`/
+    `AlmacenSesiones._guardar()` (forzando el fallo de escritura con `monkeypatch`).
+  - 12 tests nuevos. Suite completa: 248 tests en verde.
+
+## Unificación de ramas + Docker completo + RAG operativo (2026-09-23)
+- **Ramas unificadas:** `release/docker-chatbot-base` (Dockerfile, compose, `.env.example`, script de
+  limpieza de ramas) se había creado antes de RAG por inquilino, los agentes y el panel web, y quedó
+  desconectada. Mergeada en `feat/panel-web`, que ya contenía todo `integracion/femix-completa`:
+  una sola rama con todo. Sin conflictos de código; solo de prosa en `docs/CHANGELOG_DOCKER.md`,
+  `docs/TAREAS_CHATBOT.md` y `docs/TAREAS_REPO.md`, resueltos conservando ambos lados.
+  `requirements.txt` trajo el fix de `numpy==2.5.3` (versión inexistente que rompía el build).
+- **Por qué el bot en Docker no llegaba a Ollama:** Ollama en `madre` escucha solo en
+  `127.0.0.1:11434`; desde la red bridge, `localhost` es el propio contenedor y
+  `host.docker.internal` (que en Linux ni resuelve sin `extra_hosts`) apunta a la IP del bridge, que
+  Ollama rechaza. `docker-compose.yml` pasa a `network_mode: host`. Alternativa documentada en
+  `docs/docker.md`.
+- **Otros fallos del Docker anterior:** el `CMD` arrancaba el CLI (lee de stdin → sale sin TTY →
+  reinicio en bucle) en vez de `conectores.telegram.bot`; `conectores/` no se copiaba a la imagen;
+  `.env.example` pedía `DISCORD_TOKEN` (el código lee `TELEGRAM_BOT_TOKEN`); `datos/` no persistía.
+  Corregido todo, más usuario sin privilegios, `PYTHONUNBUFFERED`, `.dockerignore`, volumen para la
+  caché de Whisper, y el panel web como servicio opcional (perfil `web`, está en pruebas).
+- **`fix(llm)`:** con `HUGIN_LLM_PROVEEDOR=openai` el router ignoraba `HUGIN_LLM_MODELO` y pedía
+  siempre `gpt-4o-mini`; contra Ollama por `/v1` (`OPENAI_BASE_URL`, como está `madre`) eso da
+  *model not found*. Afectaba también a los modelos rápido/complejo.
+- **RAG operativo sin el panel:** `python -m femix.bot.ingerir <ficheros|directorios>` carga `.txt`/`.md`
+  en el índice del mismo `FEMIX_INQUILINO_ID` y directorio que lee el bot; relanzarlo no duplica.
+  En Docker: `docker compose run --rm femix-bot python -m femix.bot.ingerir /app/documentos`.
+- `docs/PRODUCCION_MADRE.md` listaba variables que el código no lee (`FEMIX_MODELO_BASE`,
+  `FEMIX_MODELO_RAPIDO`, `FEMIX_MODELO_PENSAMIENTO`, `FEMIX_USUARIO_ID`): con ellas el bot usaba en
+  silencio los valores por defecto. Corregido con los nombres reales (`HUGIN_LLM_MODELO*`).
+  README: eliminada la sección de Docker duplicada y desactualizada.
+- **Verificación:** Docker Hub bloqueado desde el entorno de desarrollo, así que la imagen no se
+  llegó a construir. Sí: `docker compose config` válido, `pip install -r requirements.txt` limpio en
+  Python 3.11, y prueba de extremo a extremo con el layout exacto de la imagen y un Ollama falso en
+  `127.0.0.1:11434` (ingesta → pregunta → el contexto RAG llega en la petición a
+  `localhost:11434/api/chat` con el modelo configurado). Pendiente: `docker compose up` real en
+  `madre`.
+- 7 tests nuevos (`tests/test_ingerir.py`, `tests/test_configuracion_llm.py`). Suite completa: 255
+  tests en verde.
+
+## Verificación en madre (2026-09-23)
+- Docker probado de verdad en `madre`: imagen construida, contenedor alcanza el Ollama del host,
+  ingesta RAG del inquilino `varo`, y el bot contesta por Telegram. `hugin-telegram.service`
+  (el bot nativo) desactivado: con el contenedor, dos procesos con el mismo token daban `Conflict`.
+- `fix(telegram)`: 30 s de margen con Telegram (antes 5 s, las respuestas se perdían con
+  `ConnectTimeout` en la línea de `madre`) y errores de red en una línea de log.
+- `fix(bot)`: una respuesta vacía del modelo ya no llega vacía a Telegram (la rechazaba con
+  `Message text is empty`); `BadRequest` ya no se etiqueta como fallo de red.
+- `feat(bot)`: una línea de log por mensaje (inquilino, usuario, camino, segundos, entrada y salida
+  recortadas) y aviso con traza cuando el subagente falla (antes se tragaba la excepción).
+- Los comandos (`/tarea`, `/hoy`, `/diario`, `/recordatorio`) **no funcionaban en Telegram** desde
+  que existe el conector (`75be47d`): `filters.TEXT & ~filters.COMMAND` los descartaba. Arreglado.
+  `bot.py` ya no construye `Femix` al importarse (`construir_aplicacion`), y tiene tests.
+- 264 tests en verde con las dependencias de la imagen (260 + 1 saltado sin `python-telegram-bot`).
+
+## Fase 2: inquilinos, un bot por inquilino y panel del dueño (2026-09-23)
+Un inquilino es una persona o una empresa, con su bot de Telegram acoplado. Sin conectar al LLM:
+nada del perfil entra en el prompt (eso es la Fase 3).
+- **Control de acceso** (`conectores/telegram/acceso.py`): cada bot solo atiende a sus IDs de
+  Telegram permitidos; vacío = nadie. Corta en el grupo -1, antes de `/start`, comandos, texto y
+  voz; al desconocido le dice su ID (en privado) y queda en el log para autorizarlo. En `.env`:
+  `FEMIX_TELEGRAM_PERMITIDOS`. **Al actualizar `madre` hay que ponerlo o el bot no contesta.**
+- **Perfil** (`inquilino/perfil.py`) en `datos/{id}/perfil.json` (0600, lleva el token): tipo,
+  descripción, horario por franjas, capacidades, token y permitidos de Telegram, alta/baja.
+  Validado campo a campo; escrituras atómicas bajo un bloqueo global (dos inquilinos no pueden
+  compartir token); `modificar()` lee y escribe dentro del bloqueo; un perfil ilegible se aparta
+  (`PerfilIlegible`) sin tumbar a los demás. La baja no borra nada.
+- **Capacidades** (`inquilino/capacidades.py`): memoria, voz y documentos (RAG) deciden qué piezas
+  lleva cada bot; las pendientes del ROADMAP (búsqueda web, citas en Postgres, tool calling) están en
+  el catálogo pero no se pueden encender.
+- **Datos por inquilino**: tareas, diario, recordatorios y memoria en `datos/{id}/` (antes sueltos y
+  compartidos). `inquilino/migracion.py` los mueve al arrancar (bot, CLI y panel), bajo bloqueo,
+  sin pisar nada; si el destino ya existe, junta las listas. Sin `FEMIX_INQUILINO_ID` no adivina de
+  quién son los del bot. `Memoria` pasa a escribir de forma atómica.
+- **Un bot por inquilino en un proceso** (`conectores/telegram/flota.py`): cada 30 s relee los
+  perfiles y arranca, para o rearranca solo lo que cambió; permitidos en caliente; un token
+  rechazado no se reintenta hasta que cambie; detecta un token revocado con el bot en marcha;
+  parada en dos fases (nadie acepta mensajes nuevos mientras otro termina) y `stop_grace_period`
+  de 90 s. El `.env` sigue valiendo y manda sobre el perfil de su inquilino. LLM y Whisper en hilos
+  para que un bot no pare a los demás. Estado de cada bot en `datos/.estado_bots.json`. Filtro de
+  logs que tapa cualquier token de bot.
+- **Panel del dueño** (`/admin/login`): inquilinos con el estado de su bot, alta, perfil, baja y
+  reactivación, documentos de su RAG y contraseña de su panel. Cookie propia (`SameSite=Strict`,
+  solo `/admin`, caduca al cambiar el token) + CSRF en cada formulario; el token de ejemplo de
+  `.env.example` o uno de menos de 24 caracteres deja el panel cerrado. Un inquilino de baja no
+  entra en el suyo; cambiar su contraseña o darlo de baja cierra sus sesiones. Tope de 6 MB por
+  petición antes de autenticar, 5 MB por documento y 100 MB de índice por inquilino.
+- **Revisión adversarial** con tres revisores (seguridad, ciclo de vida de los bots, datos y
+  reglas), todos los hallazgos reproducidos contra el código: 6 + 5 + 17, ninguno alto; arreglados
+  los reproducibles, con un test que falla sin el arreglo. Entre ellos: un token revocado dejaba el
+  bot muerto en silencio (python-telegram-bot deja `updater.running` en True), `"varo\n"` pasaba
+  como id y creaba un inquilino gemelo, y la confirmación de la baja se podía romper con un
+  apóstrofo en el nombre.
+- Verificado en Chromium (panel en escritorio y móvil) y con el proceso real parándose con SIGTERM.
+  No verificado todavía en `madre`.
+- 417 tests en verde con las dependencias de la imagen (367 + 3 saltados sin `python-telegram-bot`).
+
+## Fase 3: el perfil personaliza el prompt de cada bot (2026-09-23)
+- `inquilino/personalidad.py`: del perfil a la personalidad del bot. Identidad según sea persona
+  ("asistente personal de…") o empresa ("asistente de…, atiendes a quien escribe a…"), nombre del
+  asistente y tono (campos nuevos del perfil, opcionales; vacíos = los de Femix), descripción y
+  horario de atención ("lunes: de 09:00 a 14:00 y de 16:00 a 20:00… Cerrado: …"). Añade reglas para
+  no cambiar el horario, no inventar precios, servicios ni citas (empresas) y no fingir que sabe la
+  hora. Único sitio de donde sale personalización de negocio para el prompt (`AGENTS.md`).
+- Capa `llm/` sin conocimiento de inquilinos: `ProveedorOllama`/`ProveedorOpenAI` reciben
+  `prompt_sistema` (antes importaban la constante global), `obtener_motor` y `SelectorDeModelos` lo
+  pasan a todos los motores de un bot (rápido y complejo). Sin perfil, el prompt de siempre.
+  `Personalidad` gana un campo genérico `contexto`.
+- La flota lleva el prompt en la configuración de cada bot y lo rearranca si cambia; el CLI lo
+  toma del perfil. La memoria etiqueta las respuestas previas como "Asistente" (decía "Hugin").
+- Panel del dueño: campos de nombre del asistente y tono, y la sección "Así se presenta su bot" con
+  el prompt exacto que recibe el modelo.
+- Límite conocido: el prompt no lleva fecha, hora ni zona horaria.
+- 431 tests en verde con las dependencias de la imagen (378 + 3 saltados sin `python-telegram-bot`).
+
+## Fase 4 (primera parte): dominio personal en Postgres por inquilino (2026-09-23)
+- Puerto `puertos/almacen.py` (cargar/guardar la lista de un usuario) y dos adaptadores:
+  `AlmacenJson` (el mismo fichero de siempre, escritura atómica) y `AlmacenPostgres` (tabla
+  `registros`, construido para un inquilino: `WHERE inquilino_id = %s` en todas las consultas;
+  guardar reescribe la lista en una transacción con bloqueo consultivo). `Tareas`, `Diario` y
+  `Recordatorios` reciben el almacén; comandos, agente de tareas, `Femix`, fábrica y panel lo pasan.
+- `FEMIX_BASE_DATOS_URL` activa Postgres (opcional: sin ella, todo igual que antes). Bot y panel
+  crean la tabla al arrancar. `python -m femix.inquilino.a_postgres` copia los JSON existentes sin
+  pisar lo que ya haya y los deja como respaldo. Estadísticas del panel desde el almacén.
+- Pendiente: citas y disponibilidad de `hugin` (falta permiso para leer ese repo).
+- 12 tests nuevos contra un Postgres 16 real (se saltan sin `FEMIX_PRUEBAS_POSTGRES_URL`), incluida
+  una guarda que falla si alguna consulta sobre `registros` no filtra por `inquilino_id`. 443 en
+  verde con Postgres; 437 + 6 saltados sin él.
+
+## Fase 4 (segunda parte): todo lo del inquilino y del panel en Postgres (2026-09-23)
+- Memoria de las conversaciones en el almacén del inquilino (`MemoriaEnAlmacen`).
+- Perfiles de inquilino en la tabla `perfiles`, con la misma API; el bloqueo global que impide
+  dos inquilinos con el mismo token pasa a ser un bloqueo consultivo de Postgres.
+- Accesos y sesiones del panel en la tabla `documentos` (`infraestructura/documentos.py`).
+- `a_postgres` copia también memoria, perfiles (con su alta y baja) y accesos al panel.
+- `crear_esquema` rechaza una base que no esté en UTF8 (en SQL_ASCII cualquier tilde fallaba).
+- Sin `FEMIX_BASE_DATOS_URL` todo sigue en ficheros, como antes.
+- 454 tests en verde con Postgres 16 real (437 + 17 saltados sin él); uno recorre el panel entero
+  sobre Postgres y comprueba que no se escribe nada en disco.
+
+## Fase 4 (tercera parte): reservas de negocio y agenda personal (2026-09-23)
+Dos cosas distintas, igual que en `hugin` (leído, no tocado):
+- **Reservas de un negocio** (`dominio/negocio/reservas.py`, comando `/reserva`, capacidad
+  `reservas`, apagada por defecto porque es de empresas): contra el horario del perfil; el solape
+  es en minutos; motivo de rechazo en orden pasado/cerrado/fuera/ocupado; sin horario no se
+  reserva; no se ofrecen huecos pasados; si no cabe, propone huecos; anular borra. Cada cliente
+  solo ve y anula sus reservas (no ve los nombres de los demás).
+- **Agenda personal** (`dominio/personal/agenda.py`, comando `/agenda`, para todos): citas
+  propias con fecha obligatoria y hora opcional; avisa de choques; cancelar la marca.
+- Las dos en el almacén del inquilino (JSON o Postgres, siempre con `inquilino_id`).
+- 18 tests nuevos (reglas de hugin, comandos, cableado en el bot, aislamiento en Postgres). 472 en
+  verde con Postgres real.
+
+## Mejoras: fecha y hora, y recordatorios que avisan (2026-09-23)
+- `RelojZona` (`FEMIX_ZONA_HORARIA`, por defecto `Europe/Madrid`; `tzdata` en requirements): cada
+  mensaje lleva "Ahora es martes 22 de septiembre de 2026, 23:30" en el contexto, y reservas,
+  recordatorios, diario y agenda usan la hora local en vez de la UTC del contenedor.
+- Recordatorios proactivos: cada bot revisa cada minuto los recordatorios vencidos de sus usuarios
+  permitidos y les escribe "⏰ Recordatorio: …". Se marca `avisado` después de enviar (si falla, se
+  reintenta; nunca se repite). Los recordatorios antiguos sin el campo se leen igual.
+- 7 tests nuevos. 478 en verde con Postgres real (460 + 18 saltados sin él).
+
+## Mejora 5: el RAG busca por sentido (2026-09-23)
+- `MotorEmbeddingsOllama` (`rag/embeddings_ollama.py`): embeddings de `/api/embed` del Ollama del
+  host (`nomic-embed-text` por defecto). Se activa con `FEMIX_EMBEDDINGS=ollama`; sin ella, el de
+  palabras de siempre.
+- Cambiar de motor reindexa solo: el índice guarda el texto de cada fragmento y, si sus vectores
+  son de otro motor, se recalculan en la primera búsqueda y se guardan.
+- Umbral por motor (0.05 el de palabras, 0.5 el semántico; `FEMIX_EMBEDDINGS_UMBRAL`).
+- 4 tests con un Ollama simulado que entiende de temas.
+
+## Velocidad en madre (2026-09-23)
+- Verificado en `madre`: migración, bot, memoria (te llama por tu nombre), borrado de ramas. Pero
+  lento: 31 s un "hola" y 60 s de corte en la segunda pregunta.
+- Ollama: `num_predict` 300 (`HUGIN_LLM_MAX_TOKENS`) y `num_ctx` 4096 (`HUGIN_LLM_CONTEXTO`) —en
+  CPU el tiempo va con lo que escribe y lo que lee—, `keep_alive` 30m en cada petición
+  (`HUGIN_LLM_KEEP_ALIVE`) y límite de espera 120 s (`HUGIN_LLM_TIMEOUT`).
+
+## Fase 4 completa y Fase 5: tool calling (2026-09-26)
+- **Postgres en Docker**: servicio `femix-db` (Postgres 16, volumen `femix-pg`, solo en
+  `127.0.0.1:5433`) en `docker-compose.yml`. El bot y el panel reciben `FEMIX_BASE_DATOS_URL` y
+  esperan a que la base esté sana. Nueva variable obligatoria `FEMIX_DB_CLAVE`.
+- **Índice RAG en Postgres** (`rag/persistencia.py`): tabla `fragmentos`, cada consulta con
+  `inquilino_id`. `IndiceEmbeddings` no cambia de API; el `indice.json` de antes se sube la primera
+  vez y se renombra a `.migrado`.
+- **Subida automática de los JSON** al primer arranque con Postgres (`a_postgres.copiar_una_vez`,
+  marca `datos/.a_postgres.hecho`): no se repite, para no resucitar datos borrados.
+- **Fase 5, tool calling**: `llm/herramientas.py` (herramienta + ejecución segura: errores como
+  texto al modelo, sin argumentos inventados, resultado acotado), bucle de function calling en
+  `ProveedorOllama.conversar` (`tools` de `/api/chat`, máximo 4 rondas) y `ProveedorOpenAI`.
+  `bot/herramientas.py`: 10 herramientas sobre el dominio (reservas, tareas, agenda, avisos),
+  atadas a inquilino y usuario, con las mismas reglas que los comandos.
+- Capacidad `tool_calling` disponible (fuera de `POR_DEFECTO`, como `reservas`). CLI
+  `python -m femix.inquilino.capacidad ID +tool_calling -voz`.
+- Probado en Docker de verdad: `femix-db` + bot + panel, reserva por tool calling guardada en
+  Postgres, ingesta RAG en `fragmentos`. 872 tests en verde con Postgres real.
+
+## 2026-09-26 — Fase 6: SaaS de bots (`feat/panel-web`)
+- **Planes, suscripciones y consumo** (`src/femix/saas/`): interno, prueba (14 días, 300 mensajes),
+  básico y pro; tablas `suscripciones` y `consumo` (o JSON). `ControlDeUso` pausa el bot sin
+  suscripción vigente y corta al pasar el cupo del mes. Todo detrás de `FEMIX_SAAS=1`.
+- **Stripe** (`saas/pagos.py`): Checkout, portal de facturación y webhook con firma verificada.
+- **Actividad** (`infraestructura/actividad.py`): tablas `mensajes` e `incidencias`; los fallos del
+  modelo, de herramientas, de Telegram y de arranque de bots se apuntan solos.
+- **Tool calling por defecto** y nuevas herramientas `escribir_diario` y `buscar_en_documentos`: el
+  bot usa sus herramientas cuando detecta la intención, no solo con comandos.
+- **Bots abiertos** (`telegram_abierto` en el perfil) para clientes de un negocio.
+- **Web**: panel del cliente `/usuario/panel` (su bot, plan, pagos, probar, reservas, actividad);
+  portada, `/registro`, `/privacidad` y `/stripe/webhook`; en `/admin`, plan y consumo por bot, MRR,
+  `/admin/actividad` y en cada ficha suscripción, probar, reservas y actividad. CSRF en la sesión.
+- **Infra**: Caddy con HTTPS automático (perfil `publico`, `FEMIX_DOMINIO`), copias diarias de
+  Postgres (perfil `copias`), uvicorn con `--proxy-headers`. Guía en `docs/saas.md`.
+- 894 tests en verde con Postgres real.

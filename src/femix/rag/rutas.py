@@ -4,7 +4,11 @@ import re
 NOMBRE_DIRECTORIO_RAG = "rag"
 NOMBRE_INDICE = "indice.json"
 
-_PATRON_INQUILINO = re.compile(r"^[A-Za-z0-9._-]+$")
+_PATRON_INQUILINO = re.compile(r"[A-Za-z0-9._-]+")
+# Nombres que no pueden ser carpetas de inquilino porque ya hay ficheros así en `datos/`
+# (`sesiones.json`, `inquilinos.json`, `.perfiles.lock`...): crear el inquilino "sesiones.json"
+# convertía ese fichero en carpeta y tumbaba todos los logins.
+_SUFIJOS_RESERVADOS = (".json", ".lock")
 
 def validar_inquilino_id(inquilino_id: "str | None") -> str:
     """Valida el `inquilino_id` como lo que ahora es: un nombre de carpeta.
@@ -15,13 +19,17 @@ def validar_inquilino_id(inquilino_id: "str | None") -> str:
     """
     if not inquilino_id:
         raise ValueError("inquilino_id no puede estar vacío")
-    if not _PATRON_INQUILINO.match(inquilino_id):
+    # fullmatch y no `^...$`: `$` acepta un salto de línea al final, y "varo\n" sería otro
+    # inquilino (otra carpeta) que en pantalla se ve igual que "varo".
+    if not isinstance(inquilino_id, str) or not _PATRON_INQUILINO.fullmatch(inquilino_id):
         raise ValueError(
             f"inquilino_id inválido: {inquilino_id!r} "
             "(solo letras, dígitos, punto, guion y guion bajo)"
         )
-    if not inquilino_id.strip("."):
-        raise ValueError(f"inquilino_id inválido: {inquilino_id!r} (no puede ser solo puntos)")
+    if inquilino_id.startswith("."):
+        raise ValueError(f"inquilino_id inválido: {inquilino_id!r} (no puede empezar por punto)")
+    if inquilino_id.lower().endswith(_SUFIJOS_RESERVADOS):
+        raise ValueError(f"inquilino_id inválido: {inquilino_id!r} (no puede acabar en .json ni .lock)")
     return inquilino_id
 
 def directorio_inquilino(directorio_datos: str, inquilino_id: str) -> str:

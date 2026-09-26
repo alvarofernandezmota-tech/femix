@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block titulo %}Panel de {{ inquilino.nombre }} — Femix{% endblock %}
+
+{% block content %}
+<h2>Hola, {{ inquilino.nombre }}</h2>
+
+<section class="tarjeta">
+    <h3>Tareas</h3>
+    <ul>
+        {% for tarea in tareas %}
+        <li>{{ tarea }}</li>
+        {% else %}
+        <li>Sin tareas.</li>
+        {% endfor %}
+    </ul>
+</section>
+
+<section class="tarjeta">
+    <h3>Recordatorios pendientes</h3>
+    <ul>
+        {% for r in recordatorios %}
+        <li>{{ r.texto }} — {{ r.cuando }}</li>
+        {% else %}
+        <li>Sin recordatorios pendientes.</li>
+        {% endfor %}
+    </ul>
+</section>
+
+<p><a href="/usuario/panel">Mi bot: configuración, suscripción, mensajes y fallos →</a></p>
+
+<form method="post" action="/logout">
+    <button type="submit">Cerrar sesión</button>
+</form>
+{% endblock %}

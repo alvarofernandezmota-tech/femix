@@ -1,0 +1,177 @@
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+
+from fastapi.testclient import TestClient
+
+from femix.web.app import app
+from femix.web.rutas.auth import AlmacenInquilinos
+
+
+def _cliente_autenticado(tmp_path, monkeypatch):
+    monkeypatch.setenv("FEMIX_WEB_DATOS_DIR", str(tmp_path))
+    AlmacenInquilinos(str(tmp_path)).crear("acme", "ACME S.L.", "clave-secreta")
+    client = TestClient(app, base_url="https://testserver")
+    client.post("/login", data={"inquilino_id": "acme", "password": "clave-secreta"})
+    return client
+
+
+def test_dashboard_requiere_autenticacion(tmp_path, monkeypatch):
+    monkeypatch.setenv("FEMIX_WEB_DATOS_DIR", str(tmp_path))
+    client = TestClient(app, base_url="https://testserver")
+    assert client.get("/usuario/").status_code == 401
+    assert client.get("/usuario/tareas").status_code == 401
+
+
+def test_todas_las_rutas_de_usuario_requieren_autenticacion(tmp_path, monkeypatch):
+    monkeypatch.setenv("FEMIX_WEB_DATOS_DIR", str(tmp_path))
+    client = TestClient(app, base_url="https://testserver")
+    assert client.post("/usuario/tareas", json={"descripcion": "x"}).status_code == 401
+    assert client.post("/usuario/tareas/0/completar").status_code == 401
+    assert client.get("/usuario/diario").status_code == 401
+    assert client.post("/usuario/diario", json={"texto": "x"}).status_code == 401
+    assert client.get("/usuario/recordatorios").status_code == 401
+    assert (
+        client.post(
+            "/usuario/recordatorios", json={"texto": "x", "cuando": "2099-01-01T00:00:00"}
+        ).status_code
+        == 401
+    )
+
+
+def test_sesion_valida_con_inquilino_borrado_es_401(tmp_path, monkeypatch):
+    monkeypatch.setenv("FEMIX_WEB_DATOS_DIR", str(tmp_path))
+    AlmacenInquilinos(str(tmp_path)).crear("acme", "ACME S.L.", "clave-secreta")
+    client = TestClient(app, base_url="https://testserver")
+    client.post("/login", data={"inquilino_id": "acme", "password": "clave-secreta"})
+
+    os.remove(os.path.join(str(tmp_path), "inquilinos.json"))
+
+    respuesta = client.get("/usuario/")
+    assert respuesta.status_code == 401
+    assert respuesta.json()["detail"] == "Inquilino no encontrado"
+
+
+def test_dashboard_autenticado(tmp_path, monkeypatch):
+    client = _cliente_autenticado(tmp_path, monkeypatch)
+    respuesta = client.get("/usuario/")
+    assert respuesta.status_code == 200
+    assert "ACME S.L." in respuesta.text
+
+
+def test_crear_y_listar_tarea(tmp_path, monkeypatch):
+    client = _cliente_autenticado(tmp_path, monkeypatch)
+    respuesta = client.post("/usuario/tareas", json={"descripcion": "comprar pan"})
+    assert respuesta.status_code == 200
+
+    respuesta = client.get("/usuario/tareas")
+    assert respuesta.json() == {"tareas": ["0. [ ] comprar pan"]}
+
+
+def test_completar_tarea(tmp_path, monkeypatch):
+    client = _cliente_autenticado(tmp_path, monkeypatch)
+    client.post("/usuario/tareas", json={"descripcion": "comprar pan"})
+    respuesta = client.post("/usuario/tareas/0/completar")
+    assert respuesta.status_code == 200
+
+    respuesta = client.get("/usuario/tareas")
+    assert respuesta.json() == {"tareas": ["0. [x] comprar pan"]}
+
+
+def test_completar_tarea_indice_invalido_da_404(tmp_path, monkeypatch):
+    client = _cliente_autenticado(tmp_path, monkeypatch)
+    client.post("/usuario/tareas", json={"descripcion": "comprar pan"})
+
+    assert client.post("/usuario/tareas/99/completar").status_code == 404
+    assert client.post("/usuario/tareas/-1/completar").status_code == 404
+
+    respuesta = client.get("/usuario/tareas")
+    assert respuesta.json() == {"tareas": ["0. [ ] comprar pan"]}
+
+
+def test_registrar_diario_texto_vacio_da_400(tmp_path, monkeypatch):
+    client = _cliente_autenticado(tmp_path, monkeypatch)
+    respuesta = client.post("/usuario/diario", json={"texto": ""})
+    assert respuesta.status_code == 400
+
+
+def test_registrar_y_listar_diario(tmp_path, monkeypatch):
+    client = _cliente_autenticado(tmp_path, monkeypatch)
+    client.post("/usuario/diario", json={"texto": "hoy fue un buen día"})
+
+    respuesta = client.get("/usuario/diario")
+    entradas = respuesta.json()["entradas"]
+    assert len(entradas) == 1
+    assert entradas[0]["texto"] == "hoy fue un buen día"
+
+
+def test_crear_y_listar_recordatorio(tmp_path, monkeypatch):
+    client = _cliente_autenticado(tmp_path, monkeypatch)
+    client.post(
+        "/usuario/recordatorios",
+        json={"texto": "llamar al banco", "cuando": "2099-01-01T09:00:00"},
+    )
+
+    respuesta = client.get("/usuario/recordatorios")
+    assert respuesta.json() == {
+        "recordatorios": [{"texto": "llamar al banco", "cuando": "2099-01-01T09:00:00"}]
+    }
+
+
+def test_crear_recordatorio_con_fecha_invalida_da_422(tmp_path, monkeypatch):
+    client = _cliente_autenticado(tmp_path, monkeypatch)
+    respuesta = client.post(
+        "/usuario/recordatorios", json={"texto": "llamar al banco", "cuando": "mañana a las 5"}
+    )
+    assert respuesta.status_code == 422
+
+    respuesta = client.get("/usuario/recordatorios")
+    assert respuesta.json() == {"recordatorios": []}
+
+
+def test_subir_y_listar_documento_rag(tmp_path, monkeypatch):
+    client = _cliente_autenticado(tmp_path, monkeypatch)
+
+    respuesta = client.post(
+        "/usuario/rag/documentos",
+        files={"archivo": ("manual.txt", b"contenido de prueba para el indice RAG", "text/plain")},
+    )
+    assert respuesta.status_code == 201
+    cuerpo = respuesta.json()
+    assert cuerpo["fuente"] == "manual.txt"
+    assert cuerpo["fragmentos"] == 1
+
+    respuesta = client.get("/usuario/rag")
+    documentos = respuesta.json()["documentos"]
+    assert len(documentos) == 1
+    assert documentos[0]["fuente"] == "manual.txt"
+
+
+def test_subir_documento_rag_vacio_falla(tmp_path, monkeypatch):
+    client = _cliente_autenticado(tmp_path, monkeypatch)
+    respuesta = client.post(
+        "/usuario/rag/documentos",
+        files={"archivo": ("vacio.txt", b"   ", "text/plain")},
+    )
+    assert respuesta.status_code == 400
+
+
+def test_rag_requiere_autenticacion(tmp_path, monkeypatch):
+    monkeypatch.setenv("FEMIX_WEB_DATOS_DIR", str(tmp_path))
+    client = TestClient(app, base_url="https://testserver")
+    assert client.get("/usuario/rag").status_code == 401
+
+
+def test_inquilinos_no_comparten_datos(tmp_path, monkeypatch):
+    monkeypatch.setenv("FEMIX_WEB_DATOS_DIR", str(tmp_path))
+    almacen = AlmacenInquilinos(str(tmp_path))
+    almacen.crear("acme", "ACME S.L.", "clave-acme")
+    almacen.crear("beta", "Beta Inc.", "clave-beta")
+
+    client_acme = TestClient(app, base_url="https://testserver")
+    client_acme.post("/login", data={"inquilino_id": "acme", "password": "clave-acme"})
+    client_acme.post("/usuario/tareas", json={"descripcion": "tarea de acme"})
+
+    client_beta = TestClient(app, base_url="https://testserver")
+    client_beta.post("/login", data={"inquilino_id": "beta", "password": "clave-beta"})
+
+    assert client_beta.get("/usuario/tareas").json() == {"tareas": []}

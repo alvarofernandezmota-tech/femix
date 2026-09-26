@@ -1,6 +1,4 @@
-import json
-import os
-import tempfile
+from ...infraestructura.almacen_json import AlmacenJson
 from dataclasses import dataclass, asdict
 
 @dataclass
@@ -9,32 +7,20 @@ class Tarea:
     completada: bool = False
 
 class Tareas:
-    def __init__(self, usuario_id: str, directorio_datos: str = "datos"):
+    def __init__(self, usuario_id: str, directorio_datos: str = "datos", almacen=None):
         if not usuario_id:
             raise ValueError("usuario_id no puede estar vacío")
         self.usuario_id = usuario_id
         self._directorio = directorio_datos
-        self._ruta = os.path.join(directorio_datos, f"tareas_{usuario_id}.json")
-        os.makedirs(directorio_datos, exist_ok=True)
+        # Fase 4: JSON en la carpeta del inquilino o Postgres; el dominio no lo sabe.
+        self._almacen = almacen or AlmacenJson(directorio_datos)
         self._tareas: list[Tarea] = self._cargar()
 
     def _cargar(self) -> list[Tarea]:
-        if not os.path.exists(self._ruta):
-            return []
-        with open(self._ruta, "r", encoding="utf-8") as f:
-            bruto = json.load(f)
-        return [Tarea(**t) for t in bruto]
+        return [Tarea(**e) for e in self._almacen.cargar("tareas", self.usuario_id)]
 
     def _guardar(self):
-        bruto = [asdict(t) for t in self._tareas]
-        fd, ruta_temp = tempfile.mkstemp(dir=self._directorio)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(bruto, f, ensure_ascii=False, indent=2)
-            os.replace(ruta_temp, self._ruta)
-        except:
-            os.remove(ruta_temp)
-            raise
+        self._almacen.guardar("tareas", self.usuario_id, [asdict(e) for e in self._tareas])
 
     def _formatear(self, indice: int) -> str:
         t = self._tareas[indice]
