@@ -301,6 +301,8 @@ async def guardar_bot(
             whatsapp_actual = anterior.whatsapp_token if anterior else ""
             return _replace(
                 base, telegram_token="" if quitar_token else (telegram_token.strip() or token_actual),
+                # Los conectores MCP solo los toca el dueño de la plataforma: se conservan.
+                mcp_servidores=anterior.mcp_servidores if anterior else [],
                 whatsapp_telefono_id="" if quitar_whatsapp else whatsapp_telefono_id,
                 whatsapp_token="" if quitar_whatsapp else (whatsapp_token.strip() or whatsapp_actual),
             )

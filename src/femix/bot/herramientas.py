@@ -192,13 +192,18 @@ def herramienta_internet(url: str) -> Herramienta:
 
 
 def herramientas_para(usuario_id: str, directorio_datos: str, almacen=None, reservas=None, reloj=None,
-                      buscador=None, inquilino_id: "str | None" = None, internet: "str | None" = None) -> list:
+                      buscador=None, inquilino_id: "str | None" = None, internet: "str | None" = None,
+                      mcp: "list | None" = None) -> list:
     """Las herramientas de este usuario en este bot: las personales siempre, las de reservas si el
     inquilino tiene la capacidad `reservas`, la de documentos si tiene `documentos` y la de internet
     si tiene `busqueda_web` (y hay un SearXNG configurado: `internet` es su URL)."""
     lista = herramientas_personales(usuario_id, directorio_datos, almacen, reloj)
     if internet:
         lista = lista + [herramienta_internet(internet)]
+    if mcp:
+        # Conectores MCP del inquilino (calendario, correo...): los pone el dueño de la plataforma.
+        from ..llm.mcp import herramientas_mcp
+        lista = lista + herramientas_mcp(mcp)
     if reservas is not None:
         lista = herramientas_reservas(usuario_id, reservas) + lista
     if buscador is not None and inquilino_id:

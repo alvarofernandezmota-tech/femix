@@ -13,7 +13,7 @@ documentos corren en el propio servidor (`madre`).
 |---|---|
 | **Conversa** | Charla, entiende preguntas de seguimiento y contesta en directo en Telegram |
 | **Sabe del negocio** | Lee PDF, Word, Excel y webs; búsqueda híbrida; preguntas frecuentes con respuesta exacta |
-| **Actúa** | Reservas, agenda, tareas, diario, recordatorios y búsqueda en internet, con herramientas que el modelo usa solo |
+| **Actúa** | Reservas, agenda, tareas, diario, recordatorios, internet y conectores MCP (calendario, correo...), con herramientas que el modelo usa solo |
 | **Aprende** | Recuerda a cada cliente; aprende datos del negocio que aprueba el dueño; apunta lo que no supo |
 | **Canales** | Telegram y WhatsApp (API oficial de Meta) |
 | **Voz** | Entiende notas de voz (Whisper local) |
@@ -50,6 +50,7 @@ Opcionales: `--profile publico` (HTTPS con Caddy), `--profile copias` (copia dia
 | [docs/aprendizaje.md](docs/aprendizaje.md) | Qué aprende el bot y cómo lo aprueba el dueño |
 | [docs/saas.md](docs/saas.md) | Planes, Stripe, alta pública, HTTPS y copias |
 | [docs/whatsapp.md](docs/whatsapp.md) | Canal de WhatsApp (API oficial de Meta) |
+| [docs/mcp.md](docs/mcp.md) | Conectores MCP: calendario, correo, Notion... |
 | [docs/operacion.md](docs/operacion.md) | Pasar a una persona, avisos, correos y datos (RGPD) |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Fases del proyecto y estado |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Cómo trabajar en el repo (ramas, CI local, reglas) |

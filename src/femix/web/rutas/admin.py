@@ -277,6 +277,26 @@ def leer_responsable(texto: str) -> int:
     return int(texto)
 
 
+def leer_mcp(texto: str, anteriores: list) -> list:
+    """Una línea por conector: `nombre | url | cabecera`. Sin cabecera se conserva la que tuviera."""
+    guardadas = {m["nombre"]: m.get("cabecera", "") for m in anteriores or []}
+    servidores = []
+    for linea in (texto or "").splitlines():
+        if not linea.strip():
+            continue
+        partes = [p.strip() for p in linea.split("|")]
+        if len(partes) < 2:
+            raise ValueError(f"Conector MCP sin url: {linea.strip()!r} (formato: nombre | url | cabecera)")
+        nombre = partes[0].lower()
+        cabecera = partes[2] if len(partes) > 2 and partes[2] else guardadas.get(nombre, "")
+        servidores.append({"nombre": nombre, "url": partes[1], "cabecera": cabecera})
+    return servidores
+
+
+def escribir_mcp(servidores) -> str:
+    return "\n".join(f"{m['nombre']} | {m['url']}" for m in servidores or [])
+
+
 def escribir_horario(franjas) -> str:
     return "\n".join(f"{f.dia} {f.desde}-{f.hasta}" for f in franjas)
 
@@ -313,6 +333,7 @@ def _contexto_detalle(inquilino_id: str, sesion: dict, documentos=(), **extra) -
         "perfil_ilegible": ilegible,
         "horario_texto": escribir_horario(perfil.horario) if perfil else "",
         "permitidos_texto": ", ".join(str(i) for i in perfil.telegram_permitidos) if perfil else "",
+        "mcp_texto": escribir_mcp(perfil.mcp_servidores) if perfil else "",
         # Lo que recibe el modelo, tal cual: el dueño ve cómo se va a presentar su bot.
         "prompt": _prompt_para_ver(perfil),
         "acceso_panel": acceso is not None,
@@ -435,6 +456,7 @@ async def guardar_perfil(
     whatsapp_telefono_id: str = Form(""),
     whatsapp_token: str = Form(""),
     quitar_whatsapp: bool = Form(False),
+    mcp: str = Form(""),
 ):
     inquilino_id = _id_valido(inquilino_id)
     contexto = _contexto_detalle(inquilino_id, sesion)  # 404 si no existe
@@ -445,7 +467,8 @@ async def guardar_perfil(
         """Token y permitidos según el formulario, a partir del perfil leído *dentro* del bloqueo."""
         token_actual = actual.telegram_token if actual else ""
         whatsapp_actual = actual.whatsapp_token if actual else ""
-        base = replace(base, whatsapp_telefono_id="" if quitar_whatsapp else whatsapp_telefono_id,
+        base = replace(base, mcp_servidores=leer_mcp(mcp, actual.mcp_servidores if actual else []),
+                       whatsapp_telefono_id="" if quitar_whatsapp else whatsapp_telefono_id,
                        whatsapp_token="" if quitar_whatsapp else (whatsapp_token.strip() or whatsapp_actual))
         if del_entorno:
             # Los manda el .env: lo que venga del formulario no cuenta.

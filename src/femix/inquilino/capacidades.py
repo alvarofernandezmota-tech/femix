@@ -22,6 +22,7 @@ CATALOGO: dict[str, Capacidad] = {
         Capacidad("documentos", "Responde con los documentos del inquilino (RAG).", True),
         Capacidad("busqueda_web", "Busca en internet (noticias, el tiempo, datos públicos). Necesita el buscador de madre (FEMIX_BUSQUEDA_URL).", True),
         Capacidad("reservas", "Reservas de clientes contra el horario del perfil (/reserva). Para empresas.", True),
+        Capacidad("conectores_mcp", "Herramientas externas por MCP (calendario, correo, Notion...) que configura el dueño.", True),
         Capacidad("tool_calling", "Entiende lo que pides con palabras y lo hace: tareas, agenda, diario, avisos, reservas y buscar en documentos.", True),
     )
 }
@@ -34,7 +35,7 @@ TOOL_CALLING = "tool_calling"
 
 # Reservas no va por defecto: es de empresas, se enciende en su perfil. Tool calling sí: sin él el
 # bot solo apunta cosas con comandos (/tarea...), y lo normal es pedírselo con palabras.
-POR_DEFECTO: tuple[str, ...] = tuple(n for n, c in CATALOGO.items() if c.disponible and n not in ("reservas", "busqueda_web"))
+POR_DEFECTO: tuple[str, ...] = tuple(n for n, c in CATALOGO.items() if c.disponible and n not in ("reservas", "busqueda_web", "conectores_mcp"))
 
 
 def validar_capacidades(nombres) -> list[str]:

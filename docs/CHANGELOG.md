@@ -540,3 +540,10 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   reparto por número al inquilino, mismo Femix que en Telegram, sin duplicados por reintentos.
   Número y token por inquilino desde los dos paneles (el token nunca se muestra).
 - Guía: `docs/whatsapp.md`.
+
+## 2026-09-26 — Conectores MCP (`feat/panel-web`)
+- **Cliente MCP** (`llm/mcp.py`): las herramientas de servidores MCP (calendario, correo, Notion…)
+  se ofrecen al modelo como las propias. Capacidad `conectores_mcp` (plan Pro); los servidores los
+  configura solo el dueño y su cabecera secreta no se enseña ni la borra el cliente.
+- Router: calendario, correo, eventos y reuniones van al camino de herramientas.
+- Guía: `docs/mcp.md`.

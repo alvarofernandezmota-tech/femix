@@ -61,6 +61,15 @@ def almacen_dominio(directorio_datos: str, inquilino_id: str):
         return AlmacenPostgres(url, inquilino_id)
     return AlmacenJson(directorio_inquilino(directorio_datos, inquilino_id))
 
+def _mcp_del_perfil(directorio_datos: str, inquilino_id: str) -> list:
+    from ..inquilino.perfil import AlmacenPerfiles
+    try:
+        perfil = AlmacenPerfiles(directorio_datos).obtener(inquilino_id)
+    except ValueError:
+        return []
+    return perfil.mcp_servidores if perfil else []
+
+
 def construir_femix(
     directorio_datos: str = DIRECTORIO_DATOS,
     inquilino_id: "str | None" = None,
@@ -105,9 +114,12 @@ def construir_femix(
         reservas = extra.get("reservas")
         from .busqueda_web import url_busqueda
         internet = url_busqueda() if "busqueda_web" in capacidades else None
+        con_mcp = "conectores_mcp" in capacidades
         extra["herramientas"] = lambda usuario_id: herramientas_para(
             usuario_id, carpeta, almacen=almacen, reservas=reservas, reloj=reloj,
             buscador=buscador, inquilino_id=inquilino_id, internet=internet,
+            # Se relee en cada mensaje: cambiar los conectores en el panel no obliga a rearrancar el bot.
+            mcp=_mcp_del_perfil(directorio_datos, inquilino_id) if con_mcp else [],
         )
     if "preguntas" not in extra:
         # Respuestas exactas del dueño (panel): se contestan al momento, sin el modelo.

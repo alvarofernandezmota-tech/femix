@@ -141,6 +141,12 @@
             <label>Token de acceso <input name="whatsapp_token" type="password" autocomplete="off" placeholder="Déjalo vacío para no cambiarlo"></label>
             <label class="casilla"><input type="checkbox" name="quitar_whatsapp" value="true"> Desconectar WhatsApp</label>
         </fieldset>
+        <fieldset>
+            <legend>Conectores MCP (capacidad conectores_mcp)</legend>
+            <p class="secundario">Herramientas externas (calendario, correo, Notion...) de un servidor MCP. Una línea por conector:
+               <code>nombre | https://url-del-servidor/mcp | Bearer token</code>. Sin token se conserva el que tuviera. Guía: docs/mcp.md.</p>
+            <textarea name="mcp" rows="3" placeholder="calendario | https://mcp.ejemplo.com/mcp | Bearer abc123">{{ mcp_texto }}</textarea>
+        </fieldset>
 
         <button type="submit">Guardar perfil</button>
     </form>

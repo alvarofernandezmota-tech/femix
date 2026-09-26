@@ -21,7 +21,7 @@ def _perfil(inquilino_id="varo", **extra):
 
 def test_por_defecto_son_las_que_existen():
     # Todas las que existen menos reservas, que es de empresas y se enciende en su perfil.
-    assert set(POR_DEFECTO) == {n for n, c in CATALOGO.items() if c.disponible} - {"reservas", "busqueda_web"}
+    assert set(POR_DEFECTO) == {n for n, c in CATALOGO.items() if c.disponible} - {"reservas", "busqueda_web", "conectores_mcp"}
     assert set(POR_DEFECTO) == {"memoria_largo_plazo", "voz", "documentos", "tool_calling"}
 
 
