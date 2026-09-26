@@ -1,0 +1,10 @@
+{# Probar el bot desde el navegador. Necesita: csrf, prefijo; opcional prueba. #}
+<section class="tarjeta">
+    <h3>Probar el bot</h3>
+    <form method="post" action="{{ prefijo }}/probar" class="formulario">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Mensaje <input name="texto" required maxlength="1000" value="{{ prueba.texto if prueba else '' }}" placeholder="¿Qué horario tenéis?"></label>
+        <button type="submit">Enviar</button>
+    </form>
+    {% if prueba %}<p><strong>Respuesta:</strong></p><pre class="respuesta">{{ prueba.respuesta }}</pre>{% endif %}
+</section>

@@ -1,0 +1,21 @@
+{# Últimos mensajes e incidencias. Necesita: actividad; opcional mostrar_inquilino. #}
+<section class="tarjeta">
+    <h3>Incidencias</h3>
+    <table class="tabla">
+        <tr><th>Fecha</th>{% if mostrar_inquilino %}<th>Inquilino</th>{% endif %}<th>Origen</th><th>Detalle</th></tr>
+        {% for i in actividad.incidencias %}
+        <tr><td>{{ i.fecha }}</td>{% if mostrar_inquilino %}<td><a href="/admin/inquilinos/{{ i.inquilino_id }}">{{ i.inquilino_id }}</a></td>{% endif %}
+            <td>{{ i.origen }}</td><td>{{ i.detalle }}</td></tr>
+        {% else %}<tr><td colspan="4">Sin incidencias.</td></tr>{% endfor %}
+    </table>
+</section>
+<section class="tarjeta">
+    <h3>Mensajes</h3>
+    <table class="tabla">
+        <tr><th>Fecha</th>{% if mostrar_inquilino %}<th>Inquilino</th>{% endif %}<th>Usuario</th><th>Camino</th><th>s</th><th>Entrada</th><th>Respuesta</th></tr>
+        {% for m in actividad.mensajes %}
+        <tr><td>{{ m.fecha }}</td>{% if mostrar_inquilino %}<td><a href="/admin/inquilinos/{{ m.inquilino_id }}">{{ m.inquilino_id }}</a></td>{% endif %}
+            <td>{{ m.usuario_id }}</td><td>{{ m.camino }}</td><td>{{ m.segundos }}</td><td>{{ m.entrada }}</td><td>{{ m.salida }}</td></tr>
+        {% else %}<tr><td colspan="7">Sin mensajes todavía.</td></tr>{% endfor %}
+    </table>
+</section>

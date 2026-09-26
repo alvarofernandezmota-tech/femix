@@ -54,3 +54,13 @@ def test_la_ruta_de_un_inquilino_invalido_nunca_se_construye():
             assert False, f"debería haber rechazado {malo!r}"
         except ValueError:
             pass
+
+
+def test_rechaza_salto_de_linea_final():
+    # `$` en una regex acepta "varo\n": sería otra carpeta que en pantalla se ve igual.
+    assert _rechaza("varo\n")
+
+
+def test_rechaza_nombres_que_chocan_con_ficheros_de_datos():
+    for nombre in ("sesiones.json", "inquilinos.JSON", ".perfiles.lock", ".oculto"):
+        assert _rechaza(nombre), nombre

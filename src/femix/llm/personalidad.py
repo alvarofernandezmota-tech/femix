@@ -8,6 +8,9 @@ class Personalidad:
     limites: list[str] = field(default_factory=list)
     formato: str = ""
     herramientas: str = ""
+    # Lo que el asistente tiene que saber siempre (de quién es, horario...). Llega hecho de fuera:
+    # este módulo no sabe nada de ningún negocio.
+    contexto: str = ""
 
 PERSONALIDAD_FEMIX = Personalidad(
     identidad="Eres Femix, un asistente personal en español.",
@@ -24,6 +27,8 @@ PERSONALIDAD_FEMIX = Personalidad(
 
 def ensamblar_prompt_sistema(personalidad: Personalidad) -> str:
     partes = [personalidad.identidad, personalidad.tono]
+    if personalidad.contexto:
+        partes.append(personalidad.contexto)
     if personalidad.reglas:
         partes.append("Reglas:\n" + "\n".join(f"- {r}" for r in personalidad.reglas))
     if personalidad.limites:

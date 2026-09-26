@@ -19,7 +19,7 @@ huggingface_hub==1.32.0
 idna==3.20
 iniconfig==2.3.0
 jiter==0.17.0
-numpy==2.5.3
+numpy>=2.0,<2.5
 onnxruntime==1.30.0
 openai==3.16.2
 packaging==26.3
@@ -40,3 +40,11 @@ truststore==0.10.4
 typing-inspection==0.4.4
 typing_extensions==4.16.0
 urllib3==2.8.0
+# Panel web
+fastapi==0.141.1
+uvicorn==0.53.0
+jinja2==3.1.6
+python-multipart==0.0.32
+itsdangerous==2.2.0
+psycopg[binary]==3.2.10
+tzdata==2025.2

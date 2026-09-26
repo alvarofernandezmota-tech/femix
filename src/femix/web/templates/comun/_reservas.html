@@ -1,0 +1,14 @@
+{# Próximas reservas con anular. Necesita: reservas (None = sin capacidad), csrf, prefijo. #}
+{% if reservas is not none %}
+<section class="tarjeta">
+    <h3>Próximas reservas</h3>
+    <table class="tabla">
+        <tr><th>Fecha</th><th>Hora</th><th>Min</th><th>Servicio</th><th>Nombre</th><th></th></tr>
+        {% for c in reservas %}
+        <tr><td>{{ c.fecha }}</td><td>{{ c.hora }}</td><td>{{ c.duracion }}</td><td>{{ c.servicio }}</td><td>{{ c.nombre }}</td>
+            <td><form method="post" action="{{ prefijo }}/reservas/{{ c.id }}/anular" onsubmit="return confirm('¿Anular esta reserva?');">
+                <input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit">Anular</button></form></td></tr>
+        {% else %}<tr><td colspan="6">Sin reservas próximas.</td></tr>{% endfor %}
+    </table>
+</section>
+{% endif %}

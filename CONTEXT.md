@@ -1,9 +1,29 @@
 # CONTEXT.md — femix
 
-Última actualización: 2026-09-20
+Última actualización: 2026-09-26
 
 ## Fase actual del roadmap
 Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En marcha.
+Fase 2: estructura de inquilino. **Hecha** (2026-09-23).
+Fase 3: el perfil personaliza el prompt del sistema. **Hecha** (2026-09-23).
+Fase 4: Postgres por inquilino. **Hecha** (2026-09-23): con `FEMIX_BASE_DATOS_URL` (opcional) van a
+Postgres tareas, diario, recordatorios, agenda personal, reservas, memoria, perfiles y accesos/
+sesiones del panel. Reservas de negocio (`/reserva`, capacidad `reservas`) con las reglas de
+`hugin/negocio/agenda.py`; agenda personal (`/agenda`) con las de `hugin/personal/citas.py`.
+Completa el 2026-09-26: el índice RAG también en Postgres (tabla `fragmentos`), Postgres dentro de
+`docker-compose.yml` (servicio `femix-db`, clave `FEMIX_DB_CLAVE`) y subida automática de los JSON la
+primera vez que el bot arranca con Postgres.
+Fase 5: tool calling. **Hecha** (2026-09-26): capacidad `tool_calling` (se enciende por inquilino
+con el panel o `python -m femix.inquilino.capacidad ID +tool_calling`). Los mensajes que operan con
+datos (reservas, citas, agenda, tareas, avisos: `mente/decidir.necesita_herramientas`) van al
+modelo con 10 herramientas reales (`bot/herramientas.py`, `llm/herramientas.py`), atadas al
+inquilino y al usuario; la charla sigue por el camino rápido. Si el modelo con herramientas falla o
+no dice nada, responde el camino de siempre.
+Fase 6: SaaS de bots. **Hecha** (2026-09-26), apagada por defecto (`FEMIX_SAAS=1`): planes,
+prueba de 14 días, límites de mensajes, Stripe, alta pública (`FEMIX_SAAS_REGISTRO=1`), panel del
+cliente (`/usuario/panel`), actividad e incidencias de todos los bots en `/admin`, HTTPS con Caddy y
+copias diarias. `tool_calling` ya viene encendida por defecto. Ver `docs/saas.md`.
+Siguiente: decidir el modelo en madre (velocidad en CPU) y abrir el SaaS a los primeros clientes.
 
 ## Qué funciona de verdad
 - Motor Ollama conectado vía `llm/router.py`.
@@ -40,8 +60,9 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
   `/hoy`, `/tarea crear|listar|completar|consultar`, `/diario`, `/recordatorio crear|listar`.
   `Femix.procesar()` los detecta vía `entender.clasificar_intencion()` y los despacha sin llamar
   al LLM ni registrar nada en `Memoria` — `Memoria` sigue reservada solo para conversación libre.
-  CLI y Telegram los heredan automáticamente (ambos ya llaman a `femix.procesar()`). 51 tests en
-  verde (`python3 -m pytest tests/ -v`).
+  CLI y Telegram los heredan (ambos llaman a `femix.procesar()`); en Telegram no llegaban hasta el
+  2026-09-23 porque el filtro `~filters.COMMAND` descartaba todo lo que empieza por `/`. 51 tests
+  en verde (`python3 -m pytest tests/ -v`).
 
 - Agentes unificados (`src/femix/agentes/`, `src/femix/mente/decidir.py`,
   `src/femix/puertos/busqueda.py`, rama `feat/agentes-unificados`): `Femix.procesar()` es el único
@@ -69,28 +90,102 @@ Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En mar
   lleva `inquilino_id` obligatorio, así que un fragmento sin dueño no se puede construir. Migración
   automática del formato plano anterior (se mueve, no se copia; nunca pisa un índice ya migrado).
   `datos/{inquilino_id}/` deja el hueco para que `Memoria` y `dominio/personal/` cuelguen de ahí en
-  la Fase 2, pero eso **no** se ha hecho todavía. 163 tests en verde
-  (`python3 -m pytest tests/ -v`).
+  la Fase 2, pero eso **no** se ha hecho todavía.
+- RAG conectado al bot (`src/femix/rag/adaptador.py`, rama `feat/rag-por-inquilino`):
+  `IndiceEmbeddingsBuscador` implementa el puerto `puertos/busqueda.Buscador` sobre
+  `IndiceEmbeddings`, y `Subagente` monta el `AgenteBusqueda` al final de su cadena cuando recibe
+  un `buscador`. Camino completo: `Femix.procesar()` → `necesita_agente()` → `Subagente` →
+  `AgenteBusqueda` → `Buscador` → `datos/{inquilino_id}/rag/indice.json`, y lo recuperado se suma
+  al contexto de `Memoria` en el prompt. Sin `buscador`, comportamiento idéntico al anterior.
+  186 tests en verde (`python3 -m pytest tests/ -v`).
+- Panel web multi-usuario (`src/femix/web/`, rama `feat/panel-web`, base
+  `integracion/femix-completa`, encargo en `docs/ENCARGO_PANEL_WEB.md`): FastAPI con
+  `rutas/auth.py` (login/logout, `AlmacenInquilinos` y `AlmacenSesiones` en JSON local,
+  contraseñas con PBKDF2-HMAC-SHA256 + sal, sesión por cookie `session_id`), `rutas/usuario.py`
+  (tareas, diario, recordatorios y subida/listado de documentos RAG del inquilino autenticado,
+  reutilizando `dominio/personal/` y `rag/indice.py` con el `inquilino_id` como `usuario_id`) y
+  `rutas/admin.py` (alta/listado de inquilinos y estadísticas globales, protegido con header
+  `X-Admin-Token`). 61 tests nuevos, sin dependencias nuevas más allá de las ya previstas
+  (`fastapi`, `jinja2`, `python-multipart`). El alta de inquilinos es manual desde el panel admin,
+  no hay auto-registro; editar/borrar inquilino y `/usuario/config` (mencionados en el encargo)
+  quedan pendientes. El panel web usa su propio `IndiceEmbeddings` (subida/listado de documentos vía
+  `/usuario/rag`) pero no pasa por `IndiceEmbeddingsBuscador`/`Femix.procesar()`; es el mismo índice
+  en disco, así que un documento subido desde el panel ya es visible para el bot en cuanto se
+  conecta un `buscador` para ese inquilino. Endurecido tras una revisión adversarial (14/14
+  hallazgos confirmados): `inquilino_id` validado igual que en RAG, login a tiempo constante
+  (sin filtrar por temporización qué inquilinos existen), cookie de sesión `secure`, lock de
+  fichero entre procesos en `AlmacenInquilinos`/`AlmacenSesiones` (evita perder altas/sesiones
+  bajo concurrencia — real con `uvicorn --workers 4`), `cuando` de recordatorios validado, y
+  errores de dominio (texto vacío, índice inválido) traducidos a 400/404 en vez de 500. 248 tests
+  en verde.
+
+- Inquilinos (Fase 2, 2026-09-23). Un inquilino es una persona o una empresa con su propio bot:
+  - `inquilino/perfil.py`: `PerfilInquilino` (tipo, descripción, horario por franjas,
+    capacidades, token y permitidos de Telegram, alta/baja) en `datos/{id}/perfil.json` (0600,
+    lleva el token). `AlmacenPerfiles` valida, escribe atómico bajo lock global e impide dos
+    inquilinos con el mismo token. La baja no borra nada.
+  - `inquilino/capacidades.py`: catálogo. Se pueden encender las que existen (memoria, voz,
+    documentos) y deciden qué piezas lleva el bot; las pendientes del ROADMAP no se pueden encender.
+  - Datos por inquilino: tareas, diario, recordatorios y memoria en `datos/{id}/` (antes sueltos y
+    compartidos en `datos/`). `inquilino/migracion.py` los mueve al arrancar, sin pisar nada.
+  - Un bot por inquilino en un solo proceso (`conectores/telegram/flota.py`): relee los perfiles
+    cada 30 s y arranca/para/rearranca solo lo que cambió; permitidos en caliente. El `.env`
+    (`TELEGRAM_BOT_TOKEN`) sigue valiendo y manda sobre el perfil de su inquilino. El LLM y Whisper
+    corren en hilos para que un bot no pare a los demás.
+  - Control de acceso: cada bot solo atiende a sus IDs de Telegram permitidos (cerrado por
+    defecto), antes que cualquier otro handler.
+  - Panel del dueño (`/admin/login`): inquilinos y estado de sus bots, alta, perfil, baja/alta,
+    documentos RAG y contraseña de su panel. Cookie propia + CSRF; el token de ejemplo no abre nada.
+- Personalidad por inquilino (Fase 3, 2026-09-23): `inquilino/personalidad.py` convierte el perfil
+  (persona/empresa, nombre, nombre del asistente, tono, descripción, horario) en el prompt del
+  sistema de su bot, con límites para no inventar precios, citas ni horarios. Único sitio de donde
+  sale personalización de negocio para el prompt (`AGENTS.md`). La capa `llm/` sigue sin saber de
+  inquilinos: los proveedores reciben el prompt hecho y el selector se lo da a los motores rápido y
+  complejo de ese bot. Cambiarlo en el panel rearranca su bot; el panel enseña el prompt exacto.
+
+- Postgres (Fase 4, 2026-09-23): puerto `puertos/almacen.py` con dos adaptadores,
+  `AlmacenJson` (los ficheros de siempre) y `AlmacenPostgres` (tabla `registros`, construido para
+  un inquilino, `inquilino_id` en todas las consultas; un test lo comprueba leyendo el SQL). La
+  fábrica elige según `FEMIX_BASE_DATOS_URL`; bot y panel crean la tabla al arrancar;
+  `python -m femix.inquilino.a_postgres` copia los JSON sin pisar nada.
 
 ## Qué está a medias o pendiente
-- `inquilino/` no existe todavía como código (solo como concepto de diseño).
-- RAG sigue **sin enchufar** a `Femix.procesar()`: falta el adaptador de `IndiceEmbeddings` al
-  puerto `puertos/busqueda.Buscador`, que es lo que lo conectaría con `AgenteBusqueda`. Los dos
-  lados ya existen y encajan por el puerto; falta escribir el adaptador y pasarle el `buscador` a
-  `Femix`.
+- El prompt no lleva la fecha ni la hora (el bot lo dice en vez de adivinar si está abierto ahora),
+  ni zona horaria del inquilino. Para eso haría falta pasar la hora en cada mensaje.
+- Probar en `madre` el paso a varios bots: al arrancar la versión nueva, los datos sueltos de
+  `datos/` pasan a `datos/varo/`, y hay que poner `FEMIX_TELEGRAM_PERMITIDOS` en el `.env` o el
+  bot no atenderá a nadie.
+- RAG **encendido** de punta a punta: `bot/fabrica.construir_femix()` enchufa
+  `IndiceEmbeddingsBuscador` y lee `FEMIX_INQUILINO_ID`; CLI (`bot/main.py`) y Telegram
+  (`conectores/telegram/bot.py`) lo usan. Verificado contra Ollama real: el modelo responde citando
+  el documento del índice del inquilino. Documentos se cargan con `python -m femix.bot.ingerir`
+  (mismo inquilino y directorio que lee el bot) o desde el panel web.
+- La relevancia del RAG es débil mientras el motor de embeddings sea `MotorEmbeddingsHash` (bolsa
+  de palabras por hashing, sin stopwords ni IDF): las palabras vacías compartidas inflan la
+  similitud. El umbral del adaptador solo descarta con fiabilidad lo que no comparte ninguna
+  palabra. Se arregla enchufando un proveedor real por el puerto `MotorEmbeddings`, sin tocar nada
+  más.
 - Migración de lógica de negocio de `hugin` (citas, Postgres, teléfono) no iniciada.
 - Los dos LLM (rápido + complejo) ya están implementados y enchufados, pero sin medir en
   producción: falta decidir qué modelo concreto va en cada carril con la CPU actual (ver la nota de
   rendimiento de `docs/ROADMAP.md`).
-- `recordatorios` no tiene scheduler ni notificación proactiva, solo cálculo de vencimiento y listado.
-- Los comandos de dominio personal usan solo `usuario_id` (sin `inquilino_id`) — no hay aislamiento
-  por inquilino todavía en `dominio/personal/`, a diferencia de `Memoria`. No es un problema hoy
-  (un único inquilino "default" en producción), pero habrá que revisarlo en la Fase 2 del roadmap
-  (estructura de inquilino).
+- `recordatorios`: avisan por Telegram al vencer (bucle de la flota, cada minuto).
+- Panel web (`src/femix/web/`): `/usuario/config` (personalización del bot por el propio
+  inquilino) depende de la Fase 3. Sesiones en JSON local con lock de fichero: valen para varios
+  workers en la misma máquina, no para varias máquinas. El panel está en pruebas: en Docker va tras
+  el perfil `web`, no arranca por defecto.
+- Docker (`Dockerfile`, `docker-compose.yml`, `docs/docker.md`): bot de Telegram en contenedor con
+  `network_mode: host` para llegar al Ollama de `madre` (que escucha solo en `127.0.0.1`), `datos/`
+  y caché de Whisper en volúmenes. **Verificado en `madre` el 2026-09-23**: imagen construida, el
+  contenedor llega a Ollama (`qwen2.5:3b` y `7b`), ingesta RAG del inquilino `varo` y el bot contesta
+  por Telegram. El servicio nativo `hugin-telegram` quedó desactivado (dos bots con el mismo token
+  daban `Conflict`). Cada mensaje deja una línea en `docker compose logs femix-bot` (camino,
+  segundos, entrada y salida recortadas).
 
 ## Próximo paso concreto
-Crear `inquilino/perfil.py` y `inquilino/capacidades.py` como estructura de datos, antes de conectar
-personalización al prompt del LLM.
+Desplegar en `madre` y comprobar la migración, el bot de `varo` (con `FEMIX_TELEGRAM_PERMITIDOS`) y
+su personalidad desde el panel. Después, Fase 4: Postgres por inquilino (citas y disponibilidad
+migradas de `hugin`), siempre con `inquilino_id` obligatorio en cada consulta.
 
 ## Repos relacionados
 - `hugin`: lógica de negocio a migrar (citas, Postgres, teléfono).

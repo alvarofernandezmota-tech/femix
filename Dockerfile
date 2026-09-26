@@ -1,24 +1,28 @@
-FROM python:3.14-slim
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app/src
 
 WORKDIR /app
 
-# Copiar requirements
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
 
-# Copiar código
 COPY src/ ./src/
 COPY conectores/ ./conectores/
 
-# Variables de entorno
-ENV FEMIX_INQUILINO_ID=default
-ENV FEMIX_USUARIO_ID=default
-ENV OPENAI_API_KEY=tu_api_key
-ENV OPENAI_BASE_URL=http://localhost:11434/v1
+# Usuario sin privilegios. /app/datos (RAG, tareas, diario, sesiones del panel) y la caché del
+# modelo de Whisper se montan como volúmenes en docker-compose.yml; se crean aquí con el dueño
+# correcto para que un volumen con nombre nuevo herede estos permisos.
+RUN useradd --create-home --uid 1000 femix \
+    && mkdir -p /app/datos /app/documentos /home/femix/.cache \
+    && chown -R femix:femix /app/datos /app/documentos /home/femix/.cache
+USER femix
 
-# Exponer puertos
-EXPOSE 8000  # Panel web
-EXPOSE 8080  # Telegram webhook (si es necesario)
+EXPOSE 8000
 
-# Comando: bot de Telegram + panel web
-CMD ["sh", "-c", "python -m conectores.telegram.bot & python -m src.femix.web.app"]
+# Por defecto, el bot de Telegram. El panel web usa la misma imagen con otro comando
+# (ver servicio femix-web en docker-compose.yml).
+CMD ["python", "-m", "conectores.telegram.bot"]

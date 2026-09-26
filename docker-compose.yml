@@ -1,53 +1,126 @@
-version: '3.8'
+# Ollama corre en el host (madre), escuchando solo en 127.0.0.1:11434.
+#
+# Por eso los servicios usan `network_mode: host`: el contenedor comparte la red del host y
+# `localhost:11434` ES el Ollama del host, sin tocar su configuración. Con la red bridge por
+# defecto, `localhost` sería el propio contenedor y `host.docker.internal` llega a la IP del
+# bridge (172.17.0.1), que un Ollama atado a 127.0.0.1 rechaza. Alternativa sin red del host
+# en docs/docker.md.
+#
+# La base de datos (Fase 4) es el servicio femix-db: Postgres 16 en un contenedor, con sus datos en
+# el volumen femix-pg. Solo escucha en 127.0.0.1 del host (puerto FEMIX_DB_PUERTO, 5433 por defecto,
+# para no chocar con un Postgres que ya haya en madre). La clave sale de FEMIX_DB_CLAVE en .env.
+#
+#   docker compose up -d --build              # base de datos + bot de Telegram
+#   docker compose --profile web up -d        # + panel web (en pruebas)
+#   docker compose run --rm femix-bot python -m femix.bot.ingerir /app/documentos   # cargar RAG
+#   docker compose --profile web --profile publico up -d   # + HTTPS público con Caddy (FEMIX_DOMINIO)
+#   docker compose --profile copias up -d                  # + copia diaria de Postgres en ./copias
+
+x-femix: &femix
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: femix:latest
+  env_file:
+    - .env
+  environment:
+    # Manda sobre lo que ponga .env: el bot y el panel usan siempre el Postgres de femix-db.
+    FEMIX_BASE_DATOS_URL: postgresql://femix:${FEMIX_DB_CLAVE:?pon FEMIX_DB_CLAVE en .env}@127.0.0.1:${FEMIX_DB_PUERTO:-5433}/femix
+  depends_on:
+    femix-db:
+      condition: service_healthy
+  network_mode: host
+  restart: unless-stopped
+  volumes:
+    - femix-datos:/app/datos
+    - ./documentos:/app/documentos:ro
 
 services:
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
+  femix-db:
+    image: postgres:16-alpine
+    container_name: femix-db
     restart: unless-stopped
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_models:/root/.ollama
     environment:
-      - OLLAMA_HOST=0.0.0.0
-    # Si tienes GPU NVIDIA:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
+      POSTGRES_USER: femix
+      POSTGRES_DB: femix
+      POSTGRES_PASSWORD: ${FEMIX_DB_CLAVE:?pon FEMIX_DB_CLAVE en .env}
+      # femix exige UTF8 (una base en SQL_ASCII rompe con la primera tilde).
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
+    ports:
+      - "127.0.0.1:${FEMIX_DB_PUERTO:-5433}:5432"
+    volumes:
+      - femix-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U femix -d femix"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
-  femix:
-    build: .
-    container_name: femix
-    restart: unless-stopped
-    depends_on:
-      - ollama
-    ports:
-      - "8000:8000"
-    environment:
-      - FEMIX_INQUILINO_ID=${FEMIX_INQUILINO_ID}
-      - FEMIX_USUARIO_ID=${FEMIX_USUARIO_ID}
-      - FEMIX_MODELO_BASE=${FEMIX_MODELO_BASE:-mistral}
-      - FEMIX_MODELO_RAPIDO=${FEMIX_MODELO_RAPIDO:-llama3.2}
-      - FEMIX_MODELO_PENSAMIENTO=${FEMIX_MODELO_PENSAMIENTO:-qwen3.5}
-      - OPENAI_API_KEY=ollama
-      - OPENAI_BASE_URL=http://ollama:11434/v1
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+  femix-bot:
+    <<: *femix
+    container_name: femix-bot
+    # Al pararlo, cada bot termina el mensaje que tenía entre manos, y una respuesta del LLM en
+    # CPU puede tardar hasta el minuto que espera a Ollama. Con los 10 s por defecto, Docker lo
+    # mataba a medias y esa respuesta se perdía (Telegram ya había dado el mensaje por entregado).
+    stop_grace_period: 90s
     volumes:
-      - femix_datos:/app/datos
-      - femix_memoria:/app/memoria
-    networks:
-      - femix_network
+      - femix-datos:/app/datos
+      - ./documentos:/app/documentos:ro
+      - femix-cache:/home/femix/.cache
+
+  femix-web:
+    <<: *femix
+    container_name: femix-web
+    profiles: ["web"]
+    command:
+      - sh
+      - -c
+      # Tras Caddy: se fía de sus cabeceras X-Forwarded-* (https, IP real) solo si vienen de 127.0.0.1.
+      - uvicorn femix.web.app:app --host "$${FEMIX_WEB_HOST:-127.0.0.1}" --port "$${FEMIX_WEB_PORT:-8000}" --proxy-headers --forwarded-allow-ips 127.0.0.1
+
+  # HTTPS público (Fase 6). Caddy saca y renueva el certificado de Let's Encrypt solo; hace falta que
+  # FEMIX_DOMINIO apunte a madre y que los puertos 80 y 443 lleguen a ella.
+  femix-https:
+    image: caddy:2-alpine
+    container_name: femix-https
+    profiles: ["publico"]
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      FEMIX_DOMINIO: ${FEMIX_DOMINIO:-}
+      FEMIX_WEB_PORT: ${FEMIX_WEB_PORT:-8000}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - femix-caddy:/data
+
+  # Copia diaria de la base de datos en ./copias (se guardan 14 días).
+  femix-copias:
+    image: postgres:16-alpine
+    container_name: femix-copias
+    profiles: ["copias"]
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      PGPASSWORD: ${FEMIX_DB_CLAVE:?pon FEMIX_DB_CLAVE en .env}
+      PGPORT: ${FEMIX_DB_PUERTO:-5433}
+    depends_on:
+      femix-db:
+        condition: service_healthy
+    volumes:
+      - ./copias:/copias
+    entrypoint:
+      - sh
+      - -c
+      - |
+        while true; do
+          f=/copias/femix-$$(date +%F).sql.gz
+          pg_dump -h 127.0.0.1 -U femix femix | gzip > "$$f.tmp" && mv "$$f.tmp" "$$f" && echo "copia: $$f"
+          find /copias -name 'femix-*.sql.gz' -mtime +14 -delete
+          sleep 86400
+        done
 
 volumes:
-  ollama_models:
-  femix_datos:
-  femix_memoria:
-
-networks:
-  femix_network:
-    driver: bridge
+  femix-datos:
+  femix-cache:
+  femix-pg:
+  femix-caddy:
