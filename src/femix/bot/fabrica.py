@@ -91,7 +91,7 @@ def construir_femix(
         # Fase 3: todos los motores de este bot (rápido y complejo) hablan con la personalidad del
         # inquilino (`inquilino/personalidad.py`). Sin prompt, el de Femix de siempre.
         extra["selector_modelos"] = SelectorDeModelos(prompt_sistema=prompt_sistema)
-    buscador = IndiceEmbeddingsBuscador(directorio_datos=directorio_datos) if DOCUMENTOS in capacidades else None
+    buscador = extra.pop("buscador", None) or (IndiceEmbeddingsBuscador(directorio_datos=directorio_datos) if DOCUMENTOS in capacidades else None)
     if RESERVAS in capacidades and "reservas" not in extra:
         extra["reservas"] = Reservas(_horario_del_perfil(directorio_datos, inquilino_id), almacen, reloj)
     if TOOL_CALLING in capacidades and "herramientas" not in extra:

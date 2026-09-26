@@ -6,7 +6,7 @@ from ..agentes.cadena import CadenaDeAgentes
 from ..agentes.peticion import Peticion
 from ..agentes.subagente import Subagente
 from ..llm.modelos import TAREA_COMPLEJA, TAREA_RAPIDA, SelectorDeModelos
-from ..mente.decidir import necesita_agente, necesita_herramientas
+from ..mente.decidir import es_consulta, necesita_agente, necesita_herramientas
 from ..mente.entender import clasificar_intencion
 from ..mente.memoria import Memoria
 from ..dominio.personal.reloj import fecha_en_palabras
@@ -91,6 +91,7 @@ class Femix:
         else:
             self._subagente = self._subagente_por_defecto(motor, buscador)
         self._preguntas = preguntas
+        self._buscador = buscador
 
     def _subagente_por_defecto(self, motor, buscador) -> Subagente:
         """Cadena mínima: los agentes que resuelven; el de búsqueda lo monta el subagente.
@@ -104,7 +105,9 @@ class Femix:
         cadena = CadenaDeAgentes([AgenteTareas(directorio_datos=self._directorio_datos, almacen=self._almacen)])
         return Subagente(cadena, motor=motor, selector=self._selector, buscador=buscador)
 
-    def procesar(self, usuario_id: str, texto: str) -> str:
+    def procesar(self, usuario_id: str, texto: str, al_avanzar=None) -> str:
+        """La respuesta al mensaje. Con `al_avanzar(texto_parcial)`, el camino rápido la va
+        entregando según el modelo escribe (Telegram la enseña crecer)."""
         inicio = time.monotonic()
         if self._control is not None and (aviso := self._control.bloqueo_total()):
             self._registrar_mensaje(usuario_id, "pausado", inicio, texto, aviso)
@@ -131,7 +134,7 @@ class Femix:
             contexto = f"{ahora}\n{contexto}" if contexto else ahora
         if contexto_frecuente:
             contexto = f"{contexto_frecuente}\n{contexto}" if contexto else contexto_frecuente
-        respuesta, camino = self._responder(usuario_id, texto, contexto, intencion)
+        respuesta, camino = self._responder(usuario_id, texto, contexto, intencion, al_avanzar)
         # Un modelo local puede devolver la cadena vacía. Telegram rechaza un mensaje vacío
         # ("Message text is empty") y el usuario se quedaría sin nada; mejor decírselo.
         if not respuesta or not respuesta.strip():
@@ -176,7 +179,13 @@ class Femix:
         if self._actividad is not None:
             self._actividad.incidencia(self._inquilino_id, origen, detalle)
 
-    def _responder(self, usuario_id: str, texto: str, contexto: str, intencion: str) -> "tuple[str, str]":
+    def _generar(self, contexto: str, texto: str, al_avanzar=None) -> str:
+        en_directo = getattr(self._motor, "generar_en_directo", None) if al_avanzar is not None else None
+        if en_directo is not None:
+            return en_directo(contexto=contexto, entrada=texto, al_avanzar=al_avanzar)
+        return self._motor.generar(contexto=contexto, entrada=texto)
+
+    def _responder(self, usuario_id: str, texto: str, contexto: str, intencion: str, al_avanzar=None) -> "tuple[str, str]":
         """Delega si toca, y si la delegación falla o no produce nada, responde como siempre.
 
         Un agente caído nunca debe dejar al usuario sin respuesta. Devuelve también el camino
@@ -186,6 +195,10 @@ class Femix:
             respuesta = self._con_herramientas(usuario_id, texto, contexto)
             if respuesta:
                 return respuesta, "herramientas"
+        if self._buscador is not None and es_consulta(texto):
+            respuesta = self._consulta(texto, contexto, al_avanzar)
+            if respuesta:
+                return respuesta, "consulta"
         if self._subagente is not None and necesita_agente(texto, contexto):
             peticion = Peticion(
                 inquilino_id=self._inquilino_id,
@@ -202,8 +215,25 @@ class Femix:
                 delegada = None
             if delegada and delegada.strip():
                 return delegada, "agente"
-            return self._motor.generar(contexto=contexto, entrada=texto), "agente→rápido"
-        return self._motor.generar(contexto=contexto, entrada=texto), "rápido"
+            return self._generar(contexto, texto, al_avanzar), "agente→rápido"
+        return self._generar(contexto, texto, al_avanzar), "rápido"
+
+    def _consulta(self, texto: str, contexto: str, al_avanzar=None) -> "str | None":
+        """Pregunta sobre el negocio: se buscan sus documentos y contesta el modelo rápido (en
+        directo). None si no hay nada en los documentos: sigue el camino de siempre."""
+        from ..agentes.agente_busqueda import consulta_de_busqueda
+        try:
+            encontrado = self._buscador.buscar(self._inquilino_id, consulta_de_busqueda(texto, contexto), 3)
+        except Exception as exc:
+            _log.warning("La búsqueda en documentos falló", exc_info=True)
+            self._incidencia("busqueda", f"{type(exc).__name__}: {exc}")
+            return None
+        if not encontrado or not encontrado.strip():
+            return None
+        documentos = ("Información encontrada en los documentos del negocio (si la usas, di de qué documento "
+                      f"sale, y no añadas datos que no estén aquí):\n{encontrado}")
+        contexto = f"{documentos}\n{contexto}" if contexto else documentos
+        return self._generar(contexto, texto, al_avanzar) or None
 
     def _con_herramientas(self, usuario_id: str, texto: str, contexto: str) -> "str | None":
         """El modelo con function calling. None si falla o no dice nada: responde el camino de siempre."""

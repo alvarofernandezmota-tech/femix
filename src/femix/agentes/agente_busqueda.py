@@ -21,7 +21,7 @@ def consulta_de_busqueda(texto: str, contexto: str) -> str:
     """
     texto = (texto or "").strip()
     anteriores = re.findall(r"^Usuario: (.+)$", contexto or "", re.M)
-    if anteriores and (len(texto.split()) <= 4 or _SEGUIMIENTO.search(texto)):
+    if anteriores and (len(texto.split()) <= 3 or _SEGUIMIENTO.search(texto)):
         return f"{anteriores[-1]} {texto}"
     return texto
 

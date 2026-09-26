@@ -19,6 +19,7 @@ from femix.inquilino.a_postgres import copiar_una_vez
 from femix.inquilino.migracion import migrar_datos_heredados
 from femix.inquilino.perfil import AlmacenPerfiles
 from .acceso import comprobar_acceso
+from .directo import RespuestaEnDirecto
 from .flota import FlotaDeBots, bot_del_entorno, sincronizar_entorno
 from .voz import manejar_nota_de_voz
 
@@ -29,8 +30,8 @@ async def manejar_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # El LLM tarda segundos: en un hilo, para no parar a los bots de otros inquilinos, que
     # comparten este bucle de eventos. Cada bot atiende sus mensajes de uno en uno, así que un
     # mismo Femix nunca corre en dos hilos a la vez.
-    respuesta = await asyncio.to_thread(femix.procesar, str(update.effective_user.id), update.message.text)
-    await update.message.reply_text(respuesta)
+    # Con "escribiendo…" y la respuesta creciendo según la escribe el modelo (`directo.py`).
+    await RespuestaEnDirecto(update).responder(femix.procesar, str(update.effective_user.id), update.message.text)
 
 async def manejar_voz(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await manejar_nota_de_voz(update, context, context.bot_data["femix"])
@@ -152,6 +153,9 @@ def main():
             # Solo sirve para que el panel lo enseñe: el bot del .env arranca sin esto.
             logging.error("No se pudo guardar el bot del .env en el perfil de %s: %s", entorno.inquilino_id, exc)
     logging.info("FEMIX: arrancando los bots de Telegram. Ctrl+C para detener.")
+    # Los modelos se cargan mientras arrancan los bots: el primer mensaje ya no espera la carga.
+    from femix.llm.precalentar import precalentar_en_segundo_plano
+    precalentar_en_segundo_plano()
     asyncio.run(_principal(FlotaDeBots(DIRECTORIO_DATOS, entorno)))
 
 if __name__ == "__main__":

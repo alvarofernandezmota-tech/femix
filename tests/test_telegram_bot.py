@@ -22,7 +22,7 @@ class FemixFalso:
     def __init__(self):
         self.llamadas = []
 
-    def procesar(self, usuario_id, texto):
+    def procesar(self, usuario_id, texto, al_avanzar=None):
         self.llamadas.append((usuario_id, texto))
         return f"eco: {texto}"
 

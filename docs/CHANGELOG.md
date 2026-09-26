@@ -499,3 +499,13 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   momento sin el modelo.
 - Paneles: subir documentos y webs desde el del cliente, sección "Lo que sabe el bot" en ambos.
 - Guía: `docs/rag.md`. 920 tests en verde con Postgres real.
+
+## 2026-09-26 — Velocidad y router (`feat/panel-web`)
+- **Router nuevo**: las consultas sobre el negocio (precios, horario, servicios, documentos) van al
+  modelo rápido con los documentos ya buscados, en vez de al modelo grande con herramientas; las
+  herramientas quedan para acciones. Camino `consulta` en la actividad.
+- **Respuesta en directo en Telegram** ("escribiendo…" y el texto creciendo): `conectores/telegram/directo.py`
+  y `ProveedorOllama.generar_en_directo`.
+- **Precalentado** de los modelos al arrancar (`llm/precalentar.py`) y **diagnóstico** de velocidad
+  (`python -m femix.llm.diagnostico`). Nueva variable `HUGIN_LLM_HILOS`.
+- Guía: `docs/velocidad.md`. 929 tests en verde con Postgres real.
