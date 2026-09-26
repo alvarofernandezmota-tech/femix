@@ -23,6 +23,8 @@ Fase 6: SaaS de bots. **Hecha** (2026-09-26), apagada por defecto (`FEMIX_SAAS=1
 prueba de 14 días, límites de mensajes, Stripe, alta pública (`FEMIX_SAAS_REGISTRO=1`), panel del
 cliente (`/usuario/panel`), actividad e incidencias de todos los bots en `/admin`, HTTPS con Caddy y
 copias diarias. `tool_calling` ya viene encendida por defecto. Ver `docs/saas.md`.
+Un solo contenedor `femix` (bots + panel, `conectores/arranque.py`) junto a `femix-db`; Ollama sigue
+en el host. Capacidad `busqueda_web` disponible con SearXNG opcional (perfil `busqueda`).
 Siguiente: decidir el modelo en madre (velocidad en CPU) y abrir el SaaS a los primeros clientes.
 
 ## Qué funciona de verdad
