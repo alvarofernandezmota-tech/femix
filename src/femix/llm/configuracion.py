@@ -1,3 +1,4 @@
+"""Configuración del proveedor LLM desde el entorno (`HUGIN_LLM_*`, `OLLAMA_URL`)."""
 import os
 from dataclasses import dataclass
 

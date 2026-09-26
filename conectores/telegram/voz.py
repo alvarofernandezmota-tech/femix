@@ -1,3 +1,4 @@
+"""Notas de voz: se descargan, se pasan a texto con Whisper local y se contestan como un mensaje."""
 import asyncio
 import os
 import tempfile

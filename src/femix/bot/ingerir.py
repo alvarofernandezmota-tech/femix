@@ -1,3 +1,4 @@
+"""Cargar documentos en el RAG de un inquilino desde la terminal: `python -m femix.bot.ingerir RUTA`."""
 import argparse
 import os
 import sys

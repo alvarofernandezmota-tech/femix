@@ -516,3 +516,11 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   preguntas sin respuesta se agrupan para que el dueño las conteste y pasen a preguntas frecuentes.
 - Sección "Lo que el bot está aprendiendo" en los dos paneles. Guía: `docs/aprendizaje.md`.
 - 942 tests en verde con Postgres real.
+
+## 2026-09-26 — Repo profesional: documentación, CI local y despliegue (`feat/panel-web`)
+- README reescrito, `docs/arquitectura.md`, índice `docs/README.md`, `CONTRIBUTING.md`; documentos
+  antiguos a `docs/historico/`. Cabecera de documentación en todos los módulos.
+- CI local `scripts/ci.sh` (ruff + tests con Postgres de usar y tirar + build de Docker) y gancho
+  `pre-push` (`scripts/instalar-hooks.sh`). El workflow de GitHub queda manual para no gastar cuota.
+- `scripts/desplegar.sh`: `madre` igual que `main` de GitHub y contenedores reconstruidos.
+- `pyproject.toml` (pytest y ruff), plantilla de PR.

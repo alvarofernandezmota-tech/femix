@@ -1,3 +1,4 @@
+"""Femix en la terminal (sin Telegram), para probar el bot a mano."""
 from ..dominio.personal.reloj import RelojZona
 from ..inquilino.migracion import migrar_datos_heredados
 from .fabrica import DIRECTORIO_DATOS, del_perfil, construir_femix, inquilino_desde_entorno, inquilino_explicito

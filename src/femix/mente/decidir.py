@@ -1,3 +1,8 @@
+"""Router por reglas: qué camino toma cada mensaje, sin gastar una llamada al modelo.
+
+Acciones → herramientas; consultas del negocio → modelo rápido con documentos; mensajes largos
+o de análisis → subagente; el resto, charla. Ver `docs/velocidad.md`.
+"""
 import re
 
 PALABRAS_AGENTE = (

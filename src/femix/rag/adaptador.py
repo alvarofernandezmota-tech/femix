@@ -1,3 +1,4 @@
+"""Adaptador del índice RAG al puerto `Buscador`: abre el índice del inquilino y devuelve contexto."""
 from ..puertos.busqueda import Buscador
 from ..puertos.embeddings import MotorEmbeddings
 from .contexto import construir_contexto

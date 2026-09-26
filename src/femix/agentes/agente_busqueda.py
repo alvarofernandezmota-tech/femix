@@ -1,3 +1,4 @@
+"""Agente de búsqueda: aporta al modelo lo que hay en los documentos del inquilino (RAG)."""
 import re
 
 from ..puertos.busqueda import Buscador

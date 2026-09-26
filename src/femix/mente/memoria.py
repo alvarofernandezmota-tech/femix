@@ -1,3 +1,4 @@
+"""Memoria de la conversación por inquilino y usuario (JSON o almacén/Postgres)."""
 import json
 import logging
 import os

@@ -1,3 +1,4 @@
+"""Proveedores LLM: Ollama (`/api/chat`, en directo y con function calling) y OpenAI."""
 import json
 import os
 import requests

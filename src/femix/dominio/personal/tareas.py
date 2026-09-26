@@ -1,3 +1,4 @@
+"""Tareas del usuario: crear, listar y completar."""
 from ...infraestructura.almacen_json import AlmacenJson
 from dataclasses import dataclass, asdict
 

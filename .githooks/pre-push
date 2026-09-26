@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Antes de subir nada a GitHub, el CI local (rápido: lint + tests sin Docker).
+# Saltarlo en una emergencia: git push --no-verify
+exec "$(git rev-parse --show-toplevel)/scripts/ci.sh" --rapido

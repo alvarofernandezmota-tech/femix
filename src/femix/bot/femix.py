@@ -1,3 +1,9 @@
+"""`Femix`: lo que hace el bot con cada mensaje.
+
+Router por reglas (sin gastar el modelo): comandos, preguntas frecuentes, acciones con
+herramientas, consultas del negocio con sus documentos, subagente o charla. Registra cada
+mensaje y los fallos para los paneles. Un fallo de una pieza nunca deja sin respuesta.
+"""
 import logging
 import time
 

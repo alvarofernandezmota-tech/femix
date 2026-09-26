@@ -1,3 +1,4 @@
+"""Panel del cliente (`/usuario`): sus datos, su bot, lo que sabe, lo que aprende, su plan y su actividad."""
 import os
 from datetime import datetime
 

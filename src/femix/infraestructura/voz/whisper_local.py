@@ -1,3 +1,4 @@
+"""Transcripción local con faster-whisper (CPU): el audio no sale de la máquina."""
 import os
 from faster_whisper import WhisperModel
 from ...puertos.voz import MotorVoz

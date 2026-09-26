@@ -1,3 +1,4 @@
+"""Crea el motor LLM del proveedor configurado."""
 from .configuracion import ConfiguracionLLM, configuracion_desde_entorno
 from .proveedores import ProveedorOllama, ProveedorOpenAI
 

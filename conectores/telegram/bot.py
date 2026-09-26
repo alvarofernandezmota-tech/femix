@@ -1,3 +1,8 @@
+"""Arranque del proceso de bots de Telegram y manejadores de mensajes, voz y errores.
+
+`python -m conectores.telegram.bot`. Migra datos antiguos, prepara Postgres, precalienta los
+modelos y arranca la flota (`flota.py`), que reconcilia los bots con los perfiles cada 30 s.
+"""
 import asyncio
 import logging
 import os

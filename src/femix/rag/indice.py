@@ -1,3 +1,4 @@
+"""Índice RAG de un inquilino: ingesta y búsqueda híbrida (embeddings + BM25)."""
 import os
 from dataclasses import asdict
 

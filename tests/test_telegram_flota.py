@@ -5,7 +5,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import asyncio
 import json
 import logging
-from dataclasses import replace
 from unittest import mock
 
 import pytest

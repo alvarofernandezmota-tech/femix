@@ -1,3 +1,4 @@
+"""Accesos y sesiones: login del cliente, sesiones con CSRF y token del dueño."""
 import hashlib
 import os
 import secrets

@@ -1,3 +1,8 @@
+"""Fábrica de `Femix`: arma el bot de un inquilino según sus capacidades.
+
+Memoria, documentos (RAG), reservas, herramientas, preguntas frecuentes, aprendizaje, actividad
+y límites del plan salen de aquí; el resto del código recibe las piezas ya montadas.
+"""
 import os
 
 from ..dominio.negocio.reservas import Reservas

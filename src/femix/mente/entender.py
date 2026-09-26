@@ -1,3 +1,4 @@
+"""Clasificador de intención por reglas: comando, pregunta, charla o desconocida."""
 INTERROGATIVAS = (
     "que", "qué", "como", "cómo", "cuando", "cuándo",
     "donde", "dónde", "quien", "quién", "cual", "cuál",

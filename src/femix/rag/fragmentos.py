@@ -1,3 +1,4 @@
+"""Trocear documentos: a tamaño fijo (heredado) y por apartados y frases (el que se usa)."""
 def fragmentar(texto: str, tamano: int = 500, solapamiento: int = 50) -> list[str]:
     if tamano <= 0:
         raise ValueError("tamano debe ser mayor que 0")

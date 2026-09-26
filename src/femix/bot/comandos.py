@@ -1,3 +1,7 @@
+"""Comandos con barra (`/hoy`, `/tarea`, `/diario`, `/recordatorio`, `/reserva`, `/agenda`...).
+
+Se resuelven sin el modelo, contra el dominio del inquilino y usuario.
+"""
 from datetime import datetime
 
 from ..dominio.personal.hoy import resumen_del_dia

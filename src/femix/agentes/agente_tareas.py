@@ -1,3 +1,4 @@
+"""Agente de tareas: crea y lista tareas dichas con fórmulas explícitas ("apúntame...", "mis tareas"), sin el modelo."""
 from ..dominio.personal.tareas import Tareas
 from .agente_base import Agente
 from .peticion import Peticion, RespuestaAgente

@@ -1,3 +1,4 @@
+"""Recordatorios del usuario: se guardan y la flota los avisa por Telegram al vencer."""
 from ...infraestructura.almacen_json import AlmacenJson
 from dataclasses import dataclass, asdict
 from datetime import datetime

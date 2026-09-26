@@ -1,3 +1,4 @@
+"""Tipos del RAG: documento, fragmento (siempre con su `inquilino_id`) y resultado de búsqueda."""
 from dataclasses import dataclass
 
 @dataclass
