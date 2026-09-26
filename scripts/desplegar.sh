@@ -30,6 +30,10 @@ if [[ "${1:-}" != "--sin-ci" ]]; then
 fi
 
 paso "Contenedores"
+if ! docker buildx version >/dev/null 2>&1; then
+  echo "Falta docker buildx (el Dockerfile usa la caché de BuildKit). En Arch: sudo pacman -S docker-buildx" >&2
+  exit 1
+fi
 docker compose up -d --build --remove-orphans
 
 paso "Comprobación"

@@ -3,6 +3,14 @@
 Bot de Telegram (con RAG y agentes) en Docker; **Ollama sigue en el host** (`madre`), fuera de
 Docker. El panel web corre en el mismo contenedor `femix` (`FEMIX_PANEL=0` para no arrancarlo).
 
+## Montajes rápidos
+
+El `Dockerfile` instala por pasos, de lo que menos cambia a lo que más: primero las librerías
+pesadas (`requirements-base.txt`: voz y modelos), después el resto (`requirements.txt`) y al final
+el código. Además guarda lo que pip descarga (caché de BuildKit), así que si cambia algo solo se
+baja lo nuevo. Necesita **BuildKit**: en Arch, `sudo pacman -S docker-buildx`
+(`scripts/desplegar.sh` avisa si falta).
+
 ## Puesta en marcha
 
 ```bash

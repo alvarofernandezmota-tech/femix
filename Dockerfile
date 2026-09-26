@@ -1,14 +1,20 @@
+# Necesita BuildKit (docker buildx): en Arch, `sudo pacman -S docker-buildx`.
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
     PYTHONPATH=/app/src
 
 WORKDIR /app
 
+# Por pasos, de lo que menos cambia a lo que más, para que Docker reutilice lo ya hecho:
+# 1) las librerías pesadas (voz, modelos); 2) el resto; 3) el código.
+# La caché de pip (--mount) guarda lo descargado entre montajes: si cambia un paso, solo se baja
+# lo nuevo. No queda dentro de la imagen.
+COPY requirements-base.txt .
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements-base.txt
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
 
 COPY src/ ./src/
 COPY conectores/ ./conectores/
