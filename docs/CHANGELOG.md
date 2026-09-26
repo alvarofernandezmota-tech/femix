@@ -560,3 +560,8 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
 - Caché de pip de BuildKit (`RUN --mount=type=cache`) entre montajes; necesita `docker-buildx`
   (`scripts/desplegar.sh` lo comprueba).
 - Desplegado en madre (contenedor `femix` + `femix-db` en marcha).
+
+## 2026-09-26 — Arranque sin choques en Postgres (`feat/panel-web`)
+- `crear_esquema` con cerrojo (`pg_advisory_xact_lock`): el bot y el panel arrancan a la vez y
+  creaban las tablas en paralelo; en una base nueva chocaban (UniqueViolation en `pg_type`) y el
+  panel se caía hasta el rearranque. Visto en madre; test que lo reproduce con 8 arranques a la vez.
