@@ -7,7 +7,7 @@
 | 3. Conexión inquilino → prompt | El perfil personaliza el PROMPT_SISTEMA dinámicamente | Hecha (2026-09-23): `inquilino/personalidad.py`, un prompt por bot, vista previa en el panel |
 | 4. Persistencia real por inquilino | Postgres + aislamiento, migrado de `hugin` | Hecha (2026-09-23; completa 2026-09-26): todo lo del inquilino y del panel en Postgres, también el índice RAG (tabla `fragmentos`); Postgres dentro de `docker-compose.yml` (`femix-db`) y subida automática de los JSON al arrancar |
 | 5. Tool calling (function calling) | El LLM llama a funciones reales (`guardar_cita`, `consultar_disponibilidad`) en vez de solo redactar texto | Hecha (2026-09-26): capacidad `tool_calling`, 10 herramientas (reservas, tareas, agenda, avisos) atadas a inquilino y usuario, Ollama y OpenAI |
-| 6. Escalado a SaaS de bots | Múltiples inquilinos reales (empresa propia, terceros) | Visión a futuro |
+| 6. Escalado a SaaS de bots | Múltiples inquilinos reales (empresa propia, terceros) | **Hecha** (2026-09-26): planes, prueba de 14 días, límites, Stripe, alta pública, panel del cliente, actividad e incidencias, HTTPS con Caddy, copias. Ver `docs/saas.md` |
 
 ## Capacidades futuras (evitar el error de Perplexica)
 - `busqueda_web`: pendiente.

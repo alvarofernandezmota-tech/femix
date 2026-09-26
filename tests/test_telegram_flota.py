@@ -44,7 +44,7 @@ def test_solo_los_activos_con_token():
     assert list(deseado) == ["varo"]
     config = deseado["varo"]
     assert (config.token, config.permitidos, config.capacidades) == (
-        TOKEN_VARO, frozenset({7}), ("memoria_largo_plazo", "voz", "documentos")
+        TOKEN_VARO, frozenset({7}), ("memoria_largo_plazo", "voz", "documentos", "tool_calling")
     )
     assert "asistente personal de varo" in config.prompt_sistema
     assert problemas == {}
@@ -73,7 +73,7 @@ def test_el_entorno_manda_en_token_y_permitidos_pero_no_en_capacidades():
 
 def test_el_entorno_sin_perfil_arranca_con_las_capacidades_por_defecto():
     deseado, _ = configuracion_deseada([], BotDelEntorno("varo", TOKEN_VARO, frozenset({7})))
-    assert deseado["varo"].capacidades == ("memoria_largo_plazo", "voz", "documentos")
+    assert deseado["varo"].capacidades == ("memoria_largo_plazo", "voz", "documentos", "tool_calling")
 
 
 def test_el_entorno_no_resucita_a_un_inquilino_de_baja():

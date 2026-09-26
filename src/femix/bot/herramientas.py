@@ -14,6 +14,7 @@ from datetime import date, datetime
 
 from ..dominio.negocio.reservas import DURACION_POR_DEFECTO, MOTIVOS
 from ..dominio.personal.agenda import AgendaPersonal
+from ..dominio.personal.diario import Diario
 from ..dominio.personal.recordatorios import Recordatorios
 from ..dominio.personal.tareas import Tareas
 from ..llm.herramientas import Herramienta, entero, objeto, texto
@@ -130,6 +131,12 @@ def herramientas_personales(usuario_id: str, directorio_datos: str, almacen=None
         return "; ".join(f"{c['id']}: {c['fecha']} {c.get('hora') or '(todo el día)'} {c['texto']}" for c in citas) \
             if citas else "No tiene citas en la agenda."
 
+    def escribir_diario(texto_entrada: str) -> str:
+        if not str(texto_entrada).strip():
+            raise ValueError("la entrada del diario no puede estar vacía")
+        return Diario(usuario_id, directorio_datos=directorio_datos, reloj=reloj, almacen=almacen).registrar(
+            str(texto_entrada).strip())
+
     def crear_recordatorio(texto_aviso: str, fecha: str, hora: str) -> str:
         cuando = datetime.fromisoformat(f"{_fecha(fecha)}T{_hora(hora)}")
         return Recordatorios(usuario_id, directorio_datos=directorio_datos, reloj=reloj, almacen=almacen).crear(
@@ -146,6 +153,9 @@ def herramientas_personales(usuario_id: str, directorio_datos: str, almacen=None
                            ["texto_cita", "fecha"]),
                     apuntar_en_agenda),
         Herramienta("ver_agenda", "Las próximas citas de la agenda personal del usuario.", objeto({}), ver_agenda),
+        Herramienta("escribir_diario", "Apunta una entrada en el diario personal del usuario (lo que cuenta de su día).",
+                    objeto({"texto_entrada": texto("Lo que quiere apuntar en el diario.")}, ["texto_entrada"]),
+                    escribir_diario),
         Herramienta("crear_recordatorio", "Programa un aviso por Telegram para el usuario en una fecha y hora.",
                     objeto({"texto_aviso": texto("De qué avisar."), "fecha": texto(FECHA), "hora": texto(HORA)},
                            ["texto_aviso", "fecha", "hora"]),
@@ -153,10 +163,28 @@ def herramientas_personales(usuario_id: str, directorio_datos: str, almacen=None
     ]
 
 
-def herramientas_para(usuario_id: str, directorio_datos: str, almacen=None, reservas=None, reloj=None) -> list:
+def herramienta_documentos(inquilino_id: str, buscador) -> Herramienta:
+    """Buscar en los documentos del inquilino (su RAG). El `inquilino_id` va cerrado aquí."""
+    def buscar_en_documentos(consulta: str) -> str:
+        if not str(consulta).strip():
+            raise ValueError("dime qué buscar")
+        encontrado = buscador.buscar(inquilino_id, str(consulta))
+        return encontrado or "No hay nada sobre eso en los documentos."
+
+    return Herramienta("buscar_en_documentos",
+                       "Busca en los documentos del negocio o del usuario (precios, horarios, normas, notas...). "
+                       "Úsala antes de responder algo que pueda estar escrito ahí.",
+                       objeto({"consulta": texto("Qué buscar, con palabras clave.")}, ["consulta"]),
+                       buscar_en_documentos)
+
+
+def herramientas_para(usuario_id: str, directorio_datos: str, almacen=None, reservas=None, reloj=None,
+                      buscador=None, inquilino_id: "str | None" = None) -> list:
     """Las herramientas de este usuario en este bot: las personales siempre, las de reservas si el
-    inquilino tiene la capacidad `reservas`."""
+    inquilino tiene la capacidad `reservas` y la de documentos si tiene `documentos`."""
     lista = herramientas_personales(usuario_id, directorio_datos, almacen, reloj)
     if reservas is not None:
         lista = herramientas_reservas(usuario_id, reservas) + lista
+    if buscador is not None and inquilino_id:
+        lista = [herramienta_documentos(inquilino_id, buscador)] + lista
     return lista

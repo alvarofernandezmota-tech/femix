@@ -276,8 +276,11 @@ def test_la_capacidad_tool_calling_ya_existe():
 
 def test_la_fabrica_da_herramientas_solo_con_la_capacidad(tmp_path):
     motor = MotorConHerramientas()
-    sin = construir_femix(directorio_datos=str(tmp_path), inquilino_id="varo", motor=motor)
+    sin = construir_femix(directorio_datos=str(tmp_path), inquilino_id="varo", motor=motor,
+                          capacidades=("memoria_largo_plazo", "documentos"))
     assert sin._herramientas is None
+    # Por defecto sí: entiende "apúntame..." sin comandos.
+    assert construir_femix(directorio_datos=str(tmp_path), inquilino_id="varo", motor=motor)._herramientas is not None
     con = construir_femix(directorio_datos=str(tmp_path), inquilino_id="varo", motor=motor,
                           capacidades=("memoria_largo_plazo", TOOL_CALLING, "reservas"), reloj=RelojFijo())
     nombres = {h.nombre for h in con._herramientas("7")}
@@ -304,3 +307,24 @@ def test_cli_de_capacidades(tmp_path, capsys):
     assert capacidad.main(["varo", "tool_calling", "--datos", datos]) == 2
     assert capacidad.main(["nadie", "--datos", datos]) == 1
     assert AlmacenPerfiles(datos).obtener("varo").capacidades == guardadas
+
+
+def test_con_documentos_puede_buscar_en_ellos(tmp_path):
+    from femix.rag.documentos import Documento
+    femix = construir_femix(directorio_datos=str(tmp_path), inquilino_id="varo", motor=MotorConHerramientas(),
+                            capacidades=("documentos", TOOL_CALLING))
+    herramientas = femix._herramientas("7")
+    assert "buscar_en_documentos" in {h.nombre for h in herramientas}
+    from femix.rag.indice import IndiceEmbeddings
+    IndiceEmbeddings("varo", str(tmp_path)).ingerir(Documento("d", "varo", "precios.md", "el corte cuesta quince euros"))
+    assert "quince euros" in ejecutar(herramientas, "buscar_en_documentos", {"consulta": "cuánto cuesta el corte"})
+    otro = construir_femix(directorio_datos=str(tmp_path), inquilino_id="otro", motor=MotorConHerramientas(),
+                           capacidades=("documentos", TOOL_CALLING))
+    assert "quince" not in ejecutar(otro._herramientas("7"), "buscar_en_documentos", {"consulta": "cuánto cuesta el corte"})
+
+
+def test_diario_por_herramienta(tmp_path):
+    h = herramientas_personales("7", str(tmp_path), reloj=RelojFijo())
+    assert ejecutar(h, "escribir_diario", {"texto_entrada": "hoy fui al gimnasio"}) == \
+        "Entrada registrada el 2026-09-22T09:00:00: hoy fui al gimnasio"
+    assert ejecutar(h, "escribir_diario", {"texto_entrada": "  "}).startswith("Error:")

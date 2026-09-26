@@ -14,6 +14,7 @@ from .rutas.admin import router as admin_router
 from .rutas.admin import router_acceso as admin_acceso_router
 from .rutas.auth import directorio_datos_web
 from .rutas.auth import router as auth_router
+from .rutas.saas import router as saas_router
 from .rutas.usuario import router as usuario_router
 
 _DIRECTORIO_BASE = os.path.dirname(__file__)
@@ -44,11 +45,7 @@ app.include_router(usuario_router)
 # Antes que el panel: /admin/login no puede exigir sesión de administrador.
 app.include_router(admin_acceso_router)
 app.include_router(admin_router)
-
-
-@app.get("/")
-async def root():
-    return {"message": "Femix Web Panel"}
+app.include_router(saas_router)
 
 
 @app.get("/health")

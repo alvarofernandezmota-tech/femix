@@ -10,6 +10,7 @@
     </form>
 </div>
 
+<p><a href="/admin/actividad">Mensajes y fallos de todos los bots →</a></p>
 <p class="aviso {{ 'aviso-ok' if proceso.vivo else 'aviso-error' }}">{{ proceso.texto }}</p>
 {% if error %}<p class="aviso aviso-error">{{ error }}</p>{% endif %}
 
@@ -20,6 +21,8 @@
                 <th>Inquilino</th>
                 <th>Tipo</th>
                 <th>Bot</th>
+                <th>Plan</th>
+                <th>Mensajes mes</th>
             </tr>
         </thead>
         <tbody>
@@ -31,9 +34,12 @@
                 </td>
                 <td>{{ inquilino.tipo or "—" }}</td>
                 <td><span class="estado estado-{{ inquilino.bot.clase }}">{{ inquilino.bot.texto }}</span></td>
+                {% set r = inquilino.resumen %}
+                <td>{% if r %}{{ r.plan.titulo }} · <span class="estado estado-{{ 'ok' if r.vigente else 'error' }}">{{ r.suscripcion.estado }}</span>{% else %}—{% endif %}</td>
+                <td>{% if r %}{{ r.usados }}{% if r.limite %} / {{ r.limite }}{% endif %}{% else %}—{% endif %}</td>
             </tr>
             {% else %}
-            <tr><td colspan="3">Sin inquilinos todavía.</td></tr>
+            <tr><td colspan="5">Sin inquilinos todavía.</td></tr>
             {% endfor %}
         </tbody>
     </table>
@@ -65,6 +71,8 @@
         <li>Tareas: {{ stats.total_tareas }}</li>
         <li>Entradas de diario: {{ stats.total_entradas_diario }}</li>
         <li>Recordatorios: {{ stats.total_recordatorios }}</li>
+        <li>Mensajes al modelo este mes: {{ stats.mensajes_mes }}</li>
+        <li>Ingresos recurrentes (MRR): {{ stats.mrr }} €/mes</li>
     </ul>
 </section>
 {% endblock %}

@@ -28,6 +28,10 @@ from femix.inquilino.personalidad import prompt_sistema_de
 from femix.llm.prompts import PROMPT_SISTEMA
 from femix.rag.rutas import validar_inquilino_id
 
+from femix.saas.planes import PLANES
+from femix.saas.suscripciones import ESTADOS, AlmacenSuscripciones
+
+from .. import panel_comun
 from ..documentos import ingerir_subida, listar_documentos
 from .auth import (
     AlmacenInquilinos,
@@ -54,6 +58,8 @@ AVISOS = {
     "alta": "Inquilino reactivado.",
     "documento": "Documento añadido a su RAG.",
     "password": "Contraseña del panel del inquilino guardada.",
+    "suscripcion": "Suscripción guardada.",
+    "anulada": "Reserva anulada.",
 }
 
 
@@ -214,6 +220,7 @@ def _inquilinos(directorio: str) -> list:
             "acceso_panel": acceso is not None,
             "del_entorno": inquilino_id == entorno,
             "bot": bot,
+            "resumen": panel_comun.resumen_suscripcion(directorio, inquilino_id) if inquilino_id not in ilegibles else None,
         })
     return filas
 
@@ -224,6 +231,10 @@ def _calcular_stats(directorio: str, filas: list) -> dict:
         "total_tareas": sum(_contar_registros(f["id"], directorio, "tareas") for f in filas),
         "total_entradas_diario": sum(_contar_registros(f["id"], directorio, "diario") for f in filas),
         "total_recordatorios": sum(_contar_registros(f["id"], directorio, "recordatorios") for f in filas),
+        # Ingresos recurrentes al mes: planes de pago al día.
+        "mrr": sum(f["resumen"]["plan"].precio_mes for f in filas
+                   if f["resumen"] and f["resumen"]["suscripcion"].estado == "activa" and f["resumen"]["plan"].de_pago),
+        "mensajes_mes": sum(f["resumen"]["usados"] for f in filas if f["resumen"]),
     }
 
 
@@ -298,6 +309,12 @@ def _contexto_detalle(inquilino_id: str, sesion: dict, documentos=(), **extra) -
         "tipos": TIPOS,
         "dias": DIAS,
         "csrf": sesion.get("csrf"),
+        "prefijo": f"/admin/inquilinos/{inquilino_id}",
+        "resumen": panel_comun.resumen_suscripcion(directorio, inquilino_id),
+        "planes_todos": list(PLANES.values()),
+        "estados": ESTADOS,
+        "actividad": panel_comun.actividad(directorio, inquilino_id, 30),
+        "reservas": panel_comun.proximas_reservas(directorio, inquilino_id) if not ilegible else None,
         **extra,
     }
 
@@ -504,18 +521,25 @@ def _crear_inquilino(inquilino_id: str, nombre: str, tipo: str, password: str) -
     return perfil
 
 
+def _fila_json(fila: dict) -> dict:
+    r = fila.get("resumen")
+    return {**{k: v for k, v in fila.items() if k != "resumen"},
+            "suscripcion": {"plan": r["plan"].nombre, "estado": r["suscripcion"].estado,
+                            "mensajes_mes": r["usados"], "limite": r["limite"]} if r else None}
+
+
 async def _json_inquilino(inquilino_id: str) -> dict:
     directorio = directorio_datos_web()
     fila = next((f for f in _inquilinos(directorio) if f["id"] == inquilino_id), None)
     if fila is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ese inquilino no existe")
     perfil, _ = _leer_perfil(inquilino_id)
-    return {**fila, "perfil": perfil.a_publico() if perfil else None, "documentos": await listar_documentos(inquilino_id, directorio)}
+    return {**_fila_json(fila), "perfil": perfil.a_publico() if perfil else None, "documentos": await listar_documentos(inquilino_id, directorio)}
 
 
 @router.get("/inquilinos")
 async def listar_inquilinos():
-    return {"inquilinos": _inquilinos(directorio_datos_web())}
+    return {"inquilinos": [_fila_json(f) for f in _inquilinos(directorio_datos_web())]}
 
 
 @router.post("/inquilinos", status_code=status.HTTP_201_CREATED)
@@ -534,3 +558,53 @@ async def crear_inquilino(peticion: CrearInquilinoPeticion):
 async def stats():
     directorio = directorio_datos_web()
     return _calcular_stats(directorio, _inquilinos(directorio))
+
+
+# --- Fase 6: suscripción, actividad, reservas y probar el bot ---------------------------------
+
+@router.get("/actividad")
+async def actividad_de_todos(request: Request, sesion: dict = Depends(requerir_admin)):
+    return _templates.TemplateResponse(request, "admin/actividad.html", {
+        "actividad": panel_comun.actividad(directorio_datos_web(), None, 100),
+        "mostrar_inquilino": True,
+    })
+
+
+@router.post("/inquilinos/{inquilino_id}/suscripcion")
+async def guardar_suscripcion(
+    request: Request, inquilino_id: str, sesion: dict = Depends(requerir_admin),
+    plan: str = Form(...), estado: str = Form(...), prueba_hasta: str = Form(""),
+    periodo_hasta: str = Form(""), email: str = Form(""),
+):
+    inquilino_id = _id_valido(inquilino_id)
+    _contexto_detalle(inquilino_id, sesion)  # 404 si no existe
+    try:
+        if plan not in PLANES:
+            raise ValueError(f"Plan desconocido: {plan}")
+        AlmacenSuscripciones(directorio_datos_web()).cambiar(
+            inquilino_id, plan=plan, estado=estado, prueba_hasta=prueba_hasta.strip() or None,
+            periodo_hasta=periodo_hasta.strip() or None, email=email.strip(),
+        )
+    except ValueError as exc:
+        return await _detalle(request, inquilino_id, sesion, codigo=status.HTTP_400_BAD_REQUEST, error=str(exc))
+    return _volver(inquilino_id, "suscripcion")
+
+
+@router.post("/inquilinos/{inquilino_id}/reservas/{id_cita}/anular")
+async def anular_reserva(inquilino_id: str, id_cita: int, sesion: dict = Depends(requerir_admin)):
+    inquilino_id = _id_valido(inquilino_id)
+    reservas = panel_comun.reservas_de(directorio_datos_web(), inquilino_id)
+    if reservas is None or reservas.anular(id_cita) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Esa reserva no existe")
+    return _volver(inquilino_id, "anulada")
+
+
+@router.post("/inquilinos/{inquilino_id}/probar")
+async def probar_bot(request: Request, inquilino_id: str, sesion: dict = Depends(requerir_admin), texto: str = Form("")):
+    inquilino_id = _id_valido(inquilino_id)
+    _contexto_detalle(inquilino_id, sesion)
+    try:
+        respuesta = await panel_comun.probar_bot(directorio_datos_web(), inquilino_id, "admin", texto)
+    except ValueError as exc:
+        return await _detalle(request, inquilino_id, sesion, codigo=status.HTTP_400_BAD_REQUEST, error=str(exc))
+    return await _detalle(request, inquilino_id, sesion, prueba={"texto": texto, "respuesta": respuesta})

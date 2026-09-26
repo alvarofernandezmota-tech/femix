@@ -19,7 +19,11 @@ datos (reservas, citas, agenda, tareas, avisos: `mente/decidir.necesita_herramie
 modelo con 10 herramientas reales (`bot/herramientas.py`, `llm/herramientas.py`), atadas al
 inquilino y al usuario; la charla sigue por el camino rápido. Si el modelo con herramientas falla o
 no dice nada, responde el camino de siempre.
-Siguiente: Fase 6 (SaaS de bots: visión a futuro) y decidir el modelo en madre (velocidad en CPU).
+Fase 6: SaaS de bots. **Hecha** (2026-09-26), apagada por defecto (`FEMIX_SAAS=1`): planes,
+prueba de 14 días, límites de mensajes, Stripe, alta pública (`FEMIX_SAAS_REGISTRO=1`), panel del
+cliente (`/usuario/panel`), actividad e incidencias de todos los bots en `/admin`, HTTPS con Caddy y
+copias diarias. `tool_calling` ya viene encendida por defecto. Ver `docs/saas.md`.
+Siguiente: decidir el modelo en madre (velocidad en CPU) y abrir el SaaS a los primeros clientes.
 
 ## Qué funciona de verdad
 - Motor Ollama conectado vía `llm/router.py`.

@@ -100,7 +100,18 @@ def construir_femix(
         reservas = extra.get("reservas")
         extra["herramientas"] = lambda usuario_id: herramientas_para(
             usuario_id, carpeta, almacen=almacen, reservas=reservas, reloj=reloj,
+            buscador=buscador, inquilino_id=inquilino_id,
         )
+    if "actividad" not in extra:
+        # Mensajes e incidencias para el panel del dueño y el del inquilino.
+        from ..infraestructura.actividad import Actividad
+        extra["actividad"] = Actividad(directorio_datos)
+    if "control" not in extra:
+        from ..saas import saas_activo
+        if saas_activo():
+            # Fase 6: suscripción vigente y límite de mensajes del plan en cada mensaje.
+            from ..saas.control import ControlDeUso
+            extra["control"] = ControlDeUso(inquilino_id, directorio_datos, reloj)
     return Femix(inquilino_id=inquilino_id, directorio_datos=carpeta, buscador=buscador, reloj=reloj, **extra)
 
 def _horario_del_perfil(directorio_datos: str, inquilino_id: str) -> list:

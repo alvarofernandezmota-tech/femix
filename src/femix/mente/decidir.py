@@ -35,7 +35,9 @@ PALABRAS_HERRAMIENTAS = (
     "disponible", "disponibles", "disponibilidad", "libre", "libres", "anula", "anular", "cancela",
     "cancelar", "agenda", "apunta", "apúntame", "apuntame", "anota", "anótame", "anotame",
     "tarea", "tareas", "pendiente", "pendientes", "recuérdame", "recuerdame", "recordatorio", "avísame", "avisame",
-    "hecha", "hecho", "completa", "completada",
+    "hecha", "hecho", "completa", "completada", "diario", "apunta en el diario",
+    "busca", "búscame", "buscame", "documento", "documentos", "según", "segun", "precio", "precios",
+    "horario", "cuánto cuesta", "cuanto cuesta", "abierto", "abrís", "abris", "mañana", "manana",
 )
 
 _PATRON_HERRAMIENTAS = re.compile(r"\b(?:%s)\b" % "|".join(PALABRAS_HERRAMIENTAS))

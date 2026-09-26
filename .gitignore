@@ -6,3 +6,4 @@ datos/
 *.local.md
 documentos/*
 !documentos/.gitkeep
+copias/

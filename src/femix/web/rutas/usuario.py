@@ -125,3 +125,159 @@ async def subir_documento_rag(
     archivo: UploadFile = File(...), inquilino: Inquilino = Depends(obtener_inquilino_actual)
 ):
     return await ingerir_subida(inquilino.id, archivo, directorio_datos_web())
+
+
+# --- Fase 6: su bot, su suscripción, su actividad (panel en HTML) ------------------------------
+
+from dataclasses import replace as _replace
+
+from fastapi import Form
+from fastapi.responses import RedirectResponse
+
+from femix.inquilino.capacidades import CATALOGO
+from femix.inquilino.perfil import AlmacenPerfiles, PerfilIlegible, PerfilInquilino, leer_ids_telegram
+from femix.saas import pagos
+from femix.saas.planes import planes_publicos, plan as _plan
+
+from .. import panel_comun
+from .auth import comprobar_csrf, csrf_de_sesion
+
+AVISOS = {
+    "bot": "Guardado. Tu bot se rearranca con los cambios en unos 30 s.",
+    "anulada": "Reserva anulada.",
+    "ok": "Pago recibido. Tu plan se activa en unos segundos.",
+    "cancelado": "Pago cancelado: no se ha cobrado nada.",
+}
+
+
+def _perfil(inquilino: Inquilino) -> "PerfilInquilino | None":
+    try:
+        return AlmacenPerfiles(directorio_datos_web()).obtener(inquilino.id)
+    except PerfilIlegible:
+        return None
+
+
+def _contexto(inquilino: Inquilino, csrf: str, request: Request, **extra) -> dict:
+    directorio = directorio_datos_web()
+    perfil = _perfil(inquilino)
+    resumen = panel_comun.resumen_suscripcion(directorio, inquilino.id)
+    return {
+        "inquilino": inquilino,
+        "perfil": perfil,
+        "csrf": csrf,
+        "prefijo": "/usuario",
+        "resumen": resumen,
+        "actividad": panel_comun.actividad(directorio, inquilino.id, 20),
+        "reservas": panel_comun.proximas_reservas(directorio, inquilino.id),
+        "catalogo": [c for c in CATALOGO.values() if c.disponible],
+        "permitidas": set(resumen["plan"].capacidades),
+        "planes": planes_publicos(),
+        "de_pago": pagos.planes_de_pago_disponibles(),
+        "aviso": AVISOS.get(request.query_params.get("hecho") or request.query_params.get("pago") or ""),
+        **extra,
+    }
+
+
+@router.get("/panel")
+async def panel(request: Request, inquilino: Inquilino = Depends(obtener_inquilino_actual), csrf: str = Depends(csrf_de_sesion)):
+    return _templates.TemplateResponse(request, "usuario/panel.html", _contexto(inquilino, csrf, request))
+
+
+@router.post("/probar", dependencies=[Depends(comprobar_csrf)])
+async def probar(request: Request, texto: str = Form(""), inquilino: Inquilino = Depends(obtener_inquilino_actual),
+                 csrf: str = Depends(csrf_de_sesion)):
+    try:
+        respuesta = await panel_comun.probar_bot(directorio_datos_web(), inquilino.id, inquilino.id, texto)
+        extra = {"prueba": {"texto": texto, "respuesta": respuesta}}
+    except ValueError as exc:
+        extra = {"error": str(exc)}
+    return _templates.TemplateResponse(request, "usuario/panel.html", _contexto(inquilino, csrf, request, **extra))
+
+
+@router.post("/reservas/{id_cita}/anular", dependencies=[Depends(comprobar_csrf)])
+async def anular_reserva(id_cita: int, inquilino: Inquilino = Depends(obtener_inquilino_actual)):
+    reservas = panel_comun.reservas_de(directorio_datos_web(), inquilino.id)
+    if reservas is None or reservas.anular(id_cita) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Esa reserva no existe")
+    return RedirectResponse(url="/usuario/panel?hecho=anulada", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/bot", dependencies=[Depends(comprobar_csrf)])
+async def guardar_bot(
+    request: Request,
+    inquilino: Inquilino = Depends(obtener_inquilino_actual),
+    csrf: str = Depends(csrf_de_sesion),
+    nombre: str = Form(...),
+    tipo: str = Form("empresa"),
+    descripcion: str = Form(""),
+    horario: str = Form(""),
+    nombre_asistente: str = Form(""),
+    tono: str = Form(""),
+    capacidades: list[str] = Form(default=[]),
+    telegram_token: str = Form(""),
+    quitar_token: bool = Form(False),
+    permitidos: str = Form(""),
+    abierto: bool = Form(False),
+):
+    from .admin import leer_horario
+    directorio = directorio_datos_web()
+    almacen = AlmacenPerfiles(directorio)
+    # Solo las que permite su plan; las que tenga encendidas fuera del plan se conservan (vuelven
+    # si sube de plan), pero no se pueden encender desde aquí.
+    permitidas = set(panel_comun.resumen_suscripcion(directorio, inquilino.id)["plan"].capacidades)
+    try:
+        actual = almacen.obtener(inquilino.id)
+        fuera_del_plan = [c for c in (actual.capacidades if actual else []) if c not in permitidas]
+        base = PerfilInquilino(
+            inquilino_id=inquilino.id, nombre=nombre, tipo=tipo, descripcion=descripcion,
+            horario=leer_horario(horario), capacidades=[c for c in capacidades if c in permitidas] + fuera_del_plan,
+            nombre_asistente=nombre_asistente, tono=tono, telegram_abierto=abierto,
+            telegram_permitidos=leer_ids_telegram(permitidos),
+        )
+
+        def con_token(anterior: "PerfilInquilino | None") -> PerfilInquilino:
+            token_actual = anterior.telegram_token if anterior else ""
+            return _replace(base, telegram_token="" if quitar_token else (telegram_token.strip() or token_actual))
+
+        if actual is None:
+            almacen.crear(con_token(None))
+        else:
+            almacen.modificar(inquilino.id, con_token)
+    except (ValueError, KeyError) as exc:
+        return _templates.TemplateResponse(request, "usuario/panel.html",
+                                           _contexto(inquilino, csrf, request, error=str(exc)), status_code=400)
+    return RedirectResponse(url="/usuario/panel?hecho=bot", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/suscripcion/pagar", dependencies=[Depends(comprobar_csrf)])
+async def pagar(request: Request, plan: str = Form(...), inquilino: Inquilino = Depends(obtener_inquilino_actual),
+                csrf: str = Depends(csrf_de_sesion)):
+    directorio = directorio_datos_web()
+    email = panel_comun.resumen_suscripcion(directorio, inquilino.id)["suscripcion"].email
+    try:
+        url = pagos.crear_checkout(inquilino.id, plan, email, pagos.url_publica(str(request.base_url)))
+    except pagos.ErrorDePago as exc:
+        return _templates.TemplateResponse(request, "usuario/panel.html",
+                                           _contexto(inquilino, csrf, request, error=str(exc)), status_code=400)
+    return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.post("/suscripcion/portal", dependencies=[Depends(comprobar_csrf)])
+async def portal(request: Request, inquilino: Inquilino = Depends(obtener_inquilino_actual), csrf: str = Depends(csrf_de_sesion)):
+    cliente = panel_comun.resumen_suscripcion(directorio_datos_web(), inquilino.id)["suscripcion"].stripe_cliente
+    try:
+        url = pagos.crear_portal(cliente, pagos.url_publica(str(request.base_url)))
+    except pagos.ErrorDePago as exc:
+        return _templates.TemplateResponse(request, "usuario/panel.html",
+                                           _contexto(inquilino, csrf, request, error=str(exc)), status_code=400)
+    return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/suscripcion")
+async def volver_de_stripe(request: Request):
+    pago = request.query_params.get("pago", "")
+    return RedirectResponse(url=f"/usuario/panel?pago={pago}" if pago in AVISOS else "/usuario/panel",
+                            status_code=status.HTTP_303_SEE_OTHER)
+
+
+_ = _plan  # (se usa en las plantillas vía resumen)

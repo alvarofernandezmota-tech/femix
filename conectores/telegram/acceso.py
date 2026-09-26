@@ -35,7 +35,7 @@ async def comprobar_acceso(update: object, context: ContextTypes.DEFAULT_TYPE):
     gastar Whisper ni el LLM.
     """
     usuario = update.effective_user if isinstance(update, Update) else None
-    if usuario is not None and usuario.id in context.bot_data.get("permitidos", frozenset()):
+    if usuario is not None and (context.bot_data.get("abierto") or usuario.id in context.bot_data.get("permitidos", frozenset())):
         return
     try:
         if usuario is not None:

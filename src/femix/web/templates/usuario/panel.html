@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block titulo %}Mi bot — {{ inquilino.nombre }}{% endblock %}
+
+{% block content %}
+<p><a href="/usuario/dashboard">← Inicio</a></p>
+<h2>Mi bot</h2>
+{% if aviso %}<p class="aviso aviso-ok">{{ aviso }}</p>{% endif %}
+{% if error %}<p class="aviso aviso-error">{{ error }}</p>{% endif %}
+
+{% if resumen.saas %}{% include "comun/_suscripcion.html" %}{% endif %}
+{% include "comun/_probar.html" %}
+
+<section class="tarjeta">
+    <h3>Configuración</h3>
+    <form method="post" action="/usuario/bot" class="formulario">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Nombre del negocio <input name="nombre" required maxlength="100" value="{{ perfil.nombre if perfil else inquilino.nombre }}"></label>
+        <label>Tipo
+            <select name="tipo">
+                {% for t in ["empresa", "persona"] %}<option value="{{ t }}" {% if perfil and perfil.tipo == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+            </select>
+        </label>
+        <label>Descripción <small>(servicios, precios, dirección: tu bot no inventará lo que no esté aquí)</small>
+            <textarea name="descripcion" rows="4" maxlength="2000">{{ perfil.descripcion if perfil else "" }}</textarea>
+        </label>
+        <label>Horario <small>(una franja por línea: <code>lunes 09:00-14:00</code>)</small>
+            <textarea name="horario" rows="4">{% if perfil %}{% for f in perfil.horario %}{{ f.dia }} {{ f.desde }}-{{ f.hasta }}
+{% endfor %}{% endif %}</textarea>
+        </label>
+        <label>Nombre del asistente <input name="nombre_asistente" maxlength="40" value="{{ perfil.nombre_asistente if perfil else '' }}" placeholder="Femix"></label>
+        <label>Tono <input name="tono" maxlength="300" value="{{ perfil.tono if perfil else '' }}" placeholder="Cercano y directo."></label>
+        <fieldset>
+            <legend>Herramientas del bot</legend>
+            {% for c in catalogo %}
+            {% set dentro = (not resumen.saas) or c.nombre in permitidas %}
+            <label class="casilla {{ '' if dentro else 'secundario' }}">
+                <input type="checkbox" name="capacidades" value="{{ c.nombre }}" {% if not dentro %}disabled{% endif %}
+                       {% if dentro and perfil and c.nombre in perfil.capacidades %}checked{% endif %}>
+                <strong>{{ c.nombre }}</strong> — {{ c.descripcion }}{% if not dentro %} (no incluida en tu plan){% endif %}
+            </label>
+            {% endfor %}
+        </fieldset>
+        <fieldset>
+            <legend>Telegram</legend>
+            <p class="secundario">{% if perfil and perfil.telegram_token %}Token guardado (no se muestra).{% else %}Sin token: crea tu bot con @BotFather y pega aquí su token.{% endif %}</p>
+            <label>Token del bot <input name="telegram_token" type="password" autocomplete="off" placeholder="Déjalo vacío para no cambiarlo"></label>
+            <label class="casilla"><input type="checkbox" name="quitar_token" value="true"> Quitar el token (para el bot)</label>
+            <label>IDs de Telegram permitidos <small>(separados por comas)</small>
+                <input name="permitidos" value="{{ perfil.telegram_permitidos|join(', ') if perfil else '' }}"></label>
+            <label class="casilla"><input type="checkbox" name="abierto" value="true" {% if perfil and perfil.telegram_abierto %}checked{% endif %}> Abierto a cualquiera (clientes de tu negocio)</label>
+        </fieldset>
+        <button type="submit">Guardar</button>
+    </form>
+</section>
+
+{% include "comun/_reservas.html" %}
+{% include "comun/_actividad.html" %}
+{% endblock %}

@@ -46,6 +46,8 @@ class ConfigBot:
     capacidades: tuple = POR_DEFECTO
     # Fase 3: la personalidad del inquilino hecha prompt. None = el de Femix de siempre.
     prompt_sistema: "str | None" = field(default=None, repr=False)
+    # Fase 6: cualquiera puede escribirle (bot de un negocio).
+    abierto: bool = False
 
 
 @dataclass(frozen=True)
@@ -86,12 +88,14 @@ def sincronizar_entorno(almacen: AlmacenPerfiles, entorno: BotDelEntorno) -> Non
     )
 
 
-def configuracion_deseada(perfiles, entorno: "BotDelEntorno | None", ilegibles=None) -> "tuple[dict, dict]":
+def configuracion_deseada(perfiles, entorno: "BotDelEntorno | None", ilegibles=None, limitar=None) -> "tuple[dict, dict]":
     """Qué bots tienen que estar en marcha, y por qué no está alguno que podría estarlo.
 
     `ilegibles`: `{inquilino_id: motivo}` de los que tienen `perfil.json` pero no se puede leer.
+    `limitar(inquilino_id, capacidades) -> capacidades`: en modo SaaS, las que permite su plan.
     """
     ilegibles = ilegibles or {}
+    limitar = limitar or (lambda _inquilino_id, capacidades: tuple(capacidades))
     deseado, problemas = {}, {i: f"perfil ilegible: {motivo}" for i, motivo in ilegibles.items()}
     validos = {}
     crudos = {p.inquilino_id: p for p in perfiles}
@@ -124,7 +128,9 @@ def configuracion_deseada(perfiles, entorno: "BotDelEntorno | None", ilegibles=N
                         f"con {', '.join(capacidades) or 'ninguna capacidad'})"
                     )
             deseado[entorno.inquilino_id] = ConfigBot(
-                entorno.inquilino_id, entorno.token, frozenset(entorno.permitidos), capacidades, prompt_sistema,
+                entorno.inquilino_id, entorno.token, frozenset(entorno.permitidos),
+                limitar(entorno.inquilino_id, capacidades), prompt_sistema,
+                abierto=bool(perfil is not None and perfil.telegram_abierto),
             )
 
     duenos = {c.token: c.inquilino_id for c in deseado.values()}
@@ -139,8 +145,8 @@ def configuracion_deseada(perfiles, entorno: "BotDelEntorno | None", ilegibles=N
             continue
         duenos[perfil.telegram_token] = inquilino_id
         deseado[inquilino_id] = ConfigBot(
-            inquilino_id, perfil.telegram_token, frozenset(perfil.telegram_permitidos), tuple(perfil.capacidades),
-            prompt_sistema_de(perfil),
+            inquilino_id, perfil.telegram_token, frozenset(perfil.telegram_permitidos),
+            limitar(inquilino_id, perfil.capacidades), prompt_sistema_de(perfil), abierto=perfil.telegram_abierto,
         )
     return deseado, problemas
 
@@ -176,7 +182,7 @@ def avisos_pendientes(directorio_datos: str, inquilino_id: str, permitidos, relo
     almacen = almacen_dominio(directorio_datos, inquilino_id)
     pendientes = []
     for usuario in almacen.usuarios("recordatorios"):
-        if not (usuario.isascii() and usuario.isdigit()) or int(usuario) not in permitidos:
+        if not (usuario.isascii() and usuario.isdigit()) or (permitidos is not None and int(usuario) not in permitidos):
             continue
         recordatorios = Recordatorios(usuario, reloj=reloj, almacen=almacen)
         pendientes += [(usuario, recordatorios, i, r) for i, r in recordatorios.por_avisar()]
@@ -185,7 +191,8 @@ def avisos_pendientes(directorio_datos: str, inquilino_id: str, permitidos, relo
 
 async def avisar_recordatorios(app, directorio_datos: str, inquilino_id: str, reloj) -> int:
     """Una pasada: manda los recordatorios vencidos y los marca. Devuelve cuántos mandó."""
-    permitidos = app.bot_data.get("permitidos", frozenset())
+    # Bot abierto (de un negocio): se avisa a cualquier cliente que tenga recordatorios.
+    permitidos = None if app.bot_data.get("abierto") else app.bot_data.get("permitidos", frozenset())
     pendientes = await asyncio.to_thread(avisos_pendientes, directorio_datos, inquilino_id, permitidos, reloj)
     enviados = 0
     for usuario, recordatorios, posicion, recordatorio in pendientes:
@@ -303,7 +310,7 @@ class FlotaDeBots:
 
     async def reconciliar(self) -> None:
         perfiles, ilegibles = self._almacen.listar_con_errores()
-        deseado, problemas = configuracion_deseada(perfiles, self._entorno, ilegibles)
+        deseado, problemas = configuracion_deseada(perfiles, self._entorno, ilegibles, limitar=self._limitador())
         self._avisar_problemas(problemas)
 
         por_parar = {}
@@ -319,10 +326,12 @@ class FlotaDeBots:
             elif not bot.app.updater.running or causa is not None:
                 detalle = _sin_token(f"{type(causa).__name__}: {causa}", bot.config.token) if causa else "parado"
                 por_parar[inquilino_id] = f"dejó de recibir mensajes ({detalle}); se rearranca"
-            elif nuevo.permitidos != bot.config.permitidos:
+            elif (nuevo.permitidos, nuevo.abierto) != (bot.config.permitidos, bot.config.abierto):
                 bot.app.bot_data["permitidos"] = nuevo.permitidos
+                bot.app.bot_data["abierto"] = nuevo.abierto
                 bot.config = nuevo
-                _log.info("Bot de %s: permitidos actualizados (%d)", inquilino_id, len(nuevo.permitidos))
+                _log.info("Bot de %s: acceso actualizado (%s)", inquilino_id,
+                          "abierto a todos" if nuevo.abierto else f"{len(nuevo.permitidos)} permitidos")
         # Todos a la vez: parar uno que está terminando un mensaje no retrasa a los demás.
         await self._parar_varios(por_parar)
 
@@ -338,6 +347,27 @@ class FlotaDeBots:
                 await self._arrancar(config)
 
         self._escribir_estado()
+
+    def _anotar(self, inquilino_id: str, origen: str, detalle: str) -> None:
+        from femix.infraestructura.actividad import Actividad
+        Actividad(self._directorio).incidencia(inquilino_id, origen, detalle)
+
+    def _limitador(self):
+        """En modo SaaS, las capacidades de cada bot se recortan a las de su plan."""
+        from femix.saas import saas_activo
+        if not saas_activo():
+            return None
+        from femix.saas.planes import capacidades_permitidas
+        from femix.saas.suscripciones import AlmacenSuscripciones
+        suscripciones = AlmacenSuscripciones(self._directorio)
+
+        def limitar(inquilino_id, capacidades):
+            try:
+                return capacidades_permitidas(suscripciones.obtener(inquilino_id).plan, capacidades)
+            except Exception:
+                _log.warning("No se pudo leer la suscripción de %s; se arranca con lo mínimo", inquilino_id, exc_info=True)
+                return capacidades_permitidas("basico", capacidades)
+        return limitar
 
     async def detener_todo(self) -> None:
         await self._parar_varios({inquilino_id: "se apaga el proceso" for inquilino_id in self._bots})
@@ -369,6 +399,7 @@ class FlotaDeBots:
             )
             app = self._construir_app(config.token, femix, config.permitidos, voz=VOZ in config.capacidades)
             app.bot_data["inquilino_id"] = inquilino_id
+            app.bot_data["abierto"] = config.abierto
             await app.initialize()
             # Como `run_polling`: los fallos al pedir mensajes a Telegram van al error handler del
             # bot (una línea por corte de red) en vez de a una traza entera en cada reintento.
@@ -377,6 +408,7 @@ class FlotaDeBots:
         except InvalidToken:
             await self._cerrar_sin_ruido(app)
             self._rechazados[inquilino_id] = (config, "Telegram rechaza el token")
+            self._anotar(inquilino_id, "arranque", "Telegram rechaza el token del bot")
             self._errores.pop(inquilino_id, None)
             _log.error("Bot de %s: Telegram rechaza el token. No se reintenta hasta que cambie.", inquilino_id)
             return
@@ -385,6 +417,7 @@ class FlotaDeBots:
             detalle = _sin_token(f"{type(exc).__name__}: {exc}", config.token)
             if self._errores.get(inquilino_id) != detalle:
                 _log.error("Bot de %s: no arranca (%s). Se reintenta en la siguiente vuelta.", inquilino_id, detalle)
+                self._anotar(inquilino_id, "arranque", detalle)
             self._errores[inquilino_id] = detalle
             return
         self._errores.pop(inquilino_id, None)
@@ -398,7 +431,7 @@ class FlotaDeBots:
             "Bot de %s en marcha: @%s (%s; %d permitidos)", inquilino_id, usuario,
             "texto + voz" if VOZ in config.capacidades else "solo texto", len(config.permitidos),
         )
-        if not config.permitidos:
+        if not config.permitidos and not config.abierto:
             _log.warning(
                 "Bot de %s sin permitidos: no atenderá a nadie. Escríbele y mira aquí qué ID se deniega.",
                 inquilino_id,

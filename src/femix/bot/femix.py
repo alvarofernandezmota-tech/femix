@@ -25,6 +25,15 @@ AVISO_HERRAMIENTAS = (
 
 LONGITUD_LOG = 120
 
+# Lo que devuelve el proveedor cuando el modelo no ha podido responder (`llm/proveedores.py`): al
+# usuario le llega como texto, pero para el panel es una incidencia.
+FALLOS_DEL_MODELO = (
+    "No puedo conectar con Ollama ahora mismo. ¿Está encendido?",
+    "El modelo está tardando demasiado. Prueba con algo más corto.",
+    RESPUESTA_VACIA,
+)
+PREFIJO_FALLO = "Algo falló generando la respuesta"
+
 _log = logging.getLogger(__name__)
 
 def _recortar(texto: "str | None") -> str:
@@ -51,6 +60,8 @@ class Femix:
         reservas=None,
         reloj=None,
         herramientas=None,
+        control=None,
+        actividad=None,
     ):
         self._selector = selector_modelos or SelectorDeModelos()
         self._motor = motor or self._selector.motor(tipo_tarea=TAREA_RAPIDA)
@@ -58,6 +69,10 @@ class Femix:
         # Con ellas, los mensajes que operan con datos van por function calling (modelo complejo).
         self._herramientas = herramientas
         self._motor_herramientas = motor
+        # Fase 6 (SaaS): suscripción vigente y mensajes del plan (`saas/control.py`). None = sin límites.
+        self._control = control
+        # Mensajes e incidencias para el panel (`infraestructura/actividad.py`). None = no se guardan.
+        self._actividad = actividad
         self._memoria = memoria or Memoria()
         self._inquilino_id = inquilino_id
         self._directorio_datos = directorio_datos
@@ -89,6 +104,9 @@ class Femix:
 
     def procesar(self, usuario_id: str, texto: str) -> str:
         inicio = time.monotonic()
+        if self._control is not None and (aviso := self._control.bloqueo_total()):
+            self._registrar_mensaje(usuario_id, "pausado", inicio, texto, aviso)
+            return aviso
         intencion = clasificar_intencion(texto)
         if intencion == "comando":
             respuesta = ejecutar_comando(
@@ -97,6 +115,9 @@ class Femix:
             )
             self._registrar_mensaje(usuario_id, "comando", inicio, texto, respuesta)
             return respuesta
+        if self._control is not None and (aviso := self._control.gastar_mensaje()):
+            self._registrar_mensaje(usuario_id, "límite", inicio, texto, aviso)
+            return aviso
         contexto = self._memoria.contexto(self._inquilino_id, usuario_id)
         if self._reloj is not None:
             ahora = f"Ahora es {fecha_en_palabras(self._reloj.ahora())} (hora local)."
@@ -112,11 +133,20 @@ class Femix:
         return respuesta
 
     def _registrar_mensaje(self, usuario_id: str, camino: str, inicio: float, texto: str, respuesta: str):
+        segundos = time.monotonic() - inicio
         _log.info(
             "inquilino=%s usuario=%s camino=%s %.1fs | entrada: %s | salida: %s",
-            self._inquilino_id, usuario_id, camino, time.monotonic() - inicio,
+            self._inquilino_id, usuario_id, camino, segundos,
             _recortar(texto), _recortar(respuesta),
         )
+        if self._actividad is not None:
+            self._actividad.mensaje(self._inquilino_id, usuario_id, camino, segundos, texto, respuesta)
+            if respuesta in FALLOS_DEL_MODELO or (respuesta or "").startswith(PREFIJO_FALLO):
+                self._actividad.incidencia(self._inquilino_id, "modelo", f"{camino}: {respuesta}")
+
+    def _incidencia(self, origen: str, detalle: str) -> None:
+        if self._actividad is not None:
+            self._actividad.incidencia(self._inquilino_id, origen, detalle)
 
     def _responder(self, usuario_id: str, texto: str, contexto: str, intencion: str) -> "tuple[str, str]":
         """Delega si toca, y si la delegación falla o no produce nada, responde como siempre.
@@ -138,8 +168,9 @@ class Femix:
             )
             try:
                 delegada = self._subagente.ejecutar(peticion)
-            except Exception:
+            except Exception as exc:
                 _log.warning("El subagente falló; responde el modelo rápido", exc_info=True)
+                self._incidencia("agente", f"{type(exc).__name__}: {exc}")
                 delegada = None
             if delegada and delegada.strip():
                 return delegada, "agente"
@@ -155,7 +186,8 @@ class Femix:
         contexto = f"{AVISO_HERRAMIENTAS}\n{contexto}" if contexto else AVISO_HERRAMIENTAS
         try:
             respuesta = conversar(contexto=contexto, entrada=texto, herramientas=self._herramientas(usuario_id))
-        except Exception:
+        except Exception as exc:
             _log.warning("El modelo con herramientas falló; responde el camino de siempre", exc_info=True)
+            self._incidencia("herramientas", f"{type(exc).__name__}: {exc}")
             return None
         return respuesta if respuesta and respuesta.strip() else None

@@ -460,3 +460,20 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   `python -m femix.inquilino.capacidad ID +tool_calling -voz`.
 - Probado en Docker de verdad: `femix-db` + bot + panel, reserva por tool calling guardada en
   Postgres, ingesta RAG en `fragmentos`. 872 tests en verde con Postgres real.
+
+## 2026-09-26 — Fase 6: SaaS de bots (`feat/panel-web`)
+- **Planes, suscripciones y consumo** (`src/femix/saas/`): interno, prueba (14 días, 300 mensajes),
+  básico y pro; tablas `suscripciones` y `consumo` (o JSON). `ControlDeUso` pausa el bot sin
+  suscripción vigente y corta al pasar el cupo del mes. Todo detrás de `FEMIX_SAAS=1`.
+- **Stripe** (`saas/pagos.py`): Checkout, portal de facturación y webhook con firma verificada.
+- **Actividad** (`infraestructura/actividad.py`): tablas `mensajes` e `incidencias`; los fallos del
+  modelo, de herramientas, de Telegram y de arranque de bots se apuntan solos.
+- **Tool calling por defecto** y nuevas herramientas `escribir_diario` y `buscar_en_documentos`: el
+  bot usa sus herramientas cuando detecta la intención, no solo con comandos.
+- **Bots abiertos** (`telegram_abierto` en el perfil) para clientes de un negocio.
+- **Web**: panel del cliente `/usuario/panel` (su bot, plan, pagos, probar, reservas, actividad);
+  portada, `/registro`, `/privacidad` y `/stripe/webhook`; en `/admin`, plan y consumo por bot, MRR,
+  `/admin/actividad` y en cada ficha suscripción, probar, reservas y actividad. CSRF en la sesión.
+- **Infra**: Caddy con HTTPS automático (perfil `publico`, `FEMIX_DOMINIO`), copias diarias de
+  Postgres (perfil `copias`), uvicorn con `--proxy-headers`. Guía en `docs/saas.md`.
+- 894 tests en verde con Postgres real.

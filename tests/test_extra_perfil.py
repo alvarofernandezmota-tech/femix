@@ -68,9 +68,8 @@ def _comprobar_invariantes(perfil: PerfilInquilino):
 def test_catalogo_coherente_con_sus_constantes():
     assert all(nombre == capacidad.nombre for nombre, capacidad in CATALOGO.items())
     # POR_DEFECTO va en el orden del catálogo y las constantes apuntan a capacidades disponibles.
-    # reservas y tool_calling se encienden a mano (empresa / más lento en CPU).
-    assert list(POR_DEFECTO) == [n for n in CATALOGO if CATALOGO[n].disponible and n not in ("reservas", "tool_calling")]
-    assert {MEMORIA, VOZ, DOCUMENTOS} == set(POR_DEFECTO)
+    assert list(POR_DEFECTO) == [n for n in CATALOGO if CATALOGO[n].disponible and n != "reservas"]
+    assert {MEMORIA, VOZ, DOCUMENTOS, "tool_calling"} == set(POR_DEFECTO)
     with pytest.raises(FrozenInstanceError):
         CATALOGO[VOZ].disponible = False
 
@@ -114,7 +113,7 @@ def test_la_lista_de_capacidades_por_defecto_no_se_comparte_entre_perfiles():
     uno, otro = _perfil(), _perfil("acme")
     uno.capacidades.remove(VOZ)
     assert otro.capacidades == list(POR_DEFECTO)
-    assert POR_DEFECTO == (MEMORIA, VOZ, DOCUMENTOS)
+    assert POR_DEFECTO == (MEMORIA, VOZ, DOCUMENTOS, "tool_calling")
 
 
 # --- validado(): tipos -------------------------------------------------------------------

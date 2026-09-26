@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block titulo %}Femix — tu asistente en Telegram{% endblock %}
+{% block content %}
+<section class="tarjeta">
+    <h2>Un asistente para tu negocio en Telegram</h2>
+    <p>Responde a tus clientes a cualquier hora con tu horario, tus precios y tus documentos. Coge citas,
+       apunta tareas y recordatorios, y no inventa lo que no sabe.</p>
+    <p>{% if registro %}<a class="boton" href="/registro">Pruébalo {{ dias_prueba }} días gratis</a> · {% endif %}<a href="/login">Ya tengo cuenta</a></p>
+</section>
+<section class="tarjeta">
+    <h3>Planes</h3>
+    <table class="tabla">
+        <tr><th>Plan</th><th>Precio</th><th>Mensajes al mes</th><th>Incluye</th></tr>
+        {% for p in planes %}
+        <tr><td>{{ p.titulo }}</td><td>{{ p.precio_mes ~ ' €/mes' if p.precio_mes else 'Gratis' }}</td>
+            <td>{{ p.mensajes_mes or 'Sin límite' }}</td><td>{{ p.capacidades|join(', ') }}</td></tr>
+        {% endfor %}
+    </table>
+</section>
+<p class="secundario"><a href="/privacidad">Privacidad</a></p>
+{% endblock %}

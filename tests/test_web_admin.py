@@ -99,6 +99,8 @@ def test_stats_vacio(tmp_path, monkeypatch):
         "total_tareas": 0,
         "total_entradas_diario": 0,
         "total_recordatorios": 0,
+        "mrr": 0,
+        "mensajes_mes": 0,
     }
 
 
@@ -132,6 +134,8 @@ def test_stats_agrega_datos_de_todos_los_inquilinos(tmp_path, monkeypatch):
         "total_tareas": 3,
         "total_entradas_diario": 1,
         "total_recordatorios": 0,
+        "mrr": 0,
+        "mensajes_mes": 0,
     }
 
 

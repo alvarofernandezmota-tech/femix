@@ -249,16 +249,38 @@ async def procesar_login(inquilino_id: str = Form(...), password: str = Form(...
     inquilino = AlmacenInquilinos().verificar_credenciales(inquilino_id, password)
     if inquilino is None or inquilino_de_baja(inquilino.id):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas")
-    session_id = AlmacenSesiones().crear(inquilino.id, huella=huella_password(inquilino.password_hash))
+    return abrir_sesion(inquilino)
+
+
+def abrir_sesion(inquilino: Inquilino) -> RedirectResponse:
+    """Sesión del panel del inquilino (también tras darse de alta en /registro)."""
+    session_id = AlmacenSesiones().crear(
+        inquilino.id, huella=huella_password(inquilino.password_hash), csrf=secrets.token_urlsafe(32),
+    )
     respuesta = RedirectResponse(url="/usuario/", status_code=status.HTTP_303_SEE_OTHER)
     respuesta.set_cookie(
         key="session_id",
         value=session_id,
         httponly=True,
         secure=True,
+        samesite="lax",
         max_age=DURACION_SESION_HORAS * 3600,
     )
     return respuesta
+
+
+def csrf_de_sesion(session_id: "str | None" = Cookie(default=None)) -> str:
+    """El token CSRF de la sesión del inquilino (va en cada formulario del panel)."""
+    sesion = AlmacenSesiones().obtener(session_id) or {}
+    return sesion.get("csrf", "")
+
+
+async def comprobar_csrf(request: Request, session_id: "str | None" = Cookie(default=None)) -> None:
+    """Para los formularios del panel del inquilino: el token de su sesión tiene que venir en el form."""
+    esperado = csrf_de_sesion(session_id)
+    enviado = (await request.form()).get("csrf")
+    if not esperado or not isinstance(enviado, str) or not secrets.compare_digest(enviado.encode(), esperado.encode()):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Falta el token CSRF o no coincide; vuelve a entrar")
 
 
 @router.post("/logout")

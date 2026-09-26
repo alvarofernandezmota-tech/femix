@@ -36,7 +36,29 @@ CREATE TABLE IF NOT EXISTS fragmentos (
     posicion     integer NOT NULL,
     datos        jsonb   NOT NULL,
     PRIMARY KEY (inquilino_id, posicion)
-)
+);
+CREATE TABLE IF NOT EXISTS suscripciones (
+    inquilino_id text  PRIMARY KEY,
+    datos        jsonb NOT NULL
+);
+CREATE TABLE IF NOT EXISTS consumo (
+    inquilino_id text    NOT NULL,
+    mes          text    NOT NULL,
+    mensajes     integer NOT NULL DEFAULT 0,
+    PRIMARY KEY (inquilino_id, mes)
+);
+CREATE TABLE IF NOT EXISTS mensajes (
+    id           bigserial PRIMARY KEY,
+    inquilino_id text  NOT NULL,
+    datos        jsonb NOT NULL
+);
+CREATE INDEX IF NOT EXISTS mensajes_por_inquilino ON mensajes (inquilino_id, id);
+CREATE TABLE IF NOT EXISTS incidencias (
+    id           bigserial PRIMARY KEY,
+    inquilino_id text  NOT NULL,
+    datos        jsonb NOT NULL
+);
+CREATE INDEX IF NOT EXISTS incidencias_por_inquilino ON incidencias (inquilino_id, id)
 """
 
 

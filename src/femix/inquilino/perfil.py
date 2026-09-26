@@ -60,6 +60,9 @@ class PerfilInquilino:
     capacidades: list = field(default_factory=lambda: list(POR_DEFECTO))
     telegram_token: str = ""
     telegram_permitidos: list = field(default_factory=list)
+    # Fase 6: abierto = cualquiera puede escribirle (el bot de un negocio con sus clientes). Cerrado
+    # (por defecto), solo los permitidos.
+    telegram_abierto: bool = False
     # Fase 3: cómo se presenta y habla su bot. Vacíos = los de Femix.
     nombre_asistente: str = ""
     tono: str = ""
@@ -78,6 +81,8 @@ class PerfilInquilino:
         # "false" (texto) contaría como activo: solo vale un booleano de verdad.
         if not isinstance(self.activo, bool):
             raise ValueError("activo tiene que ser true o false")
+        if not isinstance(self.telegram_abierto, bool):
+            raise ValueError("telegram_abierto tiene que ser true o false")
         nombre = (self.nombre or "").strip()
         if not nombre:
             raise ValueError("El nombre no puede estar vacío")

@@ -49,6 +49,13 @@ async def registrar_error(update: object, context: ContextTypes.DEFAULT_TYPE):
         logging.warning("Bot de %s: Telegram no respondió a tiempo: %s", inquilino_id, context.error)
         return
     logging.error("Bot de %s: error atendiendo un mensaje", inquilino_id, exc_info=context.error)
+    _anotar_incidencia(context, "telegram", f"{type(context.error).__name__}: {context.error}")
+
+def _anotar_incidencia(context, origen: str, detalle: str) -> None:
+    femix = context.bot_data.get("femix")
+    actividad = getattr(femix, "_actividad", None)
+    if actividad is not None:
+        actividad.incidencia(context.bot_data.get("inquilino_id", "?"), origen, detalle)
 
 def construir_aplicacion(token: str, femix, permitidos=frozenset(), voz: bool = True) -> Application:
     # Los 5 s por defecto de python-telegram-bot no bastan en una línea lenta: el bot recibía el

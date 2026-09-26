@@ -49,12 +49,12 @@ def test_describir_horario_vacio():
 
 
 def test_del_perfil(tmp_path):
-    assert del_perfil(str(tmp_path), "nadie") == (("memoria_largo_plazo", "voz", "documentos"), None)
+    assert del_perfil(str(tmp_path), "nadie") == (("memoria_largo_plazo", "voz", "documentos", "tool_calling"), None)
     AlmacenPerfiles(str(tmp_path)).crear(PerfilInquilino("acme", "ACME", capacidades=["voz"], tipo="empresa"))
     capacidades, prompt = del_perfil(str(tmp_path), "acme")
     assert capacidades == ("voz",) and "asistente de ACME" in prompt
     (tmp_path / "acme" / "perfil.json").write_text("{roto")
-    assert del_perfil(str(tmp_path), "acme") == (("memoria_largo_plazo", "voz", "documentos"), None)
+    assert del_perfil(str(tmp_path), "acme") == (("memoria_largo_plazo", "voz", "documentos", "tool_calling"), None)
 
 
 def test_el_prompt_del_inquilino_llega_a_ollama(tmp_path, monkeypatch):

@@ -13,6 +13,8 @@
 #   docker compose up -d --build              # base de datos + bot de Telegram
 #   docker compose --profile web up -d        # + panel web (en pruebas)
 #   docker compose run --rm femix-bot python -m femix.bot.ingerir /app/documentos   # cargar RAG
+#   docker compose --profile web --profile publico up -d   # + HTTPS público con Caddy (FEMIX_DOMINIO)
+#   docker compose --profile copias up -d                  # + copia diaria de Postgres en ./copias
 
 x-femix: &femix
   build:
@@ -73,9 +75,52 @@ services:
     command:
       - sh
       - -c
-      - uvicorn femix.web.app:app --host "$${FEMIX_WEB_HOST:-127.0.0.1}" --port "$${FEMIX_WEB_PORT:-8000}"
+      # Tras Caddy: se fía de sus cabeceras X-Forwarded-* (https, IP real) solo si vienen de 127.0.0.1.
+      - uvicorn femix.web.app:app --host "$${FEMIX_WEB_HOST:-127.0.0.1}" --port "$${FEMIX_WEB_PORT:-8000}" --proxy-headers --forwarded-allow-ips 127.0.0.1
+
+  # HTTPS público (Fase 6). Caddy saca y renueva el certificado de Let's Encrypt solo; hace falta que
+  # FEMIX_DOMINIO apunte a madre y que los puertos 80 y 443 lleguen a ella.
+  femix-https:
+    image: caddy:2-alpine
+    container_name: femix-https
+    profiles: ["publico"]
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      FEMIX_DOMINIO: ${FEMIX_DOMINIO:-}
+      FEMIX_WEB_PORT: ${FEMIX_WEB_PORT:-8000}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - femix-caddy:/data
+
+  # Copia diaria de la base de datos en ./copias (se guardan 14 días).
+  femix-copias:
+    image: postgres:16-alpine
+    container_name: femix-copias
+    profiles: ["copias"]
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      PGPASSWORD: ${FEMIX_DB_CLAVE:?pon FEMIX_DB_CLAVE en .env}
+      PGPORT: ${FEMIX_DB_PUERTO:-5433}
+    depends_on:
+      femix-db:
+        condition: service_healthy
+    volumes:
+      - ./copias:/copias
+    entrypoint:
+      - sh
+      - -c
+      - |
+        while true; do
+          f=/copias/femix-$$(date +%F).sql.gz
+          pg_dump -h 127.0.0.1 -U femix femix | gzip > "$$f.tmp" && mv "$$f.tmp" "$$f" && echo "copia: $$f"
+          find /copias -name 'femix-*.sql.gz' -mtime +14 -delete
+          sleep 86400
+        done
 
 volumes:
   femix-datos:
   femix-cache:
   femix-pg:
+  femix-caddy:

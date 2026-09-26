@@ -1,0 +1,30 @@
+{# Plan, consumo del mes y botones de pago. Necesita: resumen, csrf, prefijo; opcional de_pago, planes. #}
+<section class="tarjeta">
+    <h3>Suscripción</h3>
+    {% set s = resumen.suscripcion %}
+    <p><strong>{{ resumen.plan.titulo }}</strong>
+        {% if resumen.plan.precio_mes %}· {{ resumen.plan.precio_mes }} €/mes{% endif %}
+        · <span class="estado estado-{{ 'ok' if resumen.vigente else 'error' }}">{{ s.estado }}</span></p>
+    {% if s.prueba_hasta and s.estado == "prueba" %}<p class="secundario">Prueba hasta {{ s.prueba_hasta }}.</p>{% endif %}
+    {% if s.periodo_hasta %}<p class="secundario">Periodo pagado hasta {{ s.periodo_hasta }}.</p>{% endif %}
+    {% if resumen.motivo_pausa %}<p class="aviso aviso-error">{{ resumen.motivo_pausa }}</p>{% endif %}
+    <p>Mensajes este mes: {{ resumen.usados }}{% if resumen.limite %} de {{ resumen.limite }}{% else %} (sin límite){% endif %}</p>
+    {% if resumen.limite %}<progress max="100" value="{{ resumen.porcentaje }}">{{ resumen.porcentaje }} %</progress>{% endif %}
+    {% if de_pago %}
+    <div class="acciones">
+        {% for p in de_pago %}
+        <form method="post" action="{{ prefijo }}/suscripcion/pagar">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="hidden" name="plan" value="{{ p.nombre }}">
+            <button type="submit">{{ 'Cambiar a' if s.stripe_suscripcion else 'Contratar' }} {{ p.titulo }} · {{ p.precio_mes }} €/mes</button>
+        </form>
+        {% endfor %}
+        {% if s.stripe_cliente %}
+        <form method="post" action="{{ prefijo }}/suscripcion/portal">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit">Facturas y método de pago</button>
+        </form>
+        {% endif %}
+    </div>
+    {% endif %}
+</section>
