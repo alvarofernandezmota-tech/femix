@@ -7,6 +7,41 @@ from .herramientas import MAXIMO_RONDAS, ejecutar
 from .prompts import PROMPT_SISTEMA
 
 
+def keep_alive() -> "int | str":
+    """Cuánto sigue cargado el modelo. Ollama acepta una duración ("30m") o un número de segundos
+    (-1 = siempre), pero NO el número como texto ("-1" da error): se convierte."""
+    valor = (os.environ.get("HUGIN_LLM_KEEP_ALIVE") or "30m").strip()
+    return int(valor) if valor.lstrip("-").isdigit() else valor
+
+
+def _base(url: str) -> str:
+    """`http://host:11434/api/chat` -> `http://host:11434`."""
+    return url.split("/api/")[0].rstrip("/")
+
+
+# Ollama colgado (pasó en madre): responde a /api/chat pero nunca termina. Antes de esperar
+# hasta el timeout, se mira en unos segundos si está vivo; el resultado se recuerda un rato.
+ESPERA_VIVO = 3
+RECUERDO_VIVO = 20
+AVISO_COLGADO = "El asistente se está reiniciando. Prueba otra vez en un minuto."
+_vivo_cache: dict = {}
+
+
+def ollama_vivo(url: str, ahora: "float | None" = None) -> bool:
+    import time
+    ahora = time.monotonic() if ahora is None else ahora
+    base = _base(url)
+    guardado = _vivo_cache.get(base)
+    if guardado and ahora - guardado[0] < RECUERDO_VIVO:
+        return guardado[1]
+    try:
+        vivo = requests.get(f"{base}/api/ps", timeout=ESPERA_VIVO).ok
+    except requests.RequestException:
+        vivo = False
+    _vivo_cache[base] = (ahora, vivo)
+    return vivo
+
+
 def _mensajes_iniciales(prompt_sistema: str, contexto: str, entrada: str) -> list:
     mensajes = [{"role": "system", "content": prompt_sistema}]
     if contexto:
@@ -42,7 +77,7 @@ class ProveedorOllama(MotorLLM):
                 **opciones_extra,
             },
             # El modelo se queda cargado aunque no se haya configurado OLLAMA_KEEP_ALIVE.
-            "keep_alive": os.environ.get("HUGIN_LLM_KEEP_ALIVE") or "30m",
+            "keep_alive": keep_alive(),
         }
 
     def _pedir(self, mensajes: list, herramientas=None) -> dict:
@@ -54,6 +89,9 @@ class ProveedorOllama(MotorLLM):
         return resp.json()["message"]
 
     def _con_errores_amables(self, llamada) -> str:
+        if not ollama_vivo(self._url):
+            # Ni contesta a /api/ps: o está apagado o colgado. Mejor decirlo ya que tras 2 minutos.
+            return AVISO_COLGADO
         try:
             return llamada()
         except requests.exceptions.ConnectionError:
@@ -98,8 +136,7 @@ class ProveedorOllama(MotorLLM):
     def precalentar(self) -> bool:
         """Carga el modelo en memoria sin generar nada, para que el primer mensaje no espere."""
         try:
-            requests.post(self._url, json={"model": self._modelo, "messages": [],
-                                           "keep_alive": os.environ.get("HUGIN_LLM_KEEP_ALIVE") or "30m"},
+            requests.post(self._url, json={"model": self._modelo, "messages": [], "keep_alive": keep_alive()},
                           timeout=max(self._timeout_segundos, 300)).raise_for_status()
             return True
         except Exception:

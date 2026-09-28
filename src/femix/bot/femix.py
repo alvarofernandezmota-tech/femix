@@ -35,6 +35,7 @@ LONGITUD_LOG = 120
 # usuario le llega como texto, pero para el panel es una incidencia.
 FALLOS_DEL_MODELO = (
     "No puedo conectar con Ollama ahora mismo. ¿Está encendido?",
+    "El asistente se está reiniciando. Prueba otra vez en un minuto.",
     "El modelo está tardando demasiado. Prueba con algo más corto.",
     RESPUESTA_VACIA,
 )

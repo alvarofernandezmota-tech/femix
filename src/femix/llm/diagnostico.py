@@ -10,13 +10,14 @@ import time
 import requests
 
 from .precalentar import modelos_a_precalentar
+from .proveedores import keep_alive
 
 PREGUNTA = "Explica en dos frases qué es una cita previa en una peluquería."
 
 
 def medir(modelo: str, url: str, timeout: int = 300) -> dict:
     inicio = time.monotonic()
-    r = requests.post(url, json={"model": modelo, "stream": False, "keep_alive": "30m",
+    r = requests.post(url, json={"model": modelo, "stream": False, "keep_alive": keep_alive(),
                                  "messages": [{"role": "user", "content": PREGUNTA}],
                                  "options": {"num_predict": 80}}, timeout=timeout)
     r.raise_for_status()

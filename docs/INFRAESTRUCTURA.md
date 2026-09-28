@@ -24,6 +24,15 @@
 - El servicio antiguo `hugin-telegram.service` (systemd) está **desactivado**: dos bots con el mismo
   token se tumban mutuamente.
 
+## Ollama siempre disponible
+
+- **Modelo siempre cargado**: `OLLAMA_KEEP_ALIVE=-1` en `/etc/systemd/system/ollama.service.d/femix.conf`
+  y `HUGIN_LLM_KEEP_ALIVE=-1` en `.env` (femix lo manda en cada petición y manda sobre el de Ollama).
+- **Vigilante**: `scripts/instalar-vigilante-ollama.sh` (una vez). Cada 2 min comprueba `/api/ps`; si
+  no responde dos veces seguidas, `systemctl restart ollama`. Historial: `journalctl -u femix-vigila-ollama`.
+- **El bot no se queda esperando**: si Ollama no contesta a `/api/ps` en 3 s, el bot responde al
+  momento "se está reiniciando" y apunta una incidencia (te llega por Telegram con `FEMIX_AVISOS_TELEGRAM`).
+
 ## Datos persistentes (no versionados)
 
 - Volumen `femix-pg`: todo en Postgres (tareas, memoria, reservas, perfiles, documentos del RAG,

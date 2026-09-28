@@ -177,3 +177,61 @@ def test_las_consultas_van_al_modelo_rapido_con_los_documentos(tmp_path):
     assert "horario.md" in motor.contextos[-1]
     femix.procesar("7", "¿cuánto cuesta el tinte?")    # nada en documentos: camino de siempre
     assert "Información encontrada" not in motor.contextos[-1]
+
+
+# --- Ollama colgado ------------------------------------------------------------------------------
+
+import pytest
+
+
+def test_keep_alive_numerico(monkeypatch):
+    from femix.llm.proveedores import keep_alive
+    monkeypatch.setenv("HUGIN_LLM_KEEP_ALIVE", "-1")
+    assert keep_alive() == -1
+    monkeypatch.setenv("HUGIN_LLM_KEEP_ALIVE", "45m")
+    assert keep_alive() == "45m"
+    monkeypatch.delenv("HUGIN_LLM_KEEP_ALIVE")
+    assert keep_alive() == "30m"
+
+
+@pytest.mark.comprobar_ollama
+def test_ollama_colgado_contesta_al_momento(monkeypatch):
+    import requests
+    from femix.llm import proveedores
+    proveedores._vivo_cache.clear()
+    llamadas = []
+
+    def colgado(url, timeout):
+        llamadas.append(url)
+        raise requests.exceptions.ReadTimeout()
+    monkeypatch.setattr(proveedores.requests, "get", colgado)
+    monkeypatch.setattr(proveedores.requests, "post", lambda *a, **k: pytest.fail("no debe esperar al modelo"))
+    motor = proveedores.ProveedorOllama(url="http://ollama:11434/api/chat")
+    assert motor.generar("", "hola") == proveedores.AVISO_COLGADO
+    assert llamadas == ["http://ollama:11434/api/ps"]
+    motor.generar("", "otra")                              # recordado: no vuelve a preguntar
+    assert len(llamadas) == 1
+
+
+@pytest.mark.comprobar_ollama
+def test_ollama_vivo_sigue_normal(monkeypatch):
+    from femix.llm import proveedores
+    proveedores._vivo_cache.clear()
+
+    class Ok:
+        ok = True
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"message": {"content": "hola!"}}
+    monkeypatch.setattr(proveedores.requests, "get", lambda url, timeout: Ok())
+    monkeypatch.setattr(proveedores.requests, "post", lambda url, json, timeout: Ok())
+    assert proveedores.ProveedorOllama().generar("", "hola") == "hola!"
+
+
+def test_el_aviso_de_colgado_es_incidencia():
+    from femix.bot.femix import FALLOS_DEL_MODELO
+    from femix.llm.proveedores import AVISO_COLGADO
+    assert AVISO_COLGADO in FALLOS_DEL_MODELO

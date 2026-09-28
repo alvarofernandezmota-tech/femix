@@ -565,3 +565,10 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
 - `crear_esquema` con cerrojo (`pg_advisory_xact_lock`): el bot y el panel arrancan a la vez y
   creaban las tablas en paralelo; en una base nueva chocaban (UniqueViolation en `pg_type`) y el
   panel se caía hasta el rearranque. Visto en madre; test que lo reproduce con 8 arranques a la vez.
+
+## 2026-09-28 — Ollama colgado: detectarlo, avisar y reiniciarlo (`feat/panel-web`)
+- En madre, Ollama se quedó colgado y cada mensaje esperaba 120 s. Ahora el bot comprueba en 3 s
+  (`/api/ps`) si está vivo y, si no, contesta al momento y lo apunta como incidencia.
+- `scripts/instalar-vigilante-ollama.sh`: temporizador de systemd que reinicia Ollama si no responde.
+- Arreglo: `HUGIN_LLM_KEEP_ALIVE=-1` se mandaba como texto y Ollama lo rechaza; ahora va como número.
+  El diagnóstico ya no deja el modelo en 30 min.
