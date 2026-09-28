@@ -272,7 +272,7 @@ def leer_responsable(texto: str) -> int:
     texto = (texto or "").strip()
     if not texto:
         return 0
-    if not texto.isdigit() or int(texto) <= 0:
+    if not texto.isdigit() or len(texto) > 15 or int(texto) <= 0:
         raise ValueError(f"{texto!r} no es un ID de usuario de Telegram (responsable)")
     return int(texto)
 

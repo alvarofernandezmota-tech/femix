@@ -293,6 +293,20 @@ async def comprobar_csrf(request: Request, session_id: "str | None" = Cookie(def
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Falta el token CSRF o no coincide; vuelve a entrar")
 
 
+def comprobar_origen(request: Request) -> None:
+    """Para las rutas API del panel (JSON y subidas): si el navegador dice de dónde viene la
+    petición (`Origin` o `Referer`), tiene que ser de esta misma web. Se suma a la cookie
+    `SameSite=lax`; un cliente sin navegador (sin esas cabeceras) sigue pudiendo usar la API."""
+    from urllib.parse import urlsplit
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return
+    origen = request.headers.get("origin") or request.headers.get("referer")
+    if not origen:
+        return
+    if origen == "null" or urlsplit(origen).netloc != request.headers.get("host", request.url.netloc):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Petición desde otra web")
+
+
 @router.post("/logout")
 async def logout(session_id: "str | None" = Cookie(default=None)):
     AlmacenSesiones().eliminar(session_id)

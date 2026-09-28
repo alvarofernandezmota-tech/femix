@@ -45,7 +45,7 @@ def ejecutar_comando(
     resto = partes[1] if len(partes) > 1 else ""
 
     if comando == "/hoy":
-        return resumen_del_dia(usuario_id)
+        return resumen_del_dia(usuario_id, reloj=reloj)
     if comando == "/tarea":
         return _comando_tarea(usuario_id, resto, directorio_datos, almacen)
     if comando == "/diario":

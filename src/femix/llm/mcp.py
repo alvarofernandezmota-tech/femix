@@ -69,7 +69,8 @@ class ClienteMCP:
             respuesta = requests.post(self._url, json=cuerpo, headers=self._cabeceras(), timeout=self._timeout)
             respuesta.raise_for_status()
         except requests.RequestException as exc:
-            raise ErrorMCP(f"{metodo}: {type(exc).__name__}") from None
+            codigo = getattr(getattr(exc, "response", None), "status_code", "") or ""
+            raise ErrorMCP(f"{metodo}: {type(exc).__name__} {codigo}".strip()) from None
         if respuesta.headers.get("mcp-session-id"):
             self._sesion = respuesta.headers["mcp-session-id"]
         mensaje = _respuesta_jsonrpc(respuesta, id_peticion)
@@ -93,15 +94,29 @@ class ClienteMCP:
         with self._cerrojo:
             if self._lista and time.monotonic() - self._lista[0] < CADUCIDAD_LISTA:
                 return self._lista[1]
-            self._iniciar()
-            lista = self._llamar("tools/list").get("tools") or []
+            lista = self._con_sesion("tools/list").get("tools") or []
             self._lista = (time.monotonic(), lista[:MAXIMO_HERRAMIENTAS])
             return self._lista[1]
 
+    def _reiniciar(self) -> None:
+        self._sesion = None
+        self._lista = None
+
+    def _con_sesion(self, metodo: str, parametros: "dict | None" = None) -> dict:
+        """Llama; si el servidor dio la sesión por caducada (404/400), la renueva y reintenta una vez."""
+        self._iniciar()
+        try:
+            return self._llamar(metodo, parametros)
+        except ErrorMCP as exc:
+            if self._sesion and str(exc).endswith((" 404", " 400")):
+                self._reiniciar()
+                self._iniciar()
+                return self._llamar(metodo, parametros)
+            raise
+
     def llamar(self, nombre: str, argumentos: dict) -> str:
         with self._cerrojo:
-            self._iniciar()
-            resultado = self._llamar("tools/call", {"name": nombre, "arguments": argumentos})
+            resultado = self._con_sesion("tools/call", {"name": nombre, "arguments": argumentos})
         textos = [c.get("text", "") for c in resultado.get("content") or [] if c.get("type") == "text"]
         texto = "\n".join(t for t in textos if t) or json.dumps(resultado.get("structuredContent") or {}, ensure_ascii=False)
         if resultado.get("isError"):

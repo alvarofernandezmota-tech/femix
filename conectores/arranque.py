@@ -48,7 +48,8 @@ def main() -> int:
     caido = next(h for h in hijos if h.poll() is not None)
     if not parando:
         print(f"femix: se paró {' '.join(caido.args[1:3])} (código {caido.returncode}); se para todo.", flush=True)
-        codigo = caido.returncode or 1
+        # Muerto por una señal (p. ej. -9 si lo mata el sistema por memoria): 128 + señal, como el shell.
+        codigo = (128 - caido.returncode) if caido.returncode < 0 else (caido.returncode or 1)
         parar()
     for hijo in hijos:
         try:

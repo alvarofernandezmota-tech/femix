@@ -164,6 +164,33 @@ def _direccion_publica(url: str) -> None:
             raise ValueError("Solo se pueden leer webs públicas")
 
 
+def _ip_conectada(respuesta) -> "str | None":
+    """La IP a la que se conectó de verdad (None si urllib3 no la deja ver)."""
+    for camino in (("raw", "_connection", "sock"), ("raw", "connection", "sock"),
+                   ("raw", "_fp", "fp", "raw", "_sock")):
+        objeto = respuesta
+        for nombre in camino:
+            objeto = getattr(objeto, nombre, None)
+            if objeto is None:
+                break
+        else:
+            try:
+                return objeto.getpeername()[0]
+            except (OSError, TypeError, IndexError):
+                return None
+    return None
+
+
+def _comprobar_conectada(respuesta) -> None:
+    """Contra el DNS rebinding: el nombre se resolvió a una IP pública al comprobarlo, pero la
+    conexión pudo resolverlo otra vez a otra. Se mira la IP con la que se habló de verdad."""
+    import ipaddress
+    ip = _ip_conectada(respuesta)
+    if ip is not None and not ipaddress.ip_address(ip.split("%")[0]).is_global:
+        respuesta.close()
+        raise ValueError("Solo se pueden leer webs públicas")
+
+
 def leer_web(url: str, timeout: float = 20, maximo_bytes: int = 5 * 1024 * 1024) -> str:
     """El texto de una página web (la del negocio, su carta...). ValueError si no se puede."""
     import requests
@@ -175,6 +202,8 @@ def leer_web(url: str, timeout: float = 20, maximo_bytes: int = 5 * 1024 * 1024)
                                      headers={"User-Agent": "femix/1.0 (+documentos del negocio)"})
         except requests.RequestException as exc:
             raise ValueError(f"No se pudo abrir la web ({type(exc).__name__})") from None
+        if not requests.utils.get_environ_proxies(url):   # con proxy, la IP es la del proxy
+            _comprobar_conectada(respuesta)
         if respuesta.is_redirect and respuesta.headers.get("location"):
             from urllib.parse import urljoin
             url = urljoin(url, respuesta.headers["location"])

@@ -140,6 +140,16 @@ def test_dos_inquilinos_no_pueden_compartir_token(tmp_path):
         almacen.actualizar(_perfil("acme", nombre="Acme", telegram_token=TOKEN))
 
 
+def test_dos_inquilinos_no_pueden_compartir_numero_de_whatsapp(tmp_path):
+    almacen = AlmacenPerfiles(str(tmp_path))
+    almacen.crear(_perfil("varo", whatsapp_telefono_id="123456"))
+    with pytest.raises(ValueError, match="WhatsApp"):
+        almacen.crear(_perfil("acme", nombre="Acme", whatsapp_telefono_id="123456"))
+    almacen.crear(_perfil("acme", nombre="Acme", whatsapp_telefono_id="999"))
+    with pytest.raises(ValueError, match="WhatsApp"):
+        almacen.modificar("acme", lambda p: _perfil("acme", nombre="Acme", whatsapp_telefono_id="123456"))
+
+
 def test_actualizar_conserva_alta_y_estado(tmp_path):
     almacen = AlmacenPerfiles(str(tmp_path))
     creado = almacen.crear(_perfil())

@@ -209,8 +209,8 @@ def test_ollama_colgado_contesta_al_momento(monkeypatch):
     motor = proveedores.ProveedorOllama(url="http://ollama:11434/api/chat")
     assert motor.generar("", "hola") == proveedores.AVISO_COLGADO
     assert llamadas == ["http://ollama:11434/api/ps"]
-    motor.generar("", "otra")                              # recordado: no vuelve a preguntar
-    assert len(llamadas) == 1
+    motor.generar("", "otra")          # un "no responde" no se recuerda: se vuelve a mirar cada vez
+    assert len(llamadas) == 2
 
 
 @pytest.mark.comprobar_ollama

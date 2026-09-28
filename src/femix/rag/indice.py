@@ -46,6 +46,8 @@ class IndiceEmbeddings:
         self.fragmentos_descartados = 0
         self._fragmentos: list[Fragmento] = self._cargar()
         self.reindexados = 0
+        if self._sin_inquilino:
+            self._guardar()   # formato heredado: se reescribe una vez, ya con su `inquilino_id`
 
     @property
     def inquilino_id(self) -> str:
@@ -60,6 +62,12 @@ class IndiceEmbeddings:
     def ruta(self) -> str:
         """`datos/{inquilino_id}/rag/indice.json`"""
         return self._ruta
+
+    def version(self):
+        """La versión guardada del índice (None si no se sabe): si no ha cambiado, lo que hay en
+        memoria sigue valiendo."""
+        version = getattr(self._persistencia, "version", None)
+        return version() if version is not None else None
 
     @property
     def total_fragmentos(self) -> int:
@@ -77,8 +85,9 @@ class IndiceEmbeddings:
         os.replace(heredada, self._ruta)
         return True
 
-    def _cargar(self) -> list[Fragmento]:
-        bruto = self._persistencia.cargar()
+    def _cargar(self, bruto: "list | None" = None) -> list[Fragmento]:
+        bruto = self._persistencia.cargar() if bruto is None else bruto
+        self._sin_inquilino = any("inquilino_id" not in item for item in bruto)
         fragmentos = []
         for item in bruto:
             datos = dict(item)
@@ -99,14 +108,19 @@ class IndiceEmbeddings:
             raise ValueError("El documento pertenece a otro inquilino_id")
         trozos = (fragmentar(documento.texto, tamano, solapamiento) if tamano is not None
                   else fragmentar_por_secciones(documento.texto))
-        for indice, trozo in enumerate(trozos):
-            vector = self._motor.embed(trozo)
-            self._fragmentos.append(
-                Fragmento(self._inquilino_id, documento.id, documento.fuente, indice, trozo, vector)
-            )
-        if trozos:
+        nuevos = [Fragmento(self._inquilino_id, documento.id, documento.fuente, indice, trozo, self._motor.embed(trozo))
+                  for indice, trozo in enumerate(trozos)]
+        if not nuevos:
+            return 0
+        anadir = getattr(self._persistencia, "anadir", None)
+        if anadir is None:
+            self._fragmentos.extend(nuevos)
             self._guardar()
-        return len(trozos)
+        else:
+            # Solo añadir, releyendo lo que haya: otra subida a la vez no se pierde.
+            self.fragmentos_descartados = 0
+            self._fragmentos = self._cargar(anadir([asdict(f) for f in nuevos]))
+        return len(nuevos)
 
     def listar_documentos(self) -> list[dict]:
         documentos: dict[str, dict] = {}

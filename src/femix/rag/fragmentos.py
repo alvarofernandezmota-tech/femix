@@ -29,6 +29,9 @@ def _es_titulo(linea: str) -> "str | None":
     """El título si la línea lo es: `# Precios`, `PRECIOS`, `Precios:` (corta y sola)."""
     if linea.startswith("#"):
         return linea.lstrip("#").strip() or None
+    # "CORTE: 15 €" o "HORARIO 9-14" son datos, no títulos.
+    if any(c.isdigit() for c in linea) or "€" in linea or "$" in linea:
+        return None
     if len(linea) <= 60 and not linea.endswith((".", ",", ";")):
         letras = [c for c in linea if c.isalpha()]
         if linea.endswith(":") and len(linea.split()) <= 6:
@@ -62,11 +65,16 @@ def fragmentar_por_secciones(texto: str, tamano: int = 700) -> list[str]:
         if nuevo:
             if any(parrafos):
                 secciones.append((titulo, parrafos))
+            elif titulo:
+                # Un título sin nada debajo (o dos seguidos) no se pierde: se queda como texto.
+                secciones.append(("", [titulo]))
             titulo, parrafos = nuevo, []
         else:
             parrafos.append(linea)
     if any(parrafos):
         secciones.append((titulo, parrafos))
+    elif titulo:
+        secciones.append(("", [titulo]))
 
     trozos = []
     for titulo, lineas in secciones:
