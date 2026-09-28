@@ -12,11 +12,26 @@ import logging
 import time
 
 from telegram.constants import ChatAction
+from telegram.error import BadRequest, NetworkError, TimedOut
 
 INTERVALO = 1.5              # segundos entre ediciones del mensaje
 MINIMO_PARA_ENSENAR = 25     # caracteres antes de enseñar el primer trozo
 MAXIMO_TELEGRAM = 4096
 CURSOR = " ▌"
+AVISO_FALLO = "Perdona, algo ha fallado al preparar la respuesta. Prueba otra vez en un momento."
+
+
+def trozos(texto: str, maximo: int = MAXIMO_TELEGRAM) -> list:
+    """Parte un texto largo en mensajes de Telegram, mejor por párrafos o líneas que a mitad de frase."""
+    texto = texto or AVISO_FALLO
+    partes = []
+    while len(texto) > maximo:
+        corte = max(texto.rfind("\n\n", 0, maximo), texto.rfind("\n", 0, maximo), texto.rfind(". ", 0, maximo))
+        corte = corte + 1 if corte > maximo // 2 else maximo
+        partes.append(texto[:corte].rstrip())
+        texto = texto[corte:].lstrip()
+    partes.append(texto)
+    return partes
 
 _log = logging.getLogger(__name__)
 
@@ -67,24 +82,39 @@ class RespuestaEnDirecto:
                 _log.debug("No se pudo enseñar la respuesta a medias", exc_info=True)
 
     async def terminar(self, respuesta: str) -> None:
-        """La respuesta final: edita el mensaje en directo o, si no hubo, manda uno nuevo."""
+        """La respuesta final: edita el mensaje en directo (o manda uno nuevo si no hubo) y, si
+        pasa del máximo de Telegram, manda el resto en mensajes seguidos."""
         async with self._cerrojo:
             self._terminado = True
-            final = respuesta[:MAXIMO_TELEGRAM]
+            primero, *resto = trozos(respuesta)
             if self._mensaje is not None:
                 try:
-                    if final != self._ensenado:
-                        await self._mensaje.edit_text(final)
-                    return
-                except Exception:
-                    _log.warning("No se pudo cerrar la respuesta en directo; se manda nueva", exc_info=True)
-            await self._update.message.reply_text(final)
+                    if primero != self._ensenado:
+                        await self._mensaje.edit_text(primero)
+                except (TimedOut, NetworkError):
+                    # Puede que la edición sí llegara: reenviar duplicaría la respuesta.
+                    _log.warning("Sin confirmación al cerrar la respuesta en directo; no se reenvía")
+                except BadRequest as exc:
+                    if "not modified" not in str(exc).lower():
+                        _log.warning("No se pudo cerrar la respuesta en directo (%s); se manda nueva", exc)
+                        await self._update.message.reply_text(primero)
+            else:
+                await self._update.message.reply_text(primero)
+            for trozo in resto:
+                await self._update.message.reply_text(trozo)
 
     async def responder(self, procesar, *argumentos) -> str:
         """Corre `procesar(*argumentos, al_avanzar=...)` en un hilo con "escribiendo…" y en directo."""
         tarea = asyncio.create_task(self._escribiendo())
         try:
             respuesta = await asyncio.to_thread(procesar, *argumentos, al_avanzar=self.al_avanzar)
+        except Exception:
+            # Que el usuario no se quede sin nada (ni con el mensaje a medias con ▌).
+            try:
+                await self.terminar(AVISO_FALLO)
+            except Exception:
+                _log.warning("Tampoco se pudo avisar del fallo", exc_info=True)
+            raise
         except BaseException:
             self._terminado = True
             raise

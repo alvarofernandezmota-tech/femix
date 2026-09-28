@@ -11,7 +11,9 @@ DISPARADORES = (
 )
 
 # "¿y los sábados?", "¿y eso cuánto cuesta?": preguntas que solo se entienden con la anterior.
-_SEGUIMIENTO = re.compile(r"^\W*(y|e|entonces|pues|vale|tambien|también)\b|\b(eso|esto|ese|esa|ahi|ahí|lo mismo)\b", re.I)
+_SEGUIMIENTO = re.compile(r"^\W*(y|e|entonces|pues|vale|tambien|también|eso|esto|ese|esa|ahi|ahí|lo mismo)\b", re.I)
+# "eso" en mitad de una frase larga ("¿cuánto cuesta eso del tinte con mechas?") ya se entiende sola.
+_DEMOSTRATIVO = re.compile(r"\b(eso|esto|ese|esa|ahi|ahí|lo mismo)\b", re.I)
 
 
 def consulta_de_busqueda(texto: str, contexto: str) -> str:
@@ -22,7 +24,9 @@ def consulta_de_busqueda(texto: str, contexto: str) -> str:
     """
     texto = (texto or "").strip()
     anteriores = re.findall(r"^Usuario: (.+)$", contexto or "", re.M)
-    if anteriores and (len(texto.split()) <= 3 or _SEGUIMIENTO.search(texto)):
+    palabras = len(texto.split())
+    if anteriores and (palabras <= 3 or _SEGUIMIENTO.search(texto)
+                       or (palabras <= 6 and _DEMOSTRATIVO.search(texto))):
         return f"{anteriores[-1]} {texto}"
     return texto
 

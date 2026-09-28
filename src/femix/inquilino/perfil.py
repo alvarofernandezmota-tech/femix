@@ -458,8 +458,14 @@ class AlmacenPerfiles:
         return perfil
 
     def _comprobar_token_libre(self, perfil: PerfilInquilino):
-        if not perfil.telegram_token:
+        """Un token de Telegram o un número de WhatsApp solo puede ser de un inquilino: si no, los
+        mensajes de un negocio acabarían en el bot (y los datos) de otro."""
+        if not perfil.telegram_token and not perfil.whatsapp_telefono_id:
             return
         for otro in self.listar():
-            if otro.inquilino_id != perfil.inquilino_id and otro.telegram_token == perfil.telegram_token:
+            if otro.inquilino_id == perfil.inquilino_id:
+                continue
+            if perfil.telegram_token and otro.telegram_token == perfil.telegram_token:
                 raise ValueError(f"Ese token de Telegram ya lo usa el inquilino '{otro.inquilino_id}'")
+            if perfil.whatsapp_telefono_id and otro.whatsapp_telefono_id == perfil.whatsapp_telefono_id:
+                raise ValueError(f"Ese número de WhatsApp ya lo usa el inquilino '{otro.inquilino_id}'")

@@ -1,4 +1,5 @@
 """Memoria de la conversación por inquilino y usuario (JSON o almacén/Postgres)."""
+import fcntl
 import json
 import logging
 import os
@@ -46,13 +47,23 @@ class Memoria:
 
     def registrar(self, inquilino_id: str, usuario_id: str, entrada: str, salida: str):
         k = self.clave(inquilino_id, usuario_id)
-        self._historial.setdefault(k, []).append(Turno(entrada, salida))
-        if len(self._historial[k]) > self.maximo_turnos:
-            self._historial[k].pop(0)
-        self._guardar()
+        # Se relee bajo bloqueo antes de escribir: dos `Memoria` sobre el mismo fichero (dos
+        # procesos, o el bot y el panel) no se pisan lo que ha guardado la otra.
+        # El cerrojo es la propia carpeta: no deja ficheros de más al lado de la memoria.
+        cerrojo = os.open(os.path.dirname(self._ruta) or ".", os.O_RDONLY)
+        try:
+            fcntl.flock(cerrojo, fcntl.LOCK_EX)
+            self._historial = self._cargar()
+            turnos = self._historial.setdefault(k, [])
+            turnos.append(Turno(entrada, salida))
+            del turnos[:-self.maximo_turnos]
+            self._guardar()
+        finally:
+            os.close(cerrojo)   # cerrar suelta el bloqueo
 
     def contexto(self, inquilino_id: str, usuario_id: str) -> str:
         k = self.clave(inquilino_id, usuario_id)
+        self._historial = self._cargar()
         # "Asistente" y no un nombre: cada inquilino puede llamar a su bot como quiera.
         return "\n".join(f"Usuario: {t.entrada}\nAsistente: {t.salida}" for t in self._historial.get(k, []))
 

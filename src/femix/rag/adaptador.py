@@ -1,4 +1,6 @@
 """Adaptador del índice RAG al puerto `Buscador`: abre el índice del inquilino y devuelve contexto."""
+import threading
+
 from ..puertos.busqueda import Buscador
 from ..puertos.embeddings import MotorEmbeddings
 from .contexto import construir_contexto
@@ -15,10 +17,10 @@ class IndiceEmbeddingsBuscador(Buscador):
     El adaptador abre el índice del inquilino que toca y devuelve ya el contexto en texto,
     así que `agentes/` nunca ve fragmentos, vectores ni rutas.
 
-    **Abre un índice nuevo en cada búsqueda, a propósito.** Cachearlos por inquilino ahorraría
-    releer el JSON, pero dejaría invisibles los documentos ingeridos después de arrancar el bot.
-    A la escala actual (JSON local) releer es barato; si algún día deja de serlo, el sitio donde
-    añadir caché es aquí, no en `IndiceEmbeddings`.
+    **Guarda el índice de cada inquilino en memoria mientras no cambie.** Antes de usarlo mira
+    la versión guardada (fecha del `indice.json` o una consulta pequeña a Postgres): si otro
+    proceso (el panel) ha subido un documento, se vuelve a leer. Así no se relee todo el índice
+    en cada mensaje y tampoco quedan invisibles los documentos nuevos.
 
     El `motor_embeddings` sí se comparte entre llamadas: un proveedor real puede tener un modelo
     cargado y reconstruirlo en cada mensaje sería caro.
@@ -34,6 +36,8 @@ class IndiceEmbeddingsBuscador(Buscador):
         # Uno solo para todas las búsquedas (un modelo real no se recrea en cada mensaje).
         self._motor_embeddings = motor_embeddings or motor_embeddings_desde_entorno()
         self._limite_caracteres = limite_caracteres
+        self._cache: dict = {}            # inquilino_id -> (versión, índice)
+        self._cerrojo = threading.Lock()  # varios bots buscan a la vez desde hilos distintos
         # Cada motor puntúa en su escala: el de palabras roza 0 con lo irrelevante; uno semántico, no.
         self._puntuacion_minima = (
             puntuacion_minima if puntuacion_minima is not None
@@ -47,6 +51,16 @@ class IndiceEmbeddingsBuscador(Buscador):
             directorio_datos=self._directorio_datos,
             motor_embeddings=self._motor_embeddings,
         )
+
+    def _indice_al_dia(self, inquilino_id: str) -> IndiceEmbeddings:
+        guardado = self._cache.get(inquilino_id)
+        if guardado is not None:
+            version = guardado[1].version()
+            if version is not None and version == guardado[0]:
+                return guardado[1]
+        indice = self.indice(inquilino_id)
+        self._cache[inquilino_id] = (indice.version(), indice)
+        return indice
 
     def buscar(self, inquilino_id: str, texto: str, maximo: int = 3) -> str:
         """Contexto relevante para ese inquilino, o cadena vacía si no hay nada que aportar.
@@ -72,7 +86,11 @@ class IndiceEmbeddingsBuscador(Buscador):
         """
         if not texto or not texto.strip():
             return ""
-        resultados = self.indice(inquilino_id).buscar(texto, k=maximo)
+        with self._cerrojo:
+            indice = self._indice_al_dia(inquilino_id)
+            resultados = indice.buscar(texto, k=maximo)
+            if indice.reindexados:
+                self._cache[inquilino_id] = (indice.version(), indice)
         # Vale si se parece en significado o si comparte palabras útiles (BM25 > 0: sin palabras
         # vacías, así que "de" o "la" ya no cuelan un documento cualquiera).
         relevantes = [r for r in resultados if r.puntuacion >= self._puntuacion_minima or r.palabras > 0]

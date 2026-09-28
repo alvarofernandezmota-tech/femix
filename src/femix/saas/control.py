@@ -34,8 +34,24 @@ class ControlDeUso:
         motivo = self._suscripciones.obtener(self._inquilino_id).motivo_pausa(self._ahora())
         return PAUSADO.format(motivo=motivo) if motivo else None
 
+    def puede_gastar(self) -> "str | None":
+        """Antes de llamar al modelo: el aviso si ya no quedan mensajes; None si quedan (sin contar)."""
+        ahora = self._ahora()
+        suscripcion = self._suscripciones.obtener(self._inquilino_id)
+        motivo = suscripcion.motivo_pausa(ahora)
+        if motivo:
+            return PAUSADO.format(motivo=motivo)
+        limite = plan(suscripcion.plan).mensajes_mes
+        if limite is not None and self._consumo.del_mes(self._inquilino_id, mes_de(ahora)) >= limite:
+            return LIMITE
+        return None
+
+    def contar_mensaje(self) -> None:
+        """Después de que el modelo haya contestado de verdad (un fallo del modelo no se cobra)."""
+        self._consumo.sumar(self._inquilino_id, mes_de(self._ahora()))
+
     def gastar_mensaje(self) -> "str | None":
-        """Antes de llamar al modelo: None y cuenta el mensaje, o el aviso si ya no quedan."""
+        """Comprueba y cuenta a la vez (uso antiguo; el bot usa `puede_gastar` + `contar_mensaje`)."""
         ahora = self._ahora()
         suscripcion = self._suscripciones.obtener(self._inquilino_id)
         motivo = suscripcion.motivo_pausa(ahora)

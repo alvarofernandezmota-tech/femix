@@ -12,7 +12,7 @@ from ..agentes.cadena import CadenaDeAgentes
 from ..agentes.peticion import Peticion
 from ..agentes.subagente import Subagente
 from ..llm.modelos import TAREA_COMPLEJA, TAREA_RAPIDA, SelectorDeModelos
-from ..mente.decidir import es_consulta, necesita_agente, necesita_herramientas
+from ..mente.decidir import es_consulta, es_pregunta, necesita_agente, necesita_herramientas
 from ..mente.entender import clasificar_intencion
 from ..mente.memoria import Memoria
 from ..dominio.personal.reloj import fecha_en_palabras
@@ -40,6 +40,11 @@ FALLOS_DEL_MODELO = (
     RESPUESTA_VACIA,
 )
 PREFIJO_FALLO = "Algo falló generando la respuesta"
+
+
+def es_fallo(respuesta: "str | None") -> bool:
+    """¿Es el aviso de un fallo del modelo (no una respuesta suya)?"""
+    return not respuesta or respuesta in FALLOS_DEL_MODELO or respuesta.startswith(PREFIJO_FALLO)
 
 _log = logging.getLogger(__name__)
 
@@ -134,7 +139,7 @@ class Femix:
             self._memoria.registrar(self._inquilino_id, usuario_id, texto, frecuente)
             self._registrar_mensaje(usuario_id, "frecuente", inicio, texto, frecuente)
             return frecuente
-        if self._control is not None and (aviso := self._control.gastar_mensaje()):
+        if self._control is not None and (aviso := self._control.puede_gastar()):
             self._registrar_mensaje(usuario_id, "límite", inicio, texto, aviso)
             return aviso
         contexto = self._memoria.contexto(self._inquilino_id, usuario_id)
@@ -152,6 +157,12 @@ class Femix:
         if not respuesta or not respuesta.strip():
             _log.warning("El modelo devolvió una respuesta vacía (camino=%s)", camino)
             respuesta = RESPUESTA_VACIA
+        if self._control is not None and not es_fallo(respuesta):
+            try:
+                self._control.contar_mensaje()   # solo se cobra lo que el modelo contestó de verdad
+            except Exception as exc:
+                _log.warning("No se pudo contar el mensaje del plan", exc_info=True)
+                self._incidencia("consumo", f"{type(exc).__name__}: {exc}")
         self._memoria.registrar(self._inquilino_id, usuario_id, texto, respuesta)
         self._registrar_mensaje(usuario_id, camino, inicio, texto, respuesta)
         return respuesta
@@ -170,8 +181,15 @@ class Femix:
             return None, ""
         if pregunta is None or puntos < PARECIDO_CONTEXTO:
             return None, ""
-        if puntos >= PARECIDO_DIRECTO:
+        from ..rag.palabras import tokenizar
+        propias = set(tokenizar(pregunta["pregunta"]))
+        comunes = len(set(tokenizar(texto)) & propias)
+        # Una sola palabra en común da mucho parecido con mensajes cortos: para contestar sin
+        # modelo hacen falta dos palabras útiles en común (o todas, si la frecuente tiene menos).
+        if puntos >= PARECIDO_DIRECTO and comunes >= min(2, len(propias)):
             return pregunta["respuesta"], ""
+        if not es_pregunta(texto) and puntos < PARECIDO_DIRECTO:
+            return None, ""
         return None, (f"Respuesta oficial del negocio a la pregunta «{pregunta['pregunta']}»: "
                       f"{pregunta['respuesta']} (úsala si viene a cuento; no la cambies).")
 
@@ -184,7 +202,7 @@ class Femix:
         )
         if self._actividad is not None:
             self._actividad.mensaje(self._inquilino_id, usuario_id, camino, segundos, texto, respuesta)
-            if respuesta in FALLOS_DEL_MODELO or (respuesta or "").startswith(PREFIJO_FALLO):
+            if es_fallo(respuesta):
                 self._actividad.incidencia(self._inquilino_id, "modelo", f"{camino}: {respuesta}")
 
     def _incidencia(self, origen: str, detalle: str) -> None:
@@ -261,7 +279,8 @@ class Femix:
             self._incidencia("busqueda", f"{type(exc).__name__}: {exc}")
             return None
         if not encontrado or not encontrado.strip():
-            self._sin_respuesta(texto)   # el dueño la verá en su panel para contestarla
+            if es_pregunta(texto):
+                self._sin_respuesta(texto)   # el dueño la verá en su panel para contestarla
             return None
         documentos = ("Información encontrada en los documentos del negocio (si la usas, di de qué documento "
                       f"sale, y no añadas datos que no estén aquí):\n{encontrado}")
@@ -281,4 +300,9 @@ class Femix:
             _log.warning("El modelo con herramientas falló; responde el camino de siempre", exc_info=True)
             self._incidencia("herramientas", f"{type(exc).__name__}: {exc}")
             return None
-        return respuesta if respuesta and respuesta.strip() else None
+        if es_fallo(respuesta):
+            # El proveedor convierte sus errores en texto: no se le enseña eso al usuario.
+            if respuesta:
+                self._incidencia("herramientas", respuesta[:200])
+            return None
+        return respuesta if respuesta.strip() else None

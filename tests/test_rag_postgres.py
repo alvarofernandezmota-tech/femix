@@ -25,7 +25,7 @@ requiere_postgres = pytest.mark.skipif(not URL, reason="sin FEMIX_PRUEBAS_POSTGR
 def test_todo_el_sql_de_fragmentos_filtra_por_inquilino():
     fuente = open(persistencia.__file__, encoding="utf-8").read()
     sentencias = re.findall(r'"((?:SELECT|DELETE|UPDATE)[^"]*(?:FROM|UPDATE) fragmentos[^"]*)"', fuente)
-    assert len(sentencias) == 2
+    assert len(sentencias) >= 2
     assert all("inquilino_id = %s" in s for s in sentencias)
 
 
@@ -91,3 +91,21 @@ def test_el_indice_json_de_antes_se_sube_una_vez_y_se_aparta(tmp_path, url, monk
     assert subido.total_fragmentos == 1
     assert not os.path.exists(ruta) and os.path.exists(ruta + ".migrado")
     assert _indice(tmp_path, "varo").listar_documentos()[0]["fuente"] == "viejo.md"
+
+
+@requiere_postgres
+def test_dos_indices_abiertos_a_la_vez_no_se_pisan_en_postgres(tmp_path, url):
+    a, b = _indice(tmp_path, "varo"), _indice(tmp_path, "varo")
+    a.ingerir(Documento("d1", "varo", "uno.md", "primer documento del negocio"))
+    b.ingerir(Documento("d2", "varo", "dos.md", "segundo documento del negocio"))
+    assert sorted(d["documento_id"] for d in _indice(tmp_path, "varo").listar_documentos()) == ["d1", "d2"]
+
+
+@requiere_postgres
+def test_la_cache_del_buscador_ve_lo_subido_por_otro_proceso(tmp_path, url):
+    from femix.rag.adaptador import IndiceEmbeddingsBuscador
+    buscador = IndiceEmbeddingsBuscador(str(tmp_path), motor_embeddings=MotorEmbeddingsHash())
+    buscador.indice("varo").ingerir(Documento("d1", "varo", "a.md", "abrimos de nueve a dos"))
+    assert "nueve" in buscador.buscar("varo", "abrimos")
+    _indice(tmp_path, "varo").ingerir(Documento("d2", "varo", "b.md", "el tinte cuesta treinta euros"))
+    assert "treinta" in buscador.buscar("varo", "tinte cuesta")

@@ -1,6 +1,6 @@
 # CONTEXT.md — femix
 
-Última actualización: 2026-09-26 (fases 7–11)
+Última actualización: 2026-09-28 (fases 7–11 y revisión completa de bot, RAG, memoria y panel)
 
 ## Fase actual del roadmap
 Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En marcha.
@@ -192,9 +192,10 @@ WhatsApp; teléfono (`gjallarhorn`); release v1.0.0.
   segundos, entrada y salida recortadas).
 
 ## Próximo paso concreto
-Desplegar en `madre` y comprobar la migración, el bot de `varo` (con `FEMIX_TELEGRAM_PERMITIDOS`) y
-su personalidad desde el panel. Después, Fase 4: Postgres por inquilino (citas y disponibilidad
-migradas de `hugin`), siempre con `inquilino_id` obligatorio en cada consulta.
+Desplegar `main` en `madre` (`scripts/desplegar.sh`) y pasar `scripts/probar-todo.sh`: contenedores,
+panel, base de datos, Ollama (fuera de Docker), bots y una conversación real con RAG y aprendizaje.
+Con esa salida, elegir y ajustar el modelo y sacar la v1.0.0. Canal principal: Telegram; WhatsApp es
+un conector más. El teléfono (gjallarhorn) queda para después.
 
 ## Repos relacionados
 - `hugin`: lógica de negocio a migrar (citas, Postgres, teléfono).

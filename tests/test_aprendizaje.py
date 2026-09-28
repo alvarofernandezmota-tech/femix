@@ -15,7 +15,10 @@ from femix.mente.memoria import Memoria
 @pytest.mark.parametrize("texto, esperado", [
     ("Recuerda que soy alérgico al tinte", ("personal", "Soy alérgico al tinte")),
     ("que sepas que me llamo Ana", ("personal", "Me llamo Ana")),
-    ("No, los sábados cerráis a las dos de la tarde", ("negocio", "Los sábados cerráis a las dos de la tarde")),
+    ("Te equivocas, los sábados cerráis a las dos de la tarde", ("negocio", "Los sábados cerráis a las dos de la tarde")),
+    ("No, los sábados cerráis a las dos de la tarde", None),
+    ("recuerda que quiero ir mañana", None),
+    ("error: no me deja pagar", None),
     ("Ten en cuenta que en agosto cerráis por vacaciones", ("negocio", "En agosto cerráis por vacaciones")),
     ("no, gracias", None),
     ("no, a las 10", None),
@@ -43,7 +46,7 @@ def test_lo_personal_se_guarda_solo_para_ese_cliente(tmp_path):
 
 def test_lo_del_negocio_espera_al_dueno(tmp_path):
     a = _aprendizaje(tmp_path)
-    nota = a.observar("7", "No, los sábados cerráis a las dos de la tarde")
+    nota = a.observar("7", "Te equivocas, los sábados cerráis a las dos de la tarde")
     assert "responsable" in nota and a.contexto("8", "sábado") == ""
     pendiente = a.pendientes()[0]
     assert a.aprobar(pendiente["id"], "Los sábados cerramos a las 14:00")
@@ -96,7 +99,7 @@ def test_panel_de_aprendizaje(tmp_path, monkeypatch):
     AlmacenPerfiles(str(tmp_path)).crear(PerfilInquilino("acme", "ACME", tipo="empresa"))
     AlmacenInquilinos(str(tmp_path)).crear("acme", "ACME", "clave-secreta-larga")
     aprendizaje = panel_comun.aprendizaje_de(str(tmp_path), "acme")
-    aprendizaje.observar("7", "No, en agosto cerráis por vacaciones todo el mes")
+    aprendizaje.observar("7", "Te equivocas, en agosto cerráis por vacaciones todo el mes")
     aprendizaje.sin_respuesta("¿Aceptáis pago con bizum?")
 
     cliente = TestClient(app, base_url="https://testserver")

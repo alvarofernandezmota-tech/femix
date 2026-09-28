@@ -40,5 +40,8 @@ async def manejar_nota_de_voz(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("No entendí el audio, ¿puedes repetirlo?")
         return
 
-    respuesta = await asyncio.to_thread(femix.procesar, str(update.effective_user.id), texto)
-    await update.message.reply_text(f"🎤 Escuché: \"{texto}\"\n\n{respuesta}")
+    # Lo que se entendió, y la respuesta como un mensaje de texto (escribiendo…, en directo y en
+    # trozos si es larga; si algo falla, el usuario recibe un aviso en vez de nada).
+    await update.message.reply_text(f"🎤 Escuché: \"{texto[:1000]}\"")
+    from .directo import RespuestaEnDirecto
+    await RespuestaEnDirecto(update).responder(femix.procesar, str(update.effective_user.id), texto)

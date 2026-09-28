@@ -38,7 +38,12 @@ def ollama_vivo(url: str, ahora: "float | None" = None) -> bool:
         vivo = requests.get(f"{base}/api/ps", timeout=ESPERA_VIVO).ok
     except requests.RequestException:
         vivo = False
-    _vivo_cache[base] = (ahora, vivo)
+    if vivo:
+        _vivo_cache[base] = (ahora, True)
+    else:
+        # Solo se recuerda que está vivo: un fallo suelto (CPU a tope un momento) no puede dejar
+        # 20 s sin atender a todos los bots. Si sigue sin responder, se vuelve a mirar en el siguiente.
+        _vivo_cache.pop(base, None)
     return vivo
 
 
@@ -153,7 +158,9 @@ class ProveedorOllama(MotorLLM):
         def bucle() -> str:
             for _ in range(MAXIMO_RONDAS):
                 mensaje = self._pedir(mensajes, herramientas)
-                llamadas = mensaje.get("tool_calls") or []
+                # Un modelo pequeño puede devolver llamadas mal formadas: solo valen las que son objetos.
+                llamadas = [ll for ll in (mensaje.get("tool_calls") or [])
+                            if isinstance(ll, dict) and isinstance(ll.get("function"), dict)]
                 if not llamadas:
                     return mensaje.get("content") or ""
                 mensajes.append({"role": "assistant", "content": mensaje.get("content") or "", "tool_calls": llamadas})

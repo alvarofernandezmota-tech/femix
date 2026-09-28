@@ -578,3 +578,22 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   y derechos RGPD (incluida la AEPD); aviso visible si faltan.
 - **Recordatorio de cita por WhatsApp** con plantilla aprobada por Meta (`whatsapp_plantilla_cita` en
   el perfil), cada 10 min desde el panel web, una vez por cita. `docs/whatsapp.md` explica cómo crearla.
+
+## 2026-09-28 — Revisión completa: bot, RAG, memoria y panel (`feat/panel-web`)
+- **Prueba de todo**: `python -m femix.comprobacion` (base de datos, `/hoy`, preguntas frecuentes,
+  modelo, RAG y aprendizaje con datos de prueba) y `scripts/probar-todo.sh` para madre.
+- **Bot**: un fallo del modelo ya no gasta mensaje del plan; si algo falla en directo el usuario
+  recibe un aviso (no el mensaje a medias con ▌); respuestas largas en varios mensajes; notas de voz
+  en directo; sesión MCP que se renueva sola; `/hoy` con el reloj del bot; código de salida real.
+- **Router**: fuera las palabras ambiguas ("mañana", "hecho", "libre"…); las débiles ("dónde",
+  "servicio", "carta") solo cuentan si el mensaje es una pregunta.
+- **Aprendizaje**: solo aprende con frases explícitas ("recuerda que", "te equivocas", "ten en
+  cuenta que"…), nunca con un "No, …" suelto ni con peticiones ("quiero ir mañana").
+- **RAG**: dos subidas a la vez ya no se pisan (solo añadir, bajo bloqueo, en fichero y Postgres);
+  caché del índice por inquilino que se invalida sola; las líneas con precios no son títulos y un
+  título suelto no se pierde; seguimiento ("¿y eso?") solo en mensajes cortos; las preguntas sin
+  respuesta solo se apuntan si son preguntas; preguntas frecuentes con dos palabras en común.
+- **Memoria** en JSON: dos procesos ya no se borran lo guardado (relee bajo bloqueo).
+- **Panel**: un número de WhatsApp no puede estar en dos inquilinos; comprobación de origen en la
+  API del cliente; IP conectada comprobada al leer una web (DNS rebinding); ID de responsable
+  acotado; el panel del cliente respeta el bot del `.env`.

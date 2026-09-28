@@ -24,7 +24,7 @@ MAXIMO_POR_LISTA = 200
 MAXIMO_EN_CONTEXTO = 8
 
 _ENSENANZA = re.compile(
-    r"^\W*(?:no[,.!]+\s+|te equivocas[,.!]*\s*|eso no es así[,.!]*\s*|error[,.!:]+\s*|"
+    r"^\W*(?:te equivocas[,.!:]*\s*|eso no es así[,.!:]*\s*|no es así[,.!:]+\s*|"
     r"recuerda que|recuérdalo[:,]?|apréndete que|aprende que|ten en cuenta que|que sepas que|para que lo sepas[,:]?|"
     r"apunta que|a partir de ahora)\s*(.+)$",
     re.I | re.S,
@@ -34,6 +34,8 @@ _PERSONAL = re.compile(
     r"llámame|llamame|mi hij[oa]|mi mujer|mi marido|mi pareja|alérgic[oa]|alergic[oa])\b",
     re.I,
 )
+_PETICION = re.compile(r"^(quiero|quería|queria|mejor|prefiero ir|puedo|podéis|podeis|dame|ponme|reserva)\b", re.I)
+_MOMENTO = re.compile(r"\b(?<!la )(?:mañana|manana)\b|\b(hoy|esta tarde|esta noche|ahora mismo|luego)\b", re.I)
 _OLVIDAR = re.compile(r"^\W*(olv[ií]da(?:lo| eso| lo último| lo que te dije)?|borra lo que te dije)\W*$", re.I)
 
 
@@ -49,10 +51,9 @@ def ensenanza(texto: str) -> "tuple[str, str] | None":
     dato = " ".join(encontrado.group(1).split()).strip(" .")
     if len(dato) < 6 or len(dato) > 400 or dato.endswith("?"):
         return None
-    # Un "no, ..." suelto es muchas veces solo una respuesta ("no, gracias", "no, a las 10"):
-    # se pide más contenido que a un "recuerda que ...".
-    minimo = 3 if re.match(r"^\W*no\b", texto.strip(), re.I) else 2
-    if len(tokenizar(dato)) < minimo:
+    # "No, mejor el martes" o "error: me cobraron dos veces" no son enseñanzas: solo cuentan las
+    # fórmulas explícitas ("recuerda que", "te equivocas", ...). Tampoco planes del momento.
+    if len(tokenizar(dato)) < 2 or _PETICION.match(dato) or _MOMENTO.search(dato):
         return None
     return ("personal" if _PERSONAL.search(dato) else "negocio"), dato[0].upper() + dato[1:]
 

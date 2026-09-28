@@ -15,9 +15,9 @@ from femix.rag.rutas import directorio_inquilino
 from femix.bot.fabrica import almacen_dominio
 
 from ..documentos import ingerir_subida, ingerir_web, listar_documentos
-from .auth import Inquilino, directorio_datos_web, obtener_inquilino_actual
+from .auth import Inquilino, comprobar_origen, directorio_datos_web, obtener_inquilino_actual
 
-router = APIRouter(prefix="/usuario", tags=["usuario"])
+router = APIRouter(prefix="/usuario", tags=["usuario"], dependencies=[Depends(comprobar_origen)])
 
 _DIRECTORIO_TEMPLATES = os.path.join(os.path.dirname(__file__), "..", "templates")
 _templates = Jinja2Templates(directory=_DIRECTORIO_TEMPLATES)
@@ -297,15 +297,26 @@ async def guardar_bot(
             telegram_permitidos=leer_ids_telegram(permitidos),
         )
 
+        # El bot del .env: su token y sus permitidos los manda el .env, no el formulario.
+        from .admin import _inquilino_del_entorno, _leer_estado_bots
+        del_entorno = inquilino.id == _inquilino_del_entorno(_leer_estado_bots(directorio))
+
         def con_token(anterior: "PerfilInquilino | None") -> PerfilInquilino:
             token_actual = anterior.telegram_token if anterior else ""
             whatsapp_actual = anterior.whatsapp_token if anterior else ""
+            nuevo = con_whatsapp(anterior, token_actual, whatsapp_actual)
+            if del_entorno:
+                return _replace(nuevo, telegram_token=token_actual,
+                                telegram_permitidos=anterior.telegram_permitidos if anterior else [])
+            return nuevo
+
+        def con_whatsapp(anterior, token_actual, whatsapp_actual) -> PerfilInquilino:
             return _replace(
                 base, telegram_token="" if quitar_token else (telegram_token.strip() or token_actual),
                 # Los conectores MCP solo los toca el dueño de la plataforma: se conservan.
                 mcp_servidores=anterior.mcp_servidores if anterior else [],
                 whatsapp_telefono_id="" if quitar_whatsapp else whatsapp_telefono_id,
-                       whatsapp_plantilla_cita="" if quitar_whatsapp else whatsapp_plantilla_cita,
+                whatsapp_plantilla_cita="" if quitar_whatsapp else whatsapp_plantilla_cita,
                 whatsapp_token="" if quitar_whatsapp else (whatsapp_token.strip() or whatsapp_actual),
             )
 
