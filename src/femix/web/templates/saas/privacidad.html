@@ -3,6 +3,13 @@
 {% block content %}
 <section class="tarjeta">
     <h2>Privacidad</h2>
+    <h3>Responsable del tratamiento</h3>
+    {% if empresa.completos %}
+    <p>{{ empresa.nombre }} · NIF {{ empresa.nif }} · {{ empresa.direccion }} · <a href="mailto:{{ empresa.email }}">{{ empresa.email }}</a></p>
+    {% else %}
+    <p class="aviso aviso-error">Faltan los datos del responsable del servicio (FEMIX_EMPRESA_* en la configuración).</p>
+    {% endif %}
+    <h3>Qué guardamos y para qué</h3>
     <p>Guardamos lo necesario para que tu asistente funcione: tu perfil, tus documentos, las conversaciones
        recientes de tu bot y tus reservas, tareas y recordatorios. Cada cliente solo ve lo suyo.</p>
     <p>El modelo de lenguaje corre en nuestro propio servidor: tus datos no se envían a terceros para
@@ -11,6 +18,9 @@
        con todo lo que contiene, en cualquier momento. Las copias de seguridad se eliminan solas a los 14 días.</p>
     <p>Lo que tus clientes cuentan a tu bot se guarda para atenderles mejor; si lo prefieres, el responsable puede
        guardar solo los datos técnicos de cada mensaje, sin el texto.</p>
+    <p>Base legal: el contrato del servicio. Puedes ejercer tus derechos (acceso, rectificación, supresión, portabilidad,
+       oposición) desde tu panel o escribiendo{% if empresa.email %} a {{ empresa.email }}{% endif %}, y reclamar ante la
+       Agencia Española de Protección de Datos (aepd.es).</p>
 </section>
 <p><a href="/">← Volver</a></p>
 {% endblock %}

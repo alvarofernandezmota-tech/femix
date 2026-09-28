@@ -456,6 +456,7 @@ async def guardar_perfil(
     whatsapp_telefono_id: str = Form(""),
     whatsapp_token: str = Form(""),
     quitar_whatsapp: bool = Form(False),
+    whatsapp_plantilla_cita: str = Form(""),
     mcp: str = Form(""),
 ):
     inquilino_id = _id_valido(inquilino_id)
@@ -469,6 +470,7 @@ async def guardar_perfil(
         whatsapp_actual = actual.whatsapp_token if actual else ""
         base = replace(base, mcp_servidores=leer_mcp(mcp, actual.mcp_servidores if actual else []),
                        whatsapp_telefono_id="" if quitar_whatsapp else whatsapp_telefono_id,
+                       whatsapp_plantilla_cita="" if quitar_whatsapp else whatsapp_plantilla_cita,
                        whatsapp_token="" if quitar_whatsapp else (whatsapp_token.strip() or whatsapp_actual))
         if del_entorno:
             # Los manda el .env: lo que venga del formulario no cuenta.

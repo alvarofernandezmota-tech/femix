@@ -117,3 +117,43 @@ def test_formulario_del_cliente_guarda_whatsapp(tmp_path, monkeypatch):
     assert AlmacenPerfiles(str(tmp_path)).obtener("acme").whatsapp_token == "EAAx"
     cliente.post("/usuario/bot", data={**datos, "quitar_whatsapp": "true"})
     assert AlmacenPerfiles(str(tmp_path)).obtener("acme").whatsapp_telefono_id == ""
+
+
+def test_recordatorio_de_cita_por_plantilla(tmp_path, monkeypatch):
+    from datetime import datetime, timedelta
+    from femix.bot.fabrica import almacen_dominio
+    from femix.dominio.negocio.reservas import Reservas
+    from femix.inquilino.perfil import Franja
+
+    manana = datetime.now() + timedelta(days=1)
+    dia = ("lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo")[manana.weekday()]
+    monkeypatch.delenv("FEMIX_BASE_DATOS_URL", raising=False)
+    AlmacenPerfiles(str(tmp_path)).crear(PerfilInquilino(
+        "pelu", "Pelu", tipo="empresa", horario=[Franja(dia, "09:00", "14:00")], capacidades=["reservas"],
+        whatsapp_telefono_id="555", whatsapp_token="EAAtoken", whatsapp_plantilla_cita="recordatorio_cita"))
+    reservas = Reservas([Franja(dia, "09:00", "14:00")], almacen_dominio(str(tmp_path), "pelu"))
+    reservas.reservar(manana.date().isoformat(), "10:00", "Ana", servicio="Corte", usuario_id="wa34600111222")
+    reservas.reservar(manana.date().isoformat(), "11:00", "Luis", usuario_id="7")          # de Telegram: no
+    enviados = []
+    assert whatsapp.recordar_citas_whatsapp(str(tmp_path), enviar=lambda *a: enviados.append(a)) == 1
+    assert enviados == [("555", "EAAtoken", "34600111222", "recordatorio_cita", ["10:00", "Corte"])]
+    assert whatsapp.recordar_citas_whatsapp(str(tmp_path), enviar=lambda *a: enviados.append(a)) == 0
+
+
+def test_plantilla_de_whatsapp_validada():
+    with pytest.raises(ValueError, match="plantilla"):
+        PerfilInquilino("a", "A", whatsapp_plantilla_cita="Recordatorio Cita").validado()
+    assert PerfilInquilino("a", "A", whatsapp_plantilla_cita="recordatorio_cita").validado().whatsapp_plantilla_cita
+
+
+def test_enviar_plantilla(monkeypatch):
+    enviados = []
+
+    class Ok:
+        def raise_for_status(self):
+            pass
+    monkeypatch.setattr(whatsapp.requests, "post", lambda url, headers, json, timeout: enviados.append(json) or Ok())
+    whatsapp.enviar_plantilla("555", "T", "346", "recordatorio_cita", ["10:00", "Corte"])
+    plantilla = enviados[0]["template"]
+    assert plantilla["name"] == "recordatorio_cita" and plantilla["language"]["code"] == "es"
+    assert [p["text"] for p in plantilla["components"][0]["parameters"]] == ["10:00", "Corte"]

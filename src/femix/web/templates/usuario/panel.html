@@ -59,6 +59,8 @@
             <label>Identificador del número <small>(Phone number ID, en Meta)</small>
                 <input name="whatsapp_telefono_id" inputmode="numeric" value="{{ perfil.whatsapp_telefono_id if perfil else '' }}"></label>
             <label>Token de acceso <input name="whatsapp_token" type="password" autocomplete="off" placeholder="Déjalo vacío para no cambiarlo"></label>
+            <label>Plantilla del recordatorio de cita <small>(nombre de la plantilla aprobada en Meta, con dos variables: hora y servicio; vacío = sin recordatorio)</small>
+                <input name="whatsapp_plantilla_cita" value="{{ perfil.whatsapp_plantilla_cita if perfil else '' }}" placeholder="recordatorio_cita"></label>
             <label class="casilla"><input type="checkbox" name="quitar_whatsapp" value="true"> Desconectar WhatsApp</label>
         </fieldset>
         <button type="submit">Guardar</button>

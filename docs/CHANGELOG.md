@@ -572,3 +572,9 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
 - `scripts/instalar-vigilante-ollama.sh`: temporizador de systemd que reinicia Ollama si no responde.
 - Arreglo: `HUGIN_LLM_KEEP_ALIVE=-1` se mandaba como texto y Ollama lo rechaza; ahora va como número.
   El diagnóstico ya no deja el modelo en 30 min.
+
+## 2026-09-28 — Datos legales y recordatorios por WhatsApp (`feat/panel-web`)
+- **Términos y privacidad** con los datos de quien presta el servicio (`FEMIX_EMPRESA_*`), base legal
+  y derechos RGPD (incluida la AEPD); aviso visible si faltan.
+- **Recordatorio de cita por WhatsApp** con plantilla aprobada por Meta (`whatsapp_plantilla_cita` en
+  el perfil), cada 10 min desde el panel web, una vez por cita. `docs/whatsapp.md` explica cómo crearla.

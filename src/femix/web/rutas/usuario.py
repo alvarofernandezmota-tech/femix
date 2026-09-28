@@ -278,6 +278,7 @@ async def guardar_bot(
     whatsapp_telefono_id: str = Form(""),
     whatsapp_token: str = Form(""),
     quitar_whatsapp: bool = Form(False),
+    whatsapp_plantilla_cita: str = Form(""),
 ):
     from .admin import leer_horario, leer_responsable
     directorio = directorio_datos_web()
@@ -304,6 +305,7 @@ async def guardar_bot(
                 # Los conectores MCP solo los toca el dueño de la plataforma: se conservan.
                 mcp_servidores=anterior.mcp_servidores if anterior else [],
                 whatsapp_telefono_id="" if quitar_whatsapp else whatsapp_telefono_id,
+                       whatsapp_plantilla_cita="" if quitar_whatsapp else whatsapp_plantilla_cita,
                 whatsapp_token="" if quitar_whatsapp else (whatsapp_token.strip() or whatsapp_actual),
             )
 

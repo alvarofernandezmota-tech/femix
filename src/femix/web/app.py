@@ -1,4 +1,5 @@
 """Aplicación FastAPI del panel: rutas, estáticos y preparación de datos al arrancar."""
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -33,7 +34,22 @@ async def ciclo_de_vida(_app):
     url = (os.environ.get(VARIABLE_URL) or "").strip()
     if url:
         crear_esquema(url)
+    # Recordatorio de citas por WhatsApp (plantilla aprobada): cada 10 min, en segundo plano.
+    tarea = asyncio.create_task(_recordar_whatsapp())
     yield
+    tarea.cancel()
+
+
+async def _recordar_whatsapp(cada: float = 600) -> None:
+    from femix.canales.whatsapp import recordar_citas_whatsapp
+    while True:
+        try:
+            await asyncio.to_thread(recordar_citas_whatsapp, directorio_datos_web())
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logging.getLogger(__name__).warning("Fallo recordando citas por WhatsApp", exc_info=True)
+        await asyncio.sleep(cada)
 
 
 app = FastAPI(title="Femix Web Panel", lifespan=ciclo_de_vida)

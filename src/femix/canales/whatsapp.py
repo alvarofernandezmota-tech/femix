@@ -67,6 +67,45 @@ def enviar(telefono_id: str, token: str, destino: str, texto: str, timeout: floa
     respuesta.raise_for_status()
 
 
+def enviar_plantilla(telefono_id: str, token: str, destino: str, plantilla: str, variables: list,
+                     idioma: str = "es", timeout: float = 20) -> None:
+    """Mensaje con plantilla aprobada por Meta: lo único que se puede mandar pasadas 24 h."""
+    respuesta = requests.post(
+        f"{API}/{telefono_id}/messages",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"messaging_product": "whatsapp", "to": destino, "type": "template",
+              "template": {"name": plantilla, "language": {"code": idioma},
+                           "components": [{"type": "body", "parameters": [
+                               {"type": "text", "text": str(v)[:100]} for v in variables]}]}},
+        timeout=timeout,
+    )
+    respuesta.raise_for_status()
+
+
+def recordar_citas_whatsapp(directorio: str, enviar=enviar_plantilla) -> int:
+    """Una pasada: a cada cliente de WhatsApp con cita mañana, la plantilla del inquilino (una vez)."""
+    from ..bot.fabrica import almacen_dominio
+    from ..dominio.negocio.reservas import Reservas
+    from ..dominio.personal.reloj import RelojZona
+    from ..inquilino.perfil import AlmacenPerfiles
+    enviados = 0
+    for perfil in AlmacenPerfiles(directorio).listar_con_errores()[0]:
+        if not (perfil.activo and perfil.whatsapp_token and perfil.whatsapp_telefono_id and perfil.whatsapp_plantilla_cita):
+            continue
+        reservas = Reservas(perfil.horario, almacen_dominio(directorio, perfil.inquilino_id), RelojZona())
+        for cita in reservas.por_recordar("whatsapp"):
+            try:
+                enviar(perfil.whatsapp_telefono_id, perfil.whatsapp_token, cita["usuario_id"][2:],
+                       perfil.whatsapp_plantilla_cita, [cita["hora"], cita.get("servicio") or "tu cita"])
+            except Exception as exc:
+                _log.warning("WhatsApp de %s: no se pudo recordar la cita %s (%s)", perfil.inquilino_id,
+                             cita["id"], type(exc).__name__)
+                continue
+            reservas.marcar_recordada(cita["id"])
+            enviados += 1
+    return enviados
+
+
 class Vistos:
     """Ids de mensajes ya atendidos: Meta reintenta los avisos y no hay que contestar dos veces."""
 
