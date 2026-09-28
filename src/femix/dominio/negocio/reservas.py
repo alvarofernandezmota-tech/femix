@@ -188,11 +188,16 @@ class Reservas:
 
     # -- recordatorio del día antes -----------------------------------------------------------
 
-    def por_recordar(self) -> list:
-        """Citas de mañana de clientes de Telegram (usuario_id numérico) que aún no se han recordado."""
+    def por_recordar(self, canal: str = "telegram") -> list:
+        """Citas de mañana aún sin recordar de clientes de ese canal: Telegram (usuario_id numérico)
+        o WhatsApp (`wa<número>`)."""
         manana = (self._reloj.ahora().date() + timedelta(days=1)).isoformat()
-        return [c for c in self.citas(manana)
-                if str(c.get("usuario_id") or "").isdigit() and not c.get("recordada")]
+
+        def del_canal(usuario: str) -> bool:
+            if canal == "whatsapp":
+                return usuario.startswith("wa") and usuario[2:].isdigit()
+            return usuario.isdigit()
+        return [c for c in self.citas(manana) if del_canal(str(c.get("usuario_id") or "")) and not c.get("recordada")]
 
     def marcar_recordada(self, id_cita: int) -> None:
         with _ESCRIBIENDO:

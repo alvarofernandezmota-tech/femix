@@ -12,7 +12,7 @@ from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.templating import Jinja2Templates
 
-from femix.saas import pagos, registro_abierto, saas_activo
+from femix.saas import datos_empresa, pagos, registro_abierto, saas_activo
 from femix.saas.planes import DIAS_PRUEBA, planes_publicos
 from femix.saas.suscripciones import AlmacenSuscripciones, nueva_prueba
 
@@ -33,7 +33,8 @@ def _demasiadas_altas(ip: str, ahora: float) -> bool:
 
 
 def _contexto(**extra) -> dict:
-    return {"planes": planes_publicos(), "dias_prueba": DIAS_PRUEBA, "registro": registro_abierto(), **extra}
+    return {"planes": planes_publicos(), "dias_prueba": DIAS_PRUEBA, "registro": registro_abierto(),
+            "empresa": datos_empresa(), **extra}
 
 
 @router.get("/")

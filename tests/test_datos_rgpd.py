@@ -85,3 +85,15 @@ def test_borrar_en_postgres_solo_lo_suyo(tmp_path):
         assert c.execute("SELECT count(*) FROM registros WHERE inquilino_id = 'quedate'").fetchone()[0] == 1
         c.execute("DELETE FROM registros WHERE inquilino_id = 'quedate'")
         c.execute("DELETE FROM mensajes WHERE inquilino_id = 'quedate'")
+
+
+def test_terminos_y_privacidad_con_los_datos_de_la_empresa(monkeypatch):
+    for clave, valor in {"NOMBRE": "Varo S.L.", "NIF": "B12345678", "DIRECCION": "Calle Mayor 1, Madrid",
+                         "EMAIL": "hola@varo.es"}.items():
+        monkeypatch.setenv(f"FEMIX_EMPRESA_{clave}", valor)
+    cliente = TestClient(app)
+    for pagina in ("/terminos", "/privacidad"):
+        texto = cliente.get(pagina).text
+        assert "Varo S.L." in texto and "B12345678" in texto and "hola@varo.es" in texto
+    monkeypatch.delenv("FEMIX_EMPRESA_NIF")
+    assert "Faltan los datos del responsable" in cliente.get("/privacidad").text

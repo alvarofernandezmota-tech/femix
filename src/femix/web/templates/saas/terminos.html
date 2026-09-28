@@ -3,6 +3,12 @@
 {% block content %}
 <section class="tarjeta">
     <h2>Términos del servicio</h2>
+    <h3>Quién presta el servicio</h3>
+    {% if empresa.completos %}
+    <p>{{ empresa.nombre }} · NIF {{ empresa.nif }} · {{ empresa.direccion }} · <a href="mailto:{{ empresa.email }}">{{ empresa.email }}</a></p>
+    {% else %}
+    <p class="aviso aviso-error">Faltan los datos del responsable del servicio (FEMIX_EMPRESA_* en la configuración).</p>
+    {% endif %}
     <h3>El servicio</h3>
     <p>Femix te da un asistente en Telegram para tu negocio o para ti, con un panel para configurarlo. Funciona con
        inteligencia artificial: puede equivocarse. Revisa la información importante (precios, horarios, citas) en tu panel.</p>
@@ -19,7 +25,7 @@
        <a href="/privacidad">política de privacidad</a>.</p>
     <h3>Disponibilidad</h3>
     <p>Hacemos lo posible por que el servicio funcione siempre, pero puede haber cortes por mantenimiento o fallos.
-       Si un fallo nuestro te impide usarlo durante días, escríbenos y lo compensamos.</p>
+       Si un fallo nuestro te impide usarlo durante días, escríbenos{% if empresa.email %} a {{ empresa.email }}{% endif %} y lo compensamos.</p>
     <h3>Cambios</h3>
     <p>Si cambian estos términos o los precios, te avisamos con 30 días de antelación.</p>
 </section>

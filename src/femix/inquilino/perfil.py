@@ -69,6 +69,9 @@ class PerfilInquilino:
     # WhatsApp (Cloud API de Meta): el identificador del número y su token de acceso. Vacíos = sin WhatsApp.
     whatsapp_telefono_id: str = ""
     whatsapp_token: str = ""
+    # Plantilla aprobada por Meta para recordar la cita del día siguiente (con dos variables: hora y
+    # servicio). Vacía = no se recuerdan citas por WhatsApp.
+    whatsapp_plantilla_cita: str = ""
     # Conectores MCP (capacidad `conectores_mcp`): [{"nombre", "url", "cabecera"}]. Solo los pone el
     # dueño de la plataforma; la cabecera (Authorization) es secreta y nunca se enseña.
     mcp_servidores: list = field(default_factory=list)
@@ -82,7 +85,7 @@ class PerfilInquilino:
     def validado(self) -> "PerfilInquilino":
         """Copia normalizada, o `ValueError` diciendo qué campo está mal."""
         for campo in ("nombre", "tipo", "descripcion", "telegram_token", "nombre_asistente", "tono",
-                      "whatsapp_telefono_id", "whatsapp_token"):
+                      "whatsapp_telefono_id", "whatsapp_token", "whatsapp_plantilla_cita"):
             if not isinstance(getattr(self, campo) or "", str):
                 raise ValueError(f"{campo} tiene que ser texto")
         for campo in ("horario", "capacidades", "telegram_permitidos", "mcp_servidores"):
@@ -102,6 +105,9 @@ class PerfilInquilino:
             raise ValueError("El identificador del número de WhatsApp son solo cifras (lo da Meta)")
         if whatsapp_token and (len(whatsapp_token) > 1000 or any(c.isspace() for c in whatsapp_token)):
             raise ValueError("El token de WhatsApp no parece válido")
+        whatsapp_plantilla_cita = (self.whatsapp_plantilla_cita or "").strip()
+        if whatsapp_plantilla_cita and not re.fullmatch(r"[a-z0-9_]{1,512}", whatsapp_plantilla_cita):
+            raise ValueError("El nombre de la plantilla de WhatsApp va en minúsculas, cifras y _ (como en Meta)")
         nombre = (self.nombre or "").strip()
         if not nombre:
             raise ValueError("El nombre no puede estar vacío")
@@ -134,6 +140,7 @@ class PerfilInquilino:
             tono=tono,
             whatsapp_telefono_id=whatsapp_telefono_id,
             whatsapp_token=whatsapp_token,
+            whatsapp_plantilla_cita=whatsapp_plantilla_cita,
             mcp_servidores=_validar_mcp(self.mcp_servidores),
         )
 

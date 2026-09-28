@@ -38,9 +38,13 @@ API). No usa trucos no oficiales, así que el número no se bloquea.
 
 ## Límites de Meta que conviene saber
 
-- Un bot solo puede escribir libremente durante 24 h desde el último mensaje del cliente. Pasado
-  ese tiempo, Meta exige plantillas aprobadas, así que los recordatorios de cita por WhatsApp
-  quedan para más adelante.
+- Un bot solo puede escribir libremente durante 24 h desde el último mensaje del cliente; después,
+  solo con **plantillas aprobadas**. Para el recordatorio de cita del día anterior:
+  1. En Meta (*WhatsApp → Plantillas de mensajes*) crea una plantilla de tipo *Utilidad*, en
+     español, con dos variables, por ejemplo: `Te recordamos tu cita de mañana a las {{1}} ({{2}}). Si no puedes venir, escríbenos.`
+  2. Cuando Meta la apruebe, pon su nombre (p. ej. `recordatorio_cita`) en el perfil del bot,
+     sección WhatsApp. femix la manda cada 10 min a los clientes de WhatsApp con cita al día siguiente,
+     una vez por cita (`canales/whatsapp.recordar_citas_whatsapp`).
 - Meta cobra por conversación a partir de cierto volumen. Consulta sus precios.
 
 Código: `src/femix/canales/whatsapp.py` y `src/femix/web/rutas/whatsapp.py`. Tests: `tests/test_whatsapp.py`.
