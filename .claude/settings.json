@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(scripts/desplegar.sh:*)",
+      "Bash(scripts/probar-todo.sh:*)",
+      "Bash(scripts/ci.sh:*)",
+      "Bash(docker compose ps:*)",
+      "Bash(docker compose logs:*)",
+      "Bash(docker compose exec -T femix python -m femix.comprobacion:*)",
+      "Bash(docker compose exec -T femix python -m femix.llm.diagnostico:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git fetch:*)",
+      "Bash(systemctl list-timers:*)",
+      "Bash(curl -s http://127.0.0.1:11434/api/ps)",
+      "Bash(grep -c:*)",
+      "Bash(nproc)",
+      "Bash(free -h)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Bash(cat .env:*)",
+      "Bash(docker compose config:*)"
+    ]
+  }
+}

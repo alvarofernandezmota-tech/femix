@@ -78,6 +78,27 @@ curl -s http://127.0.0.1:11434/api/ps     # Ollama y modelos cargados
 Después, prueba a mano en Telegram: "hola", una pregunta de precio u horario, pedir una cita y una
 nota de voz. Apunta cuánto tarda cada una: con eso se ajusta el modelo.
 
+## Con Claude Code en madre (opcional)
+
+Todo lo anterior se le puede pedir a Claude Code en la propia madre. La repo ya lo trae preparado:
+`CLAUDE.md` (carga las reglas de `AGENTS.md`), comandos en `.claude/commands/` y permisos en
+`.claude/settings.json` (deja lanzar los scripts y le impide leer el `.env`).
+
+```bash
+curl -fsSL https://claude.ai/install.sh | bash      # solo la primera vez
+cd ~/GitHub/personal/femix && git pull
+tmux new -A -s claude
+claude remote-control      # aparece en la app de Claude del móvil; o `claude` a secas
+```
+
+Comandos:
+- `/desplegar`: comprueba el `.env` sin enseñarlo, instala el vigilante si falta, despliega, pasa
+  `probar-todo.sh` y resume fallos con su causa.
+- `/probar`: solo la comprobación.
+- `/diagnosticar`: mide la velocidad del modelo y propone qué modelos usar.
+
+No cambia código en madre: propone el arreglo, y el cambio va por rama y PR.
+
 ## 4. Problemas conocidos
 
 | Síntoma | Causa y arreglo |
