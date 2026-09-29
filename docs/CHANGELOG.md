@@ -678,3 +678,7 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   pestañas Hoy/Semana/Chat/Mi bot en todo el panel de la persona.
 - Docs nuevas: `comprension.md`, `mejoras.md` (investigación open source, plan Google Play y
   anuncios), `app.md` al día y `PRODUCCION_MADRE.md` con Tailscale Serve y SaaS público.
+
+## 2026-09-30 — Competencia y plan de producto (`feat/panel-web`)
+- `docs/mejoras.md`: competencia real (bots de WhatsApp en España, Booksy/Treatwell/Asistiva, open
+  source parecido), precios de mercado y lo que falta por valor. ROADMAP con las fases 12–14.
