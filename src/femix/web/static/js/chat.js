@@ -64,13 +64,20 @@
         const mio = burbuja("yo", "🎤 " + JSON.parse(transcripcion));
         mensajes.insertBefore(mio, pensando);
       }
+      let terminado = false;
       await leerEventos(respuesta, (tipo, datos) => {
         if (tipo === "parcial" || tipo === "final") {
           pensando.textContent = datos.texto;
           pensando.classList.remove("pensando");
           mensajes.scrollTop = mensajes.scrollHeight;
         }
+        if (tipo === "final") terminado = true;
       });
+      if (!terminado) {
+        // El servidor cortó sin terminar (reinicio, proxy): que no se quede el "…" para siempre.
+        pensando.textContent = "Se cortó la conexión. Prueba otra vez.";
+        pensando.classList.replace("pensando", "error");
+      }
     } catch (e) {
       pensando.textContent = "Sin conexión. Prueba otra vez.";
       pensando.classList.replace("pensando", "error");
@@ -99,10 +106,12 @@
 
   // --- Nota de voz: mantener pulsado el micro ---
   if (grabar && navigator.mediaDevices) {
-    let grabadora = null, trozos = [];
+    let grabadora = null, trozos = [], pulsado = false;
     async function empezar() {
+      pulsado = true;
       try {
         const flujo = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (!pulsado) { flujo.getTracks().forEach((t) => t.stop()); return; }   // toque corto: no grabar
         trozos = [];
         grabadora = new MediaRecorder(flujo);
         grabadora.ondataavailable = (e) => trozos.push(e.data);
@@ -121,12 +130,14 @@
       }
     }
     function parar() {
+      pulsado = false;
       if (grabadora && grabadora.state === "recording") grabadora.stop();
       grabar.classList.remove("grabando");
     }
     grabar.addEventListener("pointerdown", (e) => { e.preventDefault(); empezar(); });
     grabar.addEventListener("pointerup", parar);
     grabar.addEventListener("pointerleave", parar);
+    grabar.addEventListener("pointercancel", parar);
   } else if (grabar) {
     grabar.style.display = "none";
   }
@@ -142,6 +153,11 @@
         if ("Notification" in window && Notification.permission === "granted") {
           new Notification("Recordatorio", { body: aviso.texto, icon: "/static/icono.svg" });
         }
+      }
+      if (avisos.length) {
+        // Solo cuando ya se han enseñado: si la red se corta antes, siguen pendientes.
+        await fetch("/usuario/chat/avisos/vistos", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRF": csrf },
+                                                     body: JSON.stringify({ avisos }) });
       }
     } catch (e) { /* sin red: se reintenta */ }
   }

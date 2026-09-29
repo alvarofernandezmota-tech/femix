@@ -28,7 +28,8 @@ from datetime import date, timedelta
 from ..personal.reloj import Reloj, RelojSistema
 
 COLECCION = "reservas"
-AGENDA = "_negocio"          # una agenda por inquilino: el "usuario" de la colección
+AGENDA = "_negocio"    # una agenda por inquilino: el "usuario" de la colección
+ESPERA = "_espera"     # lista de espera: [{id, fecha, usuario_id, nombre, duracion}]
 DIAS = ("lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo")
 DURACION_POR_DEFECTO = 30   # mejor pasarse que meter a dos personas en el mismo sillón
 PASO = 30                   # las citas se ofrecen en múltiplos de esto
@@ -39,6 +40,7 @@ MOTIVOS = {
     "ocupado": "ese hueco ya está cogido",
     "sin_horario": "no hay horario de atención escrito en el perfil",
     "duracion": "la duración tiene que ser de 5 a 600 minutos",
+    "sin_nombre": "falta el nombre",
 }
 
 # Reservar y anular son leer-comprobar-escribir: sin esto, dos mensajes a la vez pasan los dos la
@@ -226,3 +228,68 @@ class Reservas:
                 if cita["id"] == id_cita:
                     cita["recordada"] = True
             self._guardar(citas)
+
+    # -- reseña después de la cita ------------------------------------------------------------
+
+    def por_agradecer(self) -> list:
+        """Citas de Telegram que ya han terminado (hoy o ayer) y a las que aún no se ha pedido reseña.
+        Solo las de ayer y hoy: no se molesta a clientes de hace semanas al activar la función."""
+        ahora = self._reloj.ahora()
+        ayer = (ahora.date() - timedelta(days=1)).isoformat()
+        hoy = ahora.date().isoformat()
+        minuto = ahora.hour * 60 + ahora.minute
+        listas = []
+        for c in self.citas():
+            if c.get("resena_pedida") or not str(c.get("usuario_id") or "").isdigit():
+                continue
+            if c["fecha"] == ayer or (c["fecha"] == hoy and _minutos(c["hora"]) + c["duracion"] <= minuto):
+                listas.append(c)
+        return listas
+
+    def marcar_resena_pedida(self, id_cita: int) -> None:
+        with self._escribiendo():
+            citas = self._almacen.cargar(COLECCION, AGENDA)
+            for cita in citas:
+                if cita["id"] == id_cita:
+                    cita["resena_pedida"] = True
+            self._guardar(citas)
+
+    # -- lista de espera ----------------------------------------------------------------------
+
+    def apuntar_espera(self, fecha: str, usuario_id: str, nombre: str, duracion: int = DURACION_POR_DEFECTO) -> dict:
+        """Apunta a alguien para que se le avise si se libera un hueco ese día."""
+        date.fromisoformat(fecha)
+        if fecha < self.hoy():
+            raise ValueError("pasado")
+        if not (nombre or "").strip():
+            raise ValueError("sin_nombre")
+        with self._escribiendo():
+            lista = self._almacen.cargar(COLECCION, ESPERA)
+            repetida = next((e for e in lista if e["fecha"] == fecha and e["usuario_id"] == str(usuario_id)), None)
+            if repetida:
+                return repetida
+            entrada = {"id": max((e["id"] for e in lista), default=0) + 1, "fecha": fecha, "usuario_id": str(usuario_id),
+                       "nombre": nombre.strip(), "duracion": int(duracion),
+                       "creada": self._reloj.ahora().strftime("%Y-%m-%d %H:%M")}
+            self._almacen.guardar(COLECCION, ESPERA, lista + [entrada])
+            return entrada
+
+    def en_espera(self, usuario_id: "str | None" = None) -> list:
+        hoy = self.hoy()
+        return [e for e in self._almacen.cargar(COLECCION, ESPERA)
+                if e["fecha"] >= hoy and (usuario_id is None or e["usuario_id"] == str(usuario_id))]
+
+    def espera_con_hueco(self) -> list:
+        """`[(entrada, hueco)]`: a quién avisar porque ya hay sitio el día que esperaba."""
+        avisos = []
+        for e in self.en_espera():
+            huecos = self.huecos(e["fecha"], e.get("duracion") or DURACION_POR_DEFECTO, tope=1)
+            if huecos:
+                avisos.append((e, huecos[0]))
+        return avisos
+
+    def quitar_espera(self, id_entrada: int) -> None:
+        with self._escribiendo():
+            lista = self._almacen.cargar(COLECCION, ESPERA)
+            hoy = self.hoy()
+            self._almacen.guardar(COLECCION, ESPERA, [e for e in lista if e["id"] != id_entrada and e["fecha"] >= hoy])

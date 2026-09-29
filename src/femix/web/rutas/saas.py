@@ -4,13 +4,12 @@ Sin `FEMIX_SAAS=1` la portada es el JSON de siempre y el alta no existe. Con el 
 el alta además necesita `FEMIX_SAAS_REGISTRO=1` (así se puede cerrar sin apagar lo demás).
 """
 import logging
-import os
 import time
 from datetime import datetime
 
 from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import JSONResponse
-from fastapi.templating import Jinja2Templates
+from ..plantillas import plantillas
 
 from femix.saas import datos_empresa, pagos, registro_abierto, saas_activo
 from femix.saas.planes import DIAS_PRUEBA, planes_publicos
@@ -20,7 +19,7 @@ from femix.saas.suscripciones import AlmacenSuscripciones, nueva_prueba
 from .auth import AlmacenInquilinos, abrir_sesion, directorio_datos_web
 
 _log = logging.getLogger(__name__)
-_templates = Jinja2Templates(directory=os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates"))
+_templates = plantillas()
 router = APIRouter()
 
 ALTAS_POR_HORA = 5

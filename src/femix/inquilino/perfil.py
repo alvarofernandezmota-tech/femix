@@ -75,6 +75,11 @@ class PerfilInquilino:
     # Conectores MCP (capacidad `conectores_mcp`): [{"nombre", "url", "cabecera"}]. Solo los pone el
     # dueño de la plataforma; la cabecera (Authorization) es secreta y nunca se enseña.
     mcp_servidores: list = field(default_factory=list)
+    # Enlace para dejar reseña (Google, etc.): el bot lo manda al terminar la cita. Vacío = no pide.
+    enlace_resenas: str = ""
+    # De quién son los datos que enseña la app (agenda, chat, tareas): un ID de Telegram de los
+    # permitidos. 0 = el primero de la lista.
+    telegram_usuario_panel: int = 0
     # Fase 3: cómo se presenta y habla su bot. Vacíos = los de Femix.
     nombre_asistente: str = ""
     tono: str = ""
@@ -108,6 +113,19 @@ class PerfilInquilino:
         whatsapp_plantilla_cita = (self.whatsapp_plantilla_cita or "").strip()
         if whatsapp_plantilla_cita and not re.fullmatch(r"[a-z0-9_]{1,512}", whatsapp_plantilla_cita):
             raise ValueError("El nombre de la plantilla de WhatsApp va en minúsculas, cifras y _ (como en Meta)")
+        try:
+            usuario_panel = int(self.telegram_usuario_panel or 0)
+        except (TypeError, ValueError):
+            raise ValueError("El ID de Telegram del usuario de la app no es válido") from None
+        if isinstance(self.telegram_usuario_panel, bool) or usuario_panel < 0 or usuario_panel > 10**15:
+            raise ValueError("El ID de Telegram del usuario de la app no es válido")
+        enlace_resenas = self.enlace_resenas or ""
+        if not isinstance(enlace_resenas, str):
+            raise ValueError("El enlace de reseñas tiene que ser un texto")
+        enlace_resenas = enlace_resenas.strip()
+        if enlace_resenas and not (enlace_resenas.startswith(("http://", "https://")) and len(enlace_resenas) <= 500
+                                   and not any(c.isspace() for c in enlace_resenas)):
+            raise ValueError("El enlace de reseñas tiene que ser una dirección web (https://…)")
         nombre = (self.nombre or "").strip()
         if not nombre:
             raise ValueError("El nombre no puede estar vacío")
@@ -141,6 +159,8 @@ class PerfilInquilino:
             whatsapp_telefono_id=whatsapp_telefono_id,
             whatsapp_token=whatsapp_token,
             whatsapp_plantilla_cita=whatsapp_plantilla_cita,
+            enlace_resenas=enlace_resenas,
+            telegram_usuario_panel=usuario_panel,
             mcp_servidores=_validar_mcp(self.mcp_servidores),
         )
 

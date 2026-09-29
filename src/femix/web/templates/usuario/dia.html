@@ -10,6 +10,7 @@
     <a href="/usuario/panel">Mi bot</a>
 </nav>
 <h2>{{ titulo }}</h2>
+{% if dueno_de_los_datos %}<p class="secundario">Datos del usuario de Telegram {{ dueno_de_los_datos }} (los mismos que ve tu bot).</p>{% endif %}
 {% if aviso %}<p class="aviso aviso-ok">{{ aviso }}</p>{% endif %}
 {% if error %}<p class="aviso aviso-error">{{ error }}</p>{% endif %}
 

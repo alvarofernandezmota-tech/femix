@@ -163,7 +163,7 @@ class Femix:
             contexto = f"{ahora}\n{contexto}" if contexto else ahora
         if contexto_frecuente:
             contexto = f"{contexto_frecuente}\n{contexto}" if contexto else contexto_frecuente
-        aprendido = self._aprender(usuario_id, texto_n)
+        aprendido = self._aprender(usuario_id, texto)   # lo que se guarda, tal cual lo escribió
         if aprendido:
             contexto = f"{aprendido}\n{contexto}" if contexto else aprendido
         respuesta, camino = self._responder(usuario_id, texto, contexto, intencion, al_avanzar, texto_n)
@@ -305,7 +305,7 @@ class Femix:
             return None
         if not encontrado or not encontrado.strip():
             if es_pregunta(texto_n or texto):
-                self._sin_respuesta(texto_n or texto)   # el dueño la verá en su panel para contestarla
+                self._sin_respuesta(texto)   # el dueño la ve tal cual la escribió el cliente   # el dueño la verá en su panel para contestarla
             return None
         documentos = ("Información encontrada en los documentos del negocio (si la usas, di de qué documento "
                       f"sale, y no añadas datos que no estén aquí):\n{encontrado}")

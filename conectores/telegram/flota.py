@@ -244,12 +244,72 @@ async def recordar_citas(app, inquilino_id: str) -> int:
     return enviados
 
 
+def _enlace_resenas(directorio_datos: str, inquilino_id: str) -> str:
+    from femix.inquilino.perfil import AlmacenPerfiles
+    try:
+        perfil = AlmacenPerfiles(directorio_datos).obtener(inquilino_id)
+    except Exception:
+        return ""
+    return (perfil.enlace_resenas or "") if perfil else ""
+
+
+async def pedir_resenas(app, directorio_datos: str, inquilino_id: str) -> int:
+    """Al terminar una cita, un mensaje con el enlace de reseñas del negocio (una vez por cita)."""
+    reservas = getattr(app.bot_data.get("femix"), "_reservas", None)
+    if reservas is None:
+        return 0
+    enlace = await asyncio.to_thread(_enlace_resenas, directorio_datos, inquilino_id)
+    if not enlace:
+        return 0
+    enviados = 0
+    for cita in await asyncio.to_thread(reservas.por_agradecer):
+        texto = (f"Gracias por tu visita, {cita['nombre']}. Si te ha gustado, nos ayuda mucho una reseña: {enlace}")
+        try:
+            await app.bot.send_message(chat_id=int(cita["usuario_id"]), text=texto)
+        except Forbidden:
+            pass   # bloqueó el bot: se marca igual, no se insiste
+        except Exception as exc:
+            _log.warning("Bot de %s: no se pudo pedir reseña por la cita %s (%s)", inquilino_id, cita["id"], type(exc).__name__)
+            continue
+        await asyncio.to_thread(reservas.marcar_resena_pedida, cita["id"])
+        enviados += 1
+    return enviados
+
+
+async def avisar_lista_espera(app, inquilino_id: str) -> int:
+    """Si se ha liberado un hueco un día con gente en espera, se les avisa y salen de la lista."""
+    reservas = getattr(app.bot_data.get("femix"), "_reservas", None)
+    if reservas is None:
+        return 0
+    enviados = 0
+    for entrada, hueco in await asyncio.to_thread(reservas.espera_con_hueco):
+        if not str(entrada["usuario_id"]).isdigit():
+            await asyncio.to_thread(reservas.quitar_espera, entrada["id"])   # de la web: no hay a quién avisar
+            continue
+        texto = (f"🎉 Se ha liberado un hueco el {hueco.fecha} a las {hueco.hora}. "
+                 f"Si lo quieres, dime «resérvame el {hueco.fecha} a las {hueco.hora}».")
+        try:
+            await app.bot.send_message(chat_id=int(entrada["usuario_id"]), text=texto)
+        except Forbidden:
+            pass
+        except Exception as exc:
+            _log.warning("Bot de %s: no se pudo avisar de la lista de espera a %s (%s)", inquilino_id, entrada["usuario_id"], type(exc).__name__)
+            continue
+        await asyncio.to_thread(reservas.quitar_espera, entrada["id"])
+        enviados += 1
+    return enviados
+
+
 async def _bucle_avisos(app, directorio_datos: str, inquilino_id: str) -> None:
+    from .resumenes import enviar_resumenes
     reloj = RelojZona()
     while True:
         try:
             await avisar_recordatorios(app, directorio_datos, inquilino_id, reloj)
             await recordar_citas(app, inquilino_id)
+            await pedir_resenas(app, directorio_datos, inquilino_id)
+            await avisar_lista_espera(app, inquilino_id)
+            await enviar_resumenes(app, directorio_datos, inquilino_id, reloj)
         except asyncio.CancelledError:
             raise
         except Exception:

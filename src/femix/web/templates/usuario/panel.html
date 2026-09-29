@@ -35,6 +35,8 @@
         </label>
         <label>Nombre del asistente <input name="nombre_asistente" maxlength="40" value="{{ perfil.nombre_asistente if perfil else '' }}" placeholder="Femix"></label>
         <label>Tono <input name="tono" maxlength="300" value="{{ perfil.tono if perfil else '' }}" placeholder="Cercano y directo."></label>
+        <label>Enlace para reseñas <small>(Google, etc.: el bot lo manda al cliente cuando termina su cita; vacío = no pide)</small>
+            <input name="enlace_resenas" type="url" value="{{ perfil.enlace_resenas if perfil else '' }}" placeholder="https://g.page/r/…/review"></label>
         <fieldset>
             <legend>Herramientas del bot</legend>
             {% for c in catalogo %}

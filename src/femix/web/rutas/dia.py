@@ -4,12 +4,11 @@ Agenda, citas del negocio, recordatorios y tareas de hoy o de la semana, con lo 
 o quitar cosas sin pasar por el bot. Los datos son los mismos que ve su bot de Telegram: se guardan
 con el ID de Telegram de la persona (`usuario_principal`), no con el id del inquilino.
 """
-import os
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Form, Request, status
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
+from ..plantillas import plantillas
 
 from femix.bot.fabrica import almacen_dominio
 from femix.dominio.personal.agenda import AgendaPersonal
@@ -23,7 +22,7 @@ from .. import panel_comun
 from .auth import Inquilino, comprobar_csrf, comprobar_origen, csrf_de_sesion, directorio_datos_web, obtener_inquilino_actual
 
 router = APIRouter(prefix="/usuario", tags=["mi-dia"], dependencies=[Depends(comprobar_origen)])
-_templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "..", "templates"))
+_templates = plantillas()
 
 AVISOS = {
     "agenda": "Apuntado en tu agenda.",
@@ -36,12 +35,17 @@ AVISOS = {
 
 
 def usuario_principal(inquilino: Inquilino) -> str:
-    """El ID de Telegram de la persona (el primero permitido). Sin bot todavía, el id del inquilino."""
+    """De quién son los datos de la app: `telegram_usuario_panel` del perfil si está (y sigue entre
+    los permitidos); si no, el primer permitido. Sin bot todavía, el id del inquilino."""
     try:
         perfil = AlmacenPerfiles(directorio_datos_web()).obtener(inquilino.id)
     except PerfilIlegible:
         perfil = None
-    if perfil is not None and perfil.telegram_permitidos:
+    if perfil is None:
+        return inquilino.id
+    if perfil.telegram_usuario_panel and perfil.telegram_usuario_panel in perfil.telegram_permitidos:
+        return str(perfil.telegram_usuario_panel)
+    if perfil.telegram_permitidos:
         return str(perfil.telegram_permitidos[0])
     return inquilino.id
 
@@ -54,12 +58,13 @@ def _pagina(request: Request, inquilino: Inquilino, csrf: str, dias: int, codigo
     directorio = directorio_datos_web()
     usuario = usuario_principal(inquilino)
     reloj = RelojZona()
+    dueno_de_los_datos = usuario if usuario != inquilino.id else ""
     reservas = panel_comun.reservas_de(directorio, inquilino.id)
     tramo = datos(usuario, dias, directorio_datos=directorio, almacen=_almacen(inquilino), reloj=reloj, reservas=reservas)
     contexto = {
         "inquilino": inquilino, "csrf": csrf, "dias": dias, "usuario": usuario,
         "titulo": ("Hoy, " + fecha_larga(tramo["ahora"])) if dias == 1 else f"Semana: del {fecha_corta(tramo['desde'])} al {fecha_corta(tramo['hasta'])}",
-        "hoy": tramo["desde"], "con_reservas": reservas is not None,
+        "hoy": tramo["desde"], "con_reservas": reservas is not None, "dueno_de_los_datos": dueno_de_los_datos,
         "aviso": AVISOS.get(request.query_params.get("hecho") or ""), "error": error,
         **{k: tramo[k] for k in ("agenda", "reservas", "recordatorios", "tareas")},
     }

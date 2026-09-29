@@ -1,5 +1,6 @@
 """Recordatorios del usuario: se guardan y la flota los avisa por Telegram al vencer."""
 from ...infraestructura.almacen_json import AlmacenJson
+import contextlib
 import threading
 from dataclasses import dataclass, asdict
 from datetime import datetime
@@ -31,6 +32,18 @@ def _sin_zona(cuando: datetime, zona: "str | None") -> datetime:
     return cuando.astimezone(ZoneInfo(zona) if zona else None).replace(tzinfo=None)
 
 class Recordatorios:
+    @contextlib.contextmanager
+    def _escribiendo(self):
+        """Hilos de este proceso y, si el almacén sabe, otros procesos (el bot marca avisados y el
+        panel crea recordatorios sobre la misma lista)."""
+        with _ESCRIBIENDO:
+            bloqueo = getattr(self._almacen, "bloqueo", None)
+            if bloqueo is None:
+                yield
+            else:
+                with bloqueo("recordatorios", self.usuario_id):
+                    yield
+
     def __init__(self, usuario_id: str, directorio_datos: str = "datos", reloj: "Reloj | None" = None, almacen=None):
         if not usuario_id:
             raise ValueError("usuario_id no puede estar vacío")
@@ -53,7 +66,7 @@ class Recordatorios:
         if not isinstance(cuando, datetime):
             cuando = datetime.fromisoformat(cuando)
         cuando_iso = _sin_zona(cuando, getattr(self._reloj, "zona", None)).isoformat()
-        with _ESCRIBIENDO:
+        with self._escribiendo():
             self._recordatorios = self._cargar()
             self._recordatorios.append(Recordatorio(texto, cuando_iso))
             self._guardar()
@@ -75,7 +88,7 @@ class Recordatorios:
         Se relee antes y se busca por texto y fecha (no por posición): mientras se mandaba el aviso
         el usuario pudo crear otro recordatorio, y reescribir la lista vieja lo borraría."""
         objetivo = self._recordatorios[posicion]
-        with _ESCRIBIENDO:
+        with self._escribiendo():
             self._recordatorios = self._cargar()
             for recordatorio in self._recordatorios:
                 if (not recordatorio.avisado and recordatorio.texto == objetivo.texto

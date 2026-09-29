@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
-from fastapi.templating import Jinja2Templates
+from ..plantillas import plantillas
 from pydantic import BaseModel, field_validator
 
 from femix.dominio.personal.diario import Diario
@@ -20,7 +20,7 @@ from .auth import Inquilino, comprobar_origen, directorio_datos_web, obtener_inq
 router = APIRouter(prefix="/usuario", tags=["usuario"], dependencies=[Depends(comprobar_origen)])
 
 _DIRECTORIO_TEMPLATES = os.path.join(os.path.dirname(__file__), "..", "templates")
-_templates = Jinja2Templates(directory=_DIRECTORIO_TEMPLATES)
+_templates = plantillas()
 
 
 def _carpeta(inquilino: Inquilino) -> str:
@@ -267,6 +267,7 @@ async def guardar_bot(
     whatsapp_token: str = Form(""),
     quitar_whatsapp: bool = Form(False),
     whatsapp_plantilla_cita: str = Form(""),
+    enlace_resenas: str = Form(""),
 ):
     from .admin import leer_horario, leer_responsable
     directorio = directorio_datos_web()

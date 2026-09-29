@@ -36,8 +36,8 @@ def resumen(directorio: str, ahora: "datetime | None" = None) -> str:
     hoy = ahora.strftime("%Y-%m-%d")
     bots = _estado_bots(directorio)
     actividad = Actividad(directorio)
-    mensajes = _de_hoy(actividad.ultimos("mensajes", limite=500), hoy)
-    incidencias = _de_hoy(actividad.ultimos("incidencias", limite=500), hoy)
+    mensajes = _de_hoy(actividad.ultimos("mensajes", limite=20000, sin_tope=True), hoy)
+    incidencias = _de_hoy(actividad.ultimos("incidencias", limite=5000, sin_tope=True), hoy)
     perfiles, ilegibles = AlmacenPerfiles(directorio).listar_con_errores()
 
     lineas = [f"📊 Plataforma · {ahora.strftime('%d/%m %H:%M')}"]

@@ -92,6 +92,8 @@
         <label>Tono <small>(cómo habla; vacío = cercano y directo)</small>
             <input name="tono" maxlength="300" value="{{ perfil.tono if perfil else '' }}" placeholder="Cercano y directo, sin formalismos excesivos.">
         </label>
+        <label>Enlace para reseñas <small>(Google, etc.: el bot lo manda al cliente cuando termina su cita; vacío = no pide)</small>
+            <input name="enlace_resenas" type="url" value="{{ perfil.enlace_resenas if perfil else '' }}" placeholder="https://g.page/r/…/review"></label>
 
         <fieldset>
             <legend>Capacidades</legend>
@@ -129,6 +131,8 @@
             {% endif %}
             <label class="casilla"><input type="checkbox" name="abierto" value="true" {% if perfil and perfil.telegram_abierto %}checked{% endif %}>
                 Abierto a cualquiera (los clientes de un negocio)</label>
+            <label>ID de Telegram del usuario de la app <small>(de quién son la agenda, el chat y las tareas que enseña su app; vacío = el primero de los permitidos)</small>
+                <input name="usuario_panel" inputmode="numeric" value="{{ perfil.telegram_usuario_panel if perfil and perfil.telegram_usuario_panel else '' }}"></label>
             <label>ID de Telegram del responsable <small>(recibe los "quiero hablar con una persona" y contesta con /responder; vacío = nadie)</small>
                 <input name="responsable" inputmode="numeric" value="{{ perfil.telegram_responsable if perfil and perfil.telegram_responsable else '' }}"></label>
         </fieldset>

@@ -47,14 +47,14 @@ def _reservas_entre(reservas, desde: str, hasta: str) -> list:
 
 
 def datos(usuario_id: str, dias: int, directorio_datos: str = "datos", almacen=None,
-          reloj: "Reloj | None" = None, reservas=None) -> dict:
+          reloj: "Reloj | None" = None, reservas=None, desde_dias: int = 0) -> dict:
     """Lo mismo que `resumen`, pero como datos (para el panel): agenda, reservas, recordatorios y
-    tareas pendientes entre hoy y `dias` días, más las fechas del tramo."""
+    tareas pendientes entre hoy (o `desde_dias` días después) y `dias` días, más las fechas del tramo."""
     if not usuario_id:
         raise ValueError("usuario_id vacío")
     reloj = reloj or RelojSistema()
     ahora = reloj.ahora()
-    inicio = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
+    inicio = ahora.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=desde_dias)
     fin = inicio + timedelta(days=dias)
     desde, hasta = inicio.date().isoformat(), (fin - timedelta(days=1)).date().isoformat()
     avisos = []
@@ -71,21 +71,26 @@ def datos(usuario_id: str, dias: int, directorio_datos: str = "datos", almacen=N
 
 
 def resumen(usuario_id: str, dias: int, directorio_datos: str = "datos", almacen=None,
-            reloj: "Reloj | None" = None, reservas=None) -> str:
-    """`dias=1`: hoy. `dias=7`: esta semana (hoy y los seis días siguientes)."""
+            reloj: "Reloj | None" = None, reservas=None, desde_dias: int = 0) -> str:
+    """`dias=1`: hoy. `dias=7`: esta semana (hoy y los seis días siguientes). `desde_dias=1`: mañana."""
     if not usuario_id:
         raise ValueError("usuario_id vacío")
     ahora = (reloj or RelojSistema()).ahora()
-    inicio = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
+    inicio = ahora.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=desde_dias)
     fin = inicio + timedelta(days=dias)
     desde, hasta = inicio.date().isoformat(), (fin - timedelta(days=1)).date().isoformat()
     con_dia = dias > 1
+    dia_inicio = inicio
 
     def cuando(fecha: str, hora: "str | None") -> str:
         partes = ([_corta(fecha)] if con_dia else []) + ([hora] if hora else [])
         return " ".join(partes) or "todo el día"
 
-    lineas = [f"📅 {'Hoy es ' + fecha_larga(ahora) if dias == 1 else 'Semana del ' + str(ahora.day) + ' al ' + str((fin - timedelta(days=1)).day) + ' de ' + _MESES[(fin - timedelta(days=1)).month - 1]}."]
+    if dias == 1:
+        cabecera = ("Hoy es " if desde_dias == 0 else "Mañana es " if desde_dias == 1 else "El día ") + fecha_larga(dia_inicio)
+    else:
+        cabecera = f"Semana del {dia_inicio.day} al {(fin - timedelta(days=1)).day} de {_MESES[(fin - timedelta(days=1)).month - 1]}"
+    lineas = [f"📅 {cabecera}."]
 
     agenda = _agenda_entre(usuario_id, desde, hasta, directorio_datos, almacen)
     if agenda:
@@ -113,3 +118,9 @@ def resumen(usuario_id: str, dias: int, directorio_datos: str = "datos", almacen
     if len(lineas) == 1:
         lineas.append("Nada apuntado. " + ("Día libre." if dias == 1 else "Semana libre."))
     return "\n".join(lineas)
+
+
+def hay_algo(usuario_id: str, dias: int, **kw) -> bool:
+    """¿Hay algo que contar en ese tramo? (para no mandar resúmenes vacíos)."""
+    d = datos(usuario_id, dias, **kw)
+    return bool(d["agenda"] or d["reservas"] or d["recordatorios"] or d["tareas"])

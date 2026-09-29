@@ -33,6 +33,7 @@ AYUDA_RESERVA = (
     "/reserva <AAAA-MM-DD> <HH:MM> <nombre> [| servicio | minutos]\n"
     "/reserva mias\n"
     "/reserva anular <n>"
+    "/reserva espera <AAAA-MM-DD> <nombre>   (te aviso si se libera un hueco)"
 )
 
 def ejecutar_comando(
@@ -185,6 +186,15 @@ def _comando_reserva(usuario_id: str, resto: str, reservas) -> str:
         suyas = reservas.de_usuario(usuario_id)
         return "\n".join(f"{c['id']}. {c['fecha']} {c['hora']} {c['servicio'] or ''} ({c['nombre']})".replace("  ", " ")
                          for c in suyas) if suyas else "No tienes reservas."
+    if accion == "espera":
+        argumentos = (partes[1] if len(partes) > 1 else "").split(maxsplit=1)
+        if len(argumentos) < 2 or not _es_fecha(argumentos[0]):
+            return AYUDA_RESERVA
+        try:
+            entrada = reservas.apuntar_espera(argumentos[0], usuario_id, argumentos[1])
+        except ValueError as exc:
+            return f"No apuntado: {MOTIVOS.get(str(exc), str(exc))}."
+        return f"Apuntado en la lista de espera del {entrada['fecha']}. Te aviso si se libera un hueco."
     if accion == "anular":
         indice = _parsear_indice(partes[1]) if len(partes) > 1 else None
         if indice is None:

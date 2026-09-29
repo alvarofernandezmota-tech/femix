@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Cookie, Depends, File, Form, Header, HTTPException, Request, UploadFile, status
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
+from ..plantillas import plantillas
 from pydantic import BaseModel
 
 from femix.bot.fabrica import almacen_dominio
@@ -49,7 +49,7 @@ NOMBRE_ESTADO_BOTS = ".estado_bots.json"
 INTERVALO_BOTS_POR_DEFECTO = 30.0
 
 _DIRECTORIO_TEMPLATES = os.path.join(os.path.dirname(__file__), "..", "templates")
-_templates = Jinja2Templates(directory=_DIRECTORIO_TEMPLATES)
+_templates = plantillas()
 
 AVISOS = {
     "creado": "Inquilino creado.",
@@ -461,6 +461,8 @@ async def guardar_perfil(
     whatsapp_token: str = Form(""),
     quitar_whatsapp: bool = Form(False),
     whatsapp_plantilla_cita: str = Form(""),
+    enlace_resenas: str = Form(""),
+    usuario_panel: str = Form(""),
     mcp: str = Form(""),
 ):
     inquilino_id = _id_valido(inquilino_id)
@@ -488,7 +490,8 @@ async def guardar_perfil(
             inquilino_id=inquilino_id, nombre=nombre, tipo=tipo, descripcion=descripcion,
             horario=leer_horario(horario), capacidades=capacidades,
             nombre_asistente=nombre_asistente, tono=tono,
-            telegram_abierto=abierto, telegram_responsable=leer_responsable(responsable),
+            telegram_abierto=abierto, telegram_responsable=leer_responsable(responsable), enlace_resenas=enlace_resenas.strip(),
+            telegram_usuario_panel=leer_responsable(usuario_panel),
         )
         if contexto["perfil_ilegible"]:
             almacen.reparar(con_telegram(base, None))

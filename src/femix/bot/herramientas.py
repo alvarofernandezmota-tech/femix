@@ -66,7 +66,8 @@ def herramientas_reservas(usuario_id: str, reservas) -> list:
             if motivo == "sin_nombre":
                 return "No reservado: falta el nombre de la persona."
             libres = _huecos(reservas, fecha, minutos) if motivo in ("ocupado", "fuera", "cerrado") else ""
-            return f"No reservado: {MOTIVOS.get(motivo, motivo)}." + (f" Huecos libres: {libres}." if libres else "")
+            espera = " Si prefiere ese día, puedo apuntarle en la lista de espera (apuntar_lista_espera)." if motivo == "ocupado" else ""
+            return f"No reservado: {MOTIVOS.get(motivo, motivo)}." + (f" Huecos libres: {libres}." if libres else "") + espera
         return (f"Reserva {cita['id']} hecha: {cita['fecha']} a las {cita['hora']} ({cita['duracion']} min) "
                 f"a nombre de {cita['nombre']}.")
 
@@ -81,7 +82,19 @@ def herramientas_reservas(usuario_id: str, reservas) -> list:
         quitada = reservas.anular(int(numero), usuario_id=usuario_id)
         return f"Reserva {numero} anulada." if quitada else f"Este usuario no tiene ninguna reserva {numero}."
 
+    def apuntar_lista_espera(fecha: str, nombre: str, duracion: int = DURACION_POR_DEFECTO) -> str:
+        try:
+            entrada = reservas.apuntar_espera(_fecha(fecha), usuario_id, nombre, _minutos(duracion, DURACION_POR_DEFECTO))
+        except ValueError as exc:
+            return f"No apuntado: {MOTIVOS.get(str(exc), str(exc))}."
+        return f"Apuntado en la lista de espera del {entrada['fecha']}: se le avisará por aquí si se libera un hueco."
+
     return [
+        Herramienta("apuntar_lista_espera",
+                    "Apunta al usuario en la lista de espera de un día lleno: se le avisará si se libera un hueco.",
+                    objeto({"fecha": texto(FECHA), "nombre": texto("Nombre de la persona."), "duracion": entero("Minutos (30 si no se sabe).")},
+                           ["fecha", "nombre"]),
+                    apuntar_lista_espera),
         Herramienta("consultar_disponibilidad",
                     "Huecos libres del negocio para reservar, desde una fecha. Úsala antes de proponer una hora.",
                     objeto({"fecha": texto(FECHA + " Vacío = hoy."), "duracion": entero("Minutos de la cita (30 si no se sabe).")}),
