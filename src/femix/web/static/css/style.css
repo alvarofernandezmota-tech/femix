@@ -10,15 +10,23 @@ body {
 }
 
 .cabecera {
-    background: #1a1a2e;
+    background: linear-gradient(120deg, #3b3fb6, #171a3a);
     color: #fff;
-    padding: 1rem 1.5rem;
+    padding: 0.7rem 1.5rem;
 }
 
-.cabecera h1 {
-    margin: 0;
-    font-size: 1.25rem;
+.cabecera .marca {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: #fff;
+    text-decoration: none;
+    font-weight: 800;
+    font-size: 1.35rem;
+    letter-spacing: -0.02em;
 }
+
+.cabecera .marca img { border-radius: 8px; }
 
 .contenido {
     max-width: 720px;
@@ -154,7 +162,7 @@ body {
 /* --- Mi día (móvil primero) --- */
 .pestanas { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
 .pestanas a { padding: 0.4rem 0.9rem; border-radius: 999px; background: #e8e8ef; color: #1a1a2e; text-decoration: none; }
-.pestanas a.activa { background: #1a1a2e; color: #fff; }
+.pestanas a.activa { background: #22255e; color: #fff; }
 .lista { list-style: none; padding: 0; margin: 0 0 0.5rem; }
 .lista li { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid #eee; }
 .lista .hora { font-variant-numeric: tabular-nums; color: #444; min-width: 5.5rem; }
@@ -178,14 +186,14 @@ details summary { cursor: pointer; color: #1a1a2e; font-weight: 600; margin-top:
 .chat { display: flex; flex-direction: column; height: calc(100vh - 11rem); min-height: 360px; background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.1); overflow: hidden; }
 .mensajes { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
 .burbuja { max-width: 85%; padding: 0.55rem 0.8rem; border-radius: 14px; white-space: pre-wrap; word-break: break-word; line-height: 1.35; }
-.burbuja.yo { align-self: flex-end; background: #1a1a2e; color: #fff; border-bottom-right-radius: 4px; }
+.burbuja.yo { align-self: flex-end; background: #22255e; color: #fff; border-bottom-right-radius: 4px; }
 .burbuja.bot { align-self: flex-start; background: #eef0f6; border-bottom-left-radius: 4px; }
 .burbuja.pensando { color: #888; }
 .burbuja.error { background: #fdecea; }
 .centrado { text-align: center; margin: auto; }
 .entrada { display: flex; gap: 0.4rem; padding: 0.6rem; border-top: 1px solid #e5e5ee; background: #fafafa; }
 .entrada textarea { flex: 1; resize: none; padding: 0.55rem 0.7rem; font: inherit; border: 1px solid #ccd; border-radius: 18px; max-height: 140px; }
-.entrada button { border: none; background: #1a1a2e; color: #fff; width: 2.6rem; border-radius: 50%; font-size: 1.1rem; cursor: pointer; }
+.entrada button { border: none; background: #22255e; color: #fff; width: 2.6rem; border-radius: 50%; font-size: 1.1rem; cursor: pointer; }
 .entrada button#grabar { background: #eef0f6; color: #1a1a2e; }
 .entrada button#grabar.grabando { background: #d33; color: #fff; }
 .entrada button:disabled { opacity: 0.5; }

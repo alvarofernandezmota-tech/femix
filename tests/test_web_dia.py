@@ -80,5 +80,10 @@ def test_sin_telegram_usa_el_id_del_inquilino(tmp_path, monkeypatch):
 def test_service_worker_en_la_raiz(tmp_path, monkeypatch):
     cliente, _ = _entrar(tmp_path, monkeypatch)
     r = cliente.get("/sw.js")
-    assert r.status_code == 200 and "serviceWorker" not in r.text and "femix-v1" in r.text
-    assert cliente.get("/static/manifest.json").json()["start_url"] == "/usuario/chat"
+    assert r.status_code == 200 and "serviceWorker" not in r.text and "femix-v" in r.text
+    manifiesto = cliente.get("/static/manifest.json").json()
+    assert manifiesto["start_url"] == "/usuario/chat"
+    # Android exige PNG de 192 y 512 (y uno "maskable") para ofrecer instalarla.
+    for icono in manifiesto["icons"]:
+        assert cliente.get(icono["src"]).status_code == 200, icono
+    assert any(i["purpose"] == "maskable" for i in manifiesto["icons"])
