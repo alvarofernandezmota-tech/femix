@@ -14,7 +14,7 @@
 | 10. Operación | Poder dar el servicio | **Hecha** (2026-09-26): pasar a una persona, recordatorio de citas, avisos de fallos, correos, RGPD, restaurar copias. `docs/operacion.md` |
 | 11. Canales y conectores | Llegar a más sitios | **Hecha** (2026-09-26): WhatsApp (Cloud API) y conectores MCP. `docs/whatsapp.md`, `docs/mcp.md` |
 | 12. App y comprensión | La app del móvil y entender a cualquiera | **Hecha** (2026-09-30): PWA con chat en directo, voz, Hoy/Semana, avisos; corrector de faltas y abreviaturas; `/plataforma`; alta en un paso; plantillas de WhatsApp; desplegado en madre (Ollama solo CPU). `docs/app.md`, `docs/comprension.md`, `docs/PRODUCCION_MADRE.md` |
-| 13. Producto | Lo que vende frente a la competencia (`docs/mejoras.md`) | Pendiente, por valor: 1) página pública de reservas por negocio; 2) resúmenes automáticos (semana los lunes, citas de mañana cada noche); 3) pedir reseña tras la cita; 4) lista de espera; 5) varios empleados; 6) señal por Stripe; 7) estadísticas; 8) Google Calendar; precios 29/79 € |
+| 13. Producto | Lo que vende frente a la competencia (`docs/mejoras.md`) | **Hecha en parte** (2026-09-30): página pública de reservas (`/r/<negocio>`), resúmenes automáticos (noche y lunes), reseña tras la cita, lista de espera, «En números», precios 29/79 €. Pendiente: varios empleados, señal por Stripe, Google Calendar en dos direcciones. `docs/operacion.md` |
 | 14. Modelo y app nativa | | Pendiente: driver de NVIDIA + `qwen2.5:7b`; reranker y embeddings mejores; push con la app cerrada; Capacitor + AdMob y Google Play (plan a un mes); release v1.0.0; teléfono (`gjallarhorn`) y archivar `hugin` |
 
 ## Capacidades futuras (evitar el error de Perplexica)

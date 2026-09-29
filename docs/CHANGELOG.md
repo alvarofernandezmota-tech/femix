@@ -682,3 +682,17 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
 ## 2026-09-30 — Competencia y plan de producto (`feat/panel-web`)
 - `docs/mejoras.md`: competencia real (bots de WhatsApp en España, Booksy/Treatwell/Asistiva, open
   source parecido), precios de mercado y lo que falta por valor. ROADMAP con las fases 12–14.
+
+## 2026-09-30 — Fase 13: lo que vende (`feat/panel-web`)
+- **Página pública de reservas** `/r/<negocio>`: el cliente reserva sin chatear (huecos del día,
+  nombre y teléfono); campo trampa y tope por IP.
+- **Resúmenes automáticos** por Telegram a los asistentes personales: lo de mañana cada noche y la
+  semana los lunes, una vez al día y solo si hay algo.
+- **Reseña tras la cita**: con el enlace del perfil, el bot lo pide una vez al terminar la cita.
+- **Lista de espera**: apuntarse a un día lleno (herramienta y `/reserva espera`); aviso al liberarse.
+- **En números** en el panel (citas, clientes, mensajes, tiempo medio, fallos). Precios 29/79 €.
+- Arreglos de la revisión del chat y el corrector: el corrector ya no toca palabras reales
+  flexionadas («muchas», «quiere») ni nombres («Cira», «Mario»); lo aprendido se guarda tal cual;
+  SSE con cola asyncio y pool propio; avisos confirmados por la app (`/avisos/vistos`); voz con
+  incidencia y tope de 5 MB; CSS versionado; usuario de la app explícito (`telegram_usuario_panel`);
+  recordatorios con cerrojo entre procesos.

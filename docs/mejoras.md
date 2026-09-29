@@ -95,9 +95,10 @@ asistente personal, todo en servidor propio sin comisiones.
 Signal), tienda de plugins, tareas programadas. Ninguno es un SaaS multi-inquilino con panel por
 cliente en español.
 
-**Por añadir, por valor**: 1) página pública de reservas por negocio; 2) resúmenes automáticos
-(semana los lunes, citas de mañana cada noche); 3) pedir reseña tras la cita; 4) lista de espera;
-5) varios empleados; 6) señal por Stripe; 7) estadísticas; 8) Google Calendar en dos direcciones.
+**Hecho el 2026-09-30**: página pública de reservas por negocio, resúmenes automáticos (semana los
+lunes, lo de mañana cada noche), reseña tras la cita, lista de espera, «En números» y precios 29/79 €
+(ver [operacion.md](operacion.md)). **Pendiente**: varios empleados, señal por Stripe, Google
+Calendar en dos direcciones.
 
 Fuentes: engrana.es, whatibot.com, recepcionista.com, potenciaredes.com, citaflow.com, sapi.es,
 getapp.es (Booksy vs Treatwell), maraiagenda.com, asistiva.app, chatpalbot.com, github.com

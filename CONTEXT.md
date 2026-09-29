@@ -1,6 +1,6 @@
 # CONTEXT.md — femix
 
-Última actualización: 2026-09-30 (madre desplegada; app con chat, voz y avisos; corrector de texto; `/plataforma`; alta en un paso)
+Última actualización: 2026-09-30 (fase 13: reservas públicas, resúmenes automáticos, reseñas, lista de espera, «En números»; app con chat; corrector)
 
 ## Fase actual del roadmap
 Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En marcha.
