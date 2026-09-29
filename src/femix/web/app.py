@@ -15,6 +15,7 @@ from .limites import LimiteDeCuerpo
 from .rutas.admin import router as admin_router
 from .rutas.chat import router as chat_router
 from .rutas.dia import router as dia_router
+from .rutas.publico import router as publico_router
 from .rutas.admin import router_acceso as admin_acceso_router
 from .rutas.auth import directorio_datos_web
 from .rutas.auth import router as auth_router
@@ -70,6 +71,7 @@ async def service_worker():
 
 app.include_router(auth_router)
 app.include_router(chat_router)
+app.include_router(publico_router)
 app.include_router(dia_router)      # antes que usuario: se queda con GET /usuario/
 app.include_router(usuario_router)
 # Antes que el panel: /admin/login no puede exigir sesión de administrador.

@@ -166,6 +166,7 @@ def _contexto(inquilino: Inquilino, csrf: str, request: Request, **extra) -> dic
         "preguntas": panel_comun.preguntas_de(directorio, inquilino.id).listar(),
         "aprendizaje": panel_comun.resumen_aprendizaje(directorio, inquilino.id),
         "reservas": panel_comun.proximas_reservas(directorio, inquilino.id),
+        "estadisticas": panel_comun.estadisticas(directorio, inquilino.id),
         "catalogo": [c for c in CATALOGO.values() if c.disponible],
         "permitidas": set(resumen["plan"].capacidades),
         "planes": planes_publicos(),

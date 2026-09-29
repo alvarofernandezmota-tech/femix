@@ -198,3 +198,14 @@ details summary { cursor: pointer; color: #1a1a2e; font-weight: 600; margin-top:
 .entrada button#grabar.grabando { background: #d33; color: #fff; }
 .entrada button:disabled { opacity: 0.5; }
 @media (max-width: 600px) { .chat { height: calc(100vh - 9.5rem); border-radius: 0; margin: 0 -1rem; } }
+
+/* --- Reservas públicas y cifras --- */
+.huecos { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.hueco { border: 1px solid #ccd; border-radius: 999px; padding: 0.35rem 0.8rem; cursor: pointer; }
+.hueco:has(input:checked) { background: #22255e; color: #fff; border-color: #22255e; }
+.hueco input { margin-right: 0.3rem; }
+.cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.6rem; }
+.cifra { background: #f3f4fa; border-radius: 8px; padding: 0.6rem 0.8rem; display: flex; flex-direction: column; }
+.cifra strong { font-size: 1.4rem; color: #22255e; }
+.cifra span { color: #666; font-size: 0.85em; }
+.cifra.mal strong { color: #b42318; }

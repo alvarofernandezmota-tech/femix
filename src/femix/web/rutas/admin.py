@@ -353,6 +353,7 @@ def _contexto_detalle(inquilino_id: str, sesion: dict, documentos=(), **extra) -
         "preguntas": panel_comun.preguntas_de(directorio, inquilino_id).listar() if not ilegible else [],
         "aprendizaje": panel_comun.resumen_aprendizaje(directorio, inquilino_id),
         "reservas": panel_comun.proximas_reservas(directorio, inquilino_id) if not ilegible else None,
+        "estadisticas": panel_comun.estadisticas(directorio, inquilino_id) if not ilegible else None,
         **extra,
     }
 
