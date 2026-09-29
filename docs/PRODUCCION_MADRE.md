@@ -33,7 +33,32 @@ En `.env` no pueden faltar:
 | `FEMIX_EMPRESA_NOMBRE`, `_NIF`, `_DIRECCION`, `_EMAIL` | datos legales en términos y privacidad |
 
 Ollama debe tener también `OLLAMA_KEEP_ALIVE=-1` (drop-in en
-`/etc/systemd/system/ollama.service.d/femix.conf`).
+`/etc/systemd/system/ollama.service.d/femix.conf`). **Solo en ese fichero**: los drop-in se leen
+por orden alfabético y gana el último, así que otro `OLLAMA_KEEP_ALIVE=30m` en `keepalive.conf` u
+`override.conf` lo pisa. Comprobar: `systemctl show ollama -p Environment`.
+
+### Ollama en madre: solo CPU (mientras no haya driver de NVIDIA)
+
+La GTX 1060 va con el driver libre `nouveau` y Ollama la usa por Vulkan (NVK) sin pedirlo. Medido
+el 2026-09-29 con `qwen2.5:3b`:
+
+| | GPU con nouveau/NVK | Solo CPU (i5-8400) |
+|---|---|---|
+| Velocidad | 5,6 tokens/s | **11,9 tokens/s** |
+| Respuesta completa | ~12 s | **5,8 s** |
+
+Por eso Ollama va **solo con CPU** con `/etc/systemd/system/ollama.service.d/solo-cpu.conf`:
+
+```ini
+[Service]
+Environment="GGML_VK_VISIBLE_DEVICES=-1"
+```
+
+Modelos: `HUGIN_LLM_MODELO=qwen2.5:3b` y `HUGIN_LLM_MODELO_RAPIDO=qwen2.5:3b`, con
+`HUGIN_LLM_MAX_TOKENS=200`. `qwen2.5:7b` en CPU sería demasiado lento.
+
+**Siguiente mejora:** instalar el driver propietario de NVIDIA (Ollama ya trae CUDA). Entonces se
+borra `solo-cpu.conf` y se pone `HUGIN_LLM_MODELO=qwen2.5:7b` (estimado: 2–4 s por respuesta).
 
 **Nunca pegues tokens en el chat ni en logs.** Los scripts los leen del `.env` sin imprimirlos.
 
@@ -107,7 +132,7 @@ No cambia código en madre: propone el arreglo, y el cambio va por rama y PR.
 | Primer mensaje muy lento | Modelo sin cargar: revisa `HUGIN_LLM_KEEP_ALIVE=-1` y `OLLAMA_KEEP_ALIVE=-1` |
 | El montaje vuelve a descargarlo todo | Falta `docker-buildx` (`sudo pacman -S docker-buildx`) o cambió `requirements-base.txt` |
 | `Conflict` en Telegram | Otra copia del bot con el mismo token fuera de Docker (el antiguo `femix.service` de usuario o `hugin-telegram`): `systemctl --user disable --now femix.service`. `probar-todo.sh` ya lo detecta |
-| Respuestas lentas (≈5 tokens/s) con la GTX 1060 | Ollama usa el driver libre `nouveau` (Vulkan). Instala el driver propietario de NVIDIA y Ollama con CUDA; mientras tanto compara con solo CPU (`OLLAMA_VULKAN=0`) y usa `HUGIN_LLM_MAX_TOKENS=200` |
+| Respuestas lentas (≈5 tokens/s) con la GTX 1060 | Ollama usa la GPU con `nouveau` (Vulkan). Pon `solo-cpu.conf` (ver arriba: 11,9 tokens/s) hasta instalar el driver de NVIDIA |
 | Login del panel da 429 | Demasiados intentos fallidos: espera una hora |
 
 ## 5. Copias
