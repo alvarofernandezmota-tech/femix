@@ -6,7 +6,8 @@
 #
 # No enseña ningún secreto: el token del panel se lee del .env sin imprimirlo.
 cd "$(dirname "$0")/.."
-PUERTO="${FEMIX_WEB_PORT:-8000}"
+PUERTO=$(grep -E '^FEMIX_WEB_PORT=' .env 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '"'"'")
+PUERTO="${PUERTO:-8000}"
 PANEL="http://127.0.0.1:$PUERTO"
 FALLOS=0
 
@@ -26,9 +27,10 @@ codigo=$(curl -s -m 5 -o /dev/null -w '%{http_code}' "$PANEL/admin/login")
 [[ "$codigo" == 200 ]] && ok "página de login del dueño" || fallo "/admin/login da $codigo"
 TOKEN=$(grep -E '^FEMIX_WEB_ADMIN_TOKEN=' .env 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"'"'")
 if [[ -n "$TOKEN" ]]; then
-  codigo=$(curl -s -m 10 -o /dev/null -w '%{http_code}' -H "X-Admin-Token: $TOKEN" "$PANEL/admin/inquilinos")
+  # La cabecera va por la entrada estándar: así el token no sale en `ps` ni en /proc.
+  codigo=$(curl -s -m 10 -o /dev/null -w '%{http_code}' -H @- "$PANEL/admin/inquilinos" <<<"X-Admin-Token: $TOKEN")
   [[ "$codigo" == 200 ]] && ok "el token del dueño entra en /admin" || fallo "el token del dueño no entra (HTTP $codigo)"
-  inquilinos=$(curl -s -m 10 -H "X-Admin-Token: $TOKEN" "$PANEL/admin/inquilinos" | grep -o '"id":"[^"]*"' | wc -l)
+  inquilinos=$(curl -s -m 10 -H @- "$PANEL/admin/inquilinos" <<<"X-Admin-Token: $TOKEN" | grep -o '"id":"[^"]*"' | wc -l)
   ok "inquilinos dados de alta: $inquilinos"
 else
   fallo "no hay FEMIX_WEB_ADMIN_TOKEN en .env"

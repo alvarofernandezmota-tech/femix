@@ -18,7 +18,7 @@ if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
 fi
 git fetch --prune origin
 git checkout -q "$RAMA"
-if ! git merge --ff-only -q "origin/$RAMA"; then
+if ! git merge --ff-only -q "origin/$RAMA" || [[ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$RAMA")" ]]; then
   echo "La $RAMA local tiene commits que no están en GitHub. Súbelos primero (git push)." >&2
   exit 1
 fi
@@ -36,9 +36,18 @@ if ! docker buildx version >/dev/null 2>&1; then
 fi
 docker compose up -d --build --remove-orphans
 
+# Lo que manda es el .env (docker compose lo lee de ahí), no el entorno de esta terminal.
+de_env() { grep -E "^$1=" .env 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '"'"'" || true; }
+PUERTO="$(de_env FEMIX_WEB_PORT)"; PUERTO="${PUERTO:-8000}"
+if [[ "$(de_env FEMIX_PANEL)" == "0" ]]; then
+  docker compose ps
+  echo "Desplegado (sin panel): $(git rev-parse --short HEAD)"
+  exit 0
+fi
+
 paso "Comprobación"
 for _ in $(seq 1 30); do
-  if curl -fsS http://127.0.0.1:${FEMIX_WEB_PORT:-8000}/health >/dev/null 2>&1; then
+  if curl -fsS "http://127.0.0.1:${PUERTO}/health" >/dev/null 2>&1; then
     docker compose ps
     echo "Desplegado: $(git rev-parse --short HEAD)"
     exit 0

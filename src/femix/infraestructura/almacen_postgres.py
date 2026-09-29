@@ -9,6 +9,7 @@ un recordatorio) con su posición, para conservar la numeración que ve el usuar
 completar 2`). Guardar reescribe la lista de ese usuario dentro de una transacción, con un
 bloqueo por (inquilino, colección, usuario) para que dos escrituras no se mezclen.
 """
+import contextlib
 from ..puertos.almacen import validar_coleccion
 from ..rag.rutas import validar_inquilino_id
 
@@ -93,6 +94,19 @@ class AlmacenPostgres:
     def _conectar(self):
         import psycopg  # solo hace falta si se usa Postgres
         return psycopg.connect(self._url)
+
+    @contextlib.contextmanager
+    def bloqueo(self, coleccion: str, usuario_id: str):
+        """Cerrojo entre procesos para leer-comprobar-escribir (el bot y el panel sobre la misma
+        agenda). Una conexión propia lo sostiene hasta salir; clave distinta a la de `guardar`."""
+        clave = (self.inquilino_id, validar_coleccion(coleccion), usuario_id)
+        with self._conectar() as conexion:
+            conexion.autocommit = True
+            conexion.execute("SELECT pg_advisory_lock(hashtext('bloqueo/' || %s || '/' || %s || '/' || %s))", clave)
+            try:
+                yield
+            finally:
+                conexion.execute("SELECT pg_advisory_unlock(hashtext('bloqueo/' || %s || '/' || %s || '/' || %s))", clave)
 
     def cargar(self, coleccion: str, usuario_id: str) -> list:
         with self._conectar() as conexion:

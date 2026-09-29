@@ -86,14 +86,16 @@ class Actividad:
         with psycopg.connect(self._url) as conexion:
             return conexion.execute(sql, parametros).fetchall()
 
-    def ultimos(self, tabla: str, inquilino_id: "str | None" = None, limite: int = 50) -> list:
+    def ultimos(self, tabla: str, inquilino_id: "str | None" = None, limite: int = 50,
+                sin_tope: bool = False) -> list:
         """Los últimos eventos, del más nuevo al más viejo, con su `inquilino_id`.
 
         Con `inquilino_id`, solo los suyos. Sin él (panel del dueño), los de todos.
         """
         if tabla not in ("mensajes", "incidencias"):
             raise ValueError(f"tabla desconocida {tabla!r}")
-        limite = max(1, min(int(limite), 500))
+        # Tope de 500 para las pantallas; la exportación RGPD (`sin_tope`) lo pide todo.
+        limite = max(1, int(limite) if sin_tope else min(int(limite), 500))
         if self._url:
             if inquilino_id is not None:
                 filas = self._pg(f"SELECT inquilino_id, datos FROM {tabla} WHERE inquilino_id = %s "

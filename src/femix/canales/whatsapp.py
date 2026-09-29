@@ -92,8 +92,14 @@ def recordar_citas_whatsapp(directorio: str, enviar=enviar_plantilla) -> int:
     for perfil in AlmacenPerfiles(directorio).listar_con_errores()[0]:
         if not (perfil.activo and perfil.whatsapp_token and perfil.whatsapp_telefono_id and perfil.whatsapp_plantilla_cita):
             continue
-        reservas = Reservas(perfil.horario, almacen_dominio(directorio, perfil.inquilino_id), RelojZona())
-        for cita in reservas.por_recordar("whatsapp"):
+        try:
+            reservas = Reservas(perfil.validado().horario, almacen_dominio(directorio, perfil.inquilino_id), RelojZona())
+            citas = reservas.por_recordar("whatsapp")
+        except Exception:
+            # Un perfil o una agenda rota no deja sin recordatorios a los demás inquilinos.
+            _log.warning("WhatsApp de %s: no se pudieron leer las citas", perfil.inquilino_id, exc_info=True)
+            continue
+        for cita in citas:
             try:
                 enviar(perfil.whatsapp_telefono_id, perfil.whatsapp_token, cita["usuario_id"][2:],
                        perfil.whatsapp_plantilla_cita, [cita["hora"], cita.get("servicio") or "tu cita"])
@@ -101,9 +107,15 @@ def recordar_citas_whatsapp(directorio: str, enviar=enviar_plantilla) -> int:
                 _log.warning("WhatsApp de %s: no se pudo recordar la cita %s (%s)", perfil.inquilino_id,
                              cita["id"], type(exc).__name__)
                 continue
-            reservas.marcar_recordada(cita["id"])
+            try:
+                reservas.marcar_recordada(cita["id"])
+            except Exception:
+                _log.warning("WhatsApp de %s: no se pudo marcar la cita %s", perfil.inquilino_id, cita["id"], exc_info=True)
             enviados += 1
     return enviados
+
+
+AVISO_FALLO = "Perdona, algo ha fallado al preparar la respuesta. Prueba otra vez en un momento."
 
 
 class Vistos:
@@ -122,6 +134,11 @@ class Vistos:
             while len(self._ids) > self._maximo:
                 self._ids.popitem(last=False)
             return True
+
+    def olvidar(self, id_mensaje: str) -> None:
+        """Si no se pudo atender, que el reintento de Meta sí se atienda."""
+        with self._cerrojo:
+            self._ids.pop(id_mensaje, None)
 
 
 class AtencionWhatsApp:
@@ -172,9 +189,19 @@ class AtencionWhatsApp:
             return None
         with self._cerrojo:
             cerrojo = self._cerrojos.setdefault(perfil.inquilino_id, threading.Lock())
-        with cerrojo:
-            femix = self._femix(perfil)
-            respuesta = femix.procesar(f"wa{remitente}", texto[:4000])
+        femix = None
+        try:
+            with cerrojo:
+                femix = self._femix(perfil)
+                respuesta = femix.procesar(f"wa{remitente}", texto[:4000])
+        except Exception as exc:
+            _log.warning("WhatsApp de %s: falló al atender un mensaje", perfil.inquilino_id, exc_info=True)
+            actividad = getattr(femix, "_actividad", None)
+            if actividad is not None:
+                actividad.incidencia(perfil.inquilino_id, "whatsapp", f"{type(exc).__name__}: {exc}"[:200])
+            respuesta = AVISO_FALLO
+            if femix is None:
+                self.vistos.olvidar(id_mensaje)   # ni se pudo preparar el bot: que Meta reintente
         try:
             self._enviar(perfil.whatsapp_telefono_id, perfil.whatsapp_token, remitente, respuesta)
         except Exception as exc:

@@ -1,9 +1,10 @@
 """El almacén de siempre: `{coleccion}_{usuario_id}.json` en la carpeta del inquilino."""
+import contextlib
 import json
 import os
 
 from ..puertos.almacen import validar_coleccion
-from .ficheros import escribir_json_atomico
+from .ficheros import bloqueo, escribir_json_atomico
 
 
 class AlmacenJson:
@@ -19,6 +20,12 @@ class AlmacenJson:
             return []
         with open(ruta, "r", encoding="utf-8") as f:
             return json.load(f)
+
+    @contextlib.contextmanager
+    def bloqueo(self, coleccion: str, usuario_id: str):
+        """Para leer-comprobar-escribir entre procesos (el bot y el panel sobre la misma agenda)."""
+        with bloqueo(self.directorio, f"{validar_coleccion(coleccion)}_{usuario_id}"):
+            yield
 
     def guardar(self, coleccion: str, usuario_id: str, elementos: list) -> None:
         escribir_json_atomico(self.ruta(coleccion, usuario_id), elementos)

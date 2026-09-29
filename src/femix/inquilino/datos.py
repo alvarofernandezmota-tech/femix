@@ -48,8 +48,8 @@ def exportar(directorio: str, inquilino_id: str) -> dict:
         "suscripcion": AlmacenSuscripciones(directorio).obtener(inquilino_id).a_dict(),
         "datos": colecciones,
         "documentos": IndiceEmbeddings(inquilino_id, directorio).listar_documentos(),
-        "mensajes": actividad.ultimos("mensajes", inquilino_id, 1000),
-        "incidencias": actividad.ultimos("incidencias", inquilino_id, 1000),
+        "mensajes": actividad.ultimos("mensajes", inquilino_id, 10**7, sin_tope=True),
+        "incidencias": actividad.ultimos("incidencias", inquilino_id, 10**7, sin_tope=True),
     }
 
 

@@ -142,7 +142,7 @@ def herramientas_personales(usuario_id: str, directorio_datos: str, almacen=None
         return Recordatorios(usuario_id, directorio_datos=directorio_datos, reloj=reloj, almacen=almacen).crear(
             str(texto_aviso).strip(), cuando)
 
-    return [
+    herramientas = [
         Herramienta("crear_tarea", "Apunta una tarea pendiente del usuario.",
                     objeto({"descripcion": texto("Qué hay que hacer.")}, ["descripcion"]), crear_tarea),
         Herramienta("listar_tareas", "Las tareas del usuario, numeradas, con [x] las hechas.", objeto({}), listar_tareas),
@@ -161,6 +161,11 @@ def herramientas_personales(usuario_id: str, directorio_datos: str, almacen=None
                            ["texto_aviso", "fecha", "hora"]),
                     crear_recordatorio),
     ]
+    if str(usuario_id).startswith("wa"):
+        # Por WhatsApp no se mandan avisos libres (Meta solo deja plantillas): no se ofrece un
+        # recordatorio que nunca llegaría.
+        herramientas = [h for h in herramientas if h.nombre != "crear_recordatorio"]
+    return herramientas
 
 
 def herramienta_documentos(inquilino_id: str, buscador) -> Herramienta:

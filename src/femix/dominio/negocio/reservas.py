@@ -19,6 +19,7 @@ Reglas (las mismas que en hugin, con sus porqués):
   hueco ofrecido que luego no se puede coger es peor que no ofrecerlo).
 - Anular **borra** la cita: una anulada que sigue ocupando sitio es peor que no anularla.
 """
+import contextlib
 import threading
 import unicodedata
 from dataclasses import dataclass
@@ -37,11 +38,15 @@ MOTIVOS = {
     "fuera": "a esa hora no cabe dentro del horario",
     "ocupado": "ese hueco ya está cogido",
     "sin_horario": "no hay horario de atención escrito en el perfil",
+    "duracion": "la duración tiene que ser de 5 a 600 minutos",
 }
 
 # Reservar y anular son leer-comprobar-escribir: sin esto, dos mensajes a la vez pasan los dos la
 # comprobación del hueco y una de las dos citas desaparece.
 _ESCRIBIENDO = threading.Lock()
+
+
+DURACION_MINIMA, DURACION_MAXIMA = 5, 600
 
 
 def _minutos(hora: str) -> int:
@@ -88,6 +93,18 @@ class Reservas:
 
     def _guardar(self, citas: list) -> None:
         self._almacen.guardar(COLECCION, AGENDA, citas)
+
+    @contextlib.contextmanager
+    def _escribiendo(self):
+        """Hilos de este proceso y, si el almacén sabe, otros procesos (Telegram en el bot,
+        WhatsApp y recordatorios en el panel escriben la misma agenda)."""
+        with _ESCRIBIENDO:
+            bloqueo = getattr(self._almacen, "bloqueo", None)
+            if bloqueo is None:
+                yield
+            else:
+                with bloqueo(COLECCION, AGENDA):
+                    yield
 
     # -- consulta ---------------------------------------------------------------------------
 
@@ -163,7 +180,10 @@ class Reservas:
         """Apunta la cita o levanta ValueError con el motivo (clave de MOTIVOS)."""
         if not (nombre or "").strip():
             raise ValueError("sin_nombre")
-        with _ESCRIBIENDO:
+        if not DURACION_MINIMA <= int(duracion) <= DURACION_MAXIMA:
+            # Una cita de 0 minutos no ocupa nada y dejaría reservar la misma hora sin fin.
+            raise ValueError("duracion")
+        with self._escribiendo():
             if (motivo := self.por_que_no(fecha, hora, duracion)) is not None:
                 raise ValueError(motivo)
             citas = self._almacen.cargar(COLECCION, AGENDA)
@@ -178,7 +198,7 @@ class Reservas:
 
     def anular(self, id_cita: int, usuario_id: "str | None" = None) -> "dict | None":
         """Borra la reserva. Con `usuario_id`, solo si es suya (un cliente no anula la de otro)."""
-        with _ESCRIBIENDO:
+        with self._escribiendo():
             citas = self._almacen.cargar(COLECCION, AGENDA)
             quitada = next((c for c in citas if c["id"] == id_cita
                             and (usuario_id is None or c.get("usuario_id") == usuario_id)), None)
@@ -200,7 +220,7 @@ class Reservas:
         return [c for c in self.citas(manana) if del_canal(str(c.get("usuario_id") or "")) and not c.get("recordada")]
 
     def marcar_recordada(self, id_cita: int) -> None:
-        with _ESCRIBIENDO:
+        with self._escribiendo():
             citas = self._almacen.cargar(COLECCION, AGENDA)
             for cita in citas:
                 if cita["id"] == id_cita:

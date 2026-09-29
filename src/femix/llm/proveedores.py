@@ -155,9 +155,26 @@ class ProveedorOllama(MotorLLM):
             return self.generar(contexto, entrada)
         mensajes = _mensajes_iniciales(self._prompt_sistema, contexto, entrada)
 
+        hechos = []   # resultados de herramientas que cambian datos (reservar, apuntar...)
+
+        def pedir(*argumentos) -> dict:
+            try:
+                return self._pedir(*argumentos)
+            except Exception:
+                if hechos:
+                    # La acción ya está hecha: decirlo, o el usuario la repetiría (y se duplicaría).
+                    raise _YaHecho("\n".join(hechos)) from None
+                raise
+
         def bucle() -> str:
+            try:
+                return rondas()
+            except _YaHecho as hecho:
+                return str(hecho)
+
+        def rondas() -> str:
             for _ in range(MAXIMO_RONDAS):
-                mensaje = self._pedir(mensajes, herramientas)
+                mensaje = pedir(mensajes, herramientas)
                 # Un modelo pequeño puede devolver llamadas mal formadas: solo valen las que son objetos.
                 llamadas = [ll for ll in (mensaje.get("tool_calls") or [])
                             if isinstance(ll, dict) and isinstance(ll.get("function"), dict)]
@@ -168,10 +185,19 @@ class ProveedorOllama(MotorLLM):
                     funcion = llamada.get("function") or {}
                     nombre = funcion.get("name") or ""
                     resultado = ejecutar(herramientas, nombre, funcion.get("arguments"))
+                    if not nombre.startswith(_SOLO_LECTURA) and not resultado.startswith("Error"):
+                        hechos.append(resultado)
                     mensajes.append({"role": "tool", "content": resultado, "tool_name": nombre})
-            return self._pedir(mensajes).get("content") or ""
+            return pedir(mensajes).get("content") or ""
 
         return self._con_errores_amables(bucle)
+
+
+_SOLO_LECTURA = ("listar", "ver_", "buscar", "consultar", "leer", "huecos", "tiempo", "mis_")
+
+
+class _YaHecho(Exception):
+    """El modelo falló después de ejecutar herramientas que cambian datos."""
 
 
 class ProveedorOpenAI(MotorLLM):

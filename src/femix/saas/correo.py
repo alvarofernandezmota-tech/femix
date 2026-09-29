@@ -87,7 +87,9 @@ def revisar_suscripciones(almacen, ahora: "datetime | None" = None, mandar=envia
         elif s.estado == "activa" and "pago_fallido" in s.correos:
             # Pagó: si vuelve a fallar, se le avisa otra vez.
             almacen.cambiar(s.inquilino_id, correos=[c for c in s.correos if c != "pago_fallido"])
-        if tipo and mandar(tipo, s.email, **datos):
+        # En primer plano (esta pasada ya corre en un hilo): solo se apunta si el SMTP lo aceptó; si
+        # falla, se reintenta en la pasada siguiente.
+        if tipo and mandar(tipo, s.email, en_segundo_plano=False, **datos):
             almacen.cambiar(s.inquilino_id, correos=s.correos + [tipo])
             enviados.append((s.inquilino_id, tipo))
     return enviados

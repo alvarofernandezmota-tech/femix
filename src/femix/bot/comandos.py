@@ -100,6 +100,8 @@ def _comando_recordatorio(usuario_id: str, resto: str, directorio_datos: str, al
     argumento = sub_partes[1] if len(sub_partes) > 1 else ""
     recordatorios = Recordatorios(usuario_id, directorio_datos=directorio_datos, reloj=reloj, almacen=almacen)
 
+    if accion == "crear" and str(usuario_id).startswith("wa"):
+        return "Por WhatsApp no puedo mandarte avisos a una hora. Si tienes cita, te la recuerdo el día antes."
     if accion == "crear":
         if "|" not in argumento:
             return AYUDA

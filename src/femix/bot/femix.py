@@ -136,7 +136,7 @@ class Femix:
             return respuesta
         frecuente, contexto_frecuente = self._pregunta_frecuente(texto)
         if frecuente is not None:
-            self._memoria.registrar(self._inquilino_id, usuario_id, texto, frecuente)
+            self._registrar_memoria(usuario_id, texto, frecuente)
             self._registrar_mensaje(usuario_id, "frecuente", inicio, texto, frecuente)
             return frecuente
         if self._control is not None and (aviso := self._control.puede_gastar()):
@@ -163,9 +163,17 @@ class Femix:
             except Exception as exc:
                 _log.warning("No se pudo contar el mensaje del plan", exc_info=True)
                 self._incidencia("consumo", f"{type(exc).__name__}: {exc}")
-        self._memoria.registrar(self._inquilino_id, usuario_id, texto, respuesta)
+        self._registrar_memoria(usuario_id, texto, respuesta)
         self._registrar_mensaje(usuario_id, camino, inicio, texto, respuesta)
         return respuesta
+
+    def _registrar_memoria(self, usuario_id: str, texto: str, respuesta: str) -> None:
+        """Si no se puede guardar la conversación, la respuesta ya hecha llega igual."""
+        try:
+            self._memoria.registrar(self._inquilino_id, usuario_id, texto, respuesta)
+        except Exception as exc:
+            _log.warning("No se pudo guardar la conversación", exc_info=True)
+            self._incidencia("memoria", f"{type(exc).__name__}: {exc}")
 
     def _pregunta_frecuente(self, texto: str) -> "tuple[str | None, str]":
         """(respuesta directa, "") si el mensaje es casi una pregunta frecuente; (None, dato para

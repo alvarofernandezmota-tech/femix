@@ -333,8 +333,14 @@ async def guardar_bot(
 async def pagar(request: Request, plan: str = Form(...), inquilino: Inquilino = Depends(obtener_inquilino_actual),
                 csrf: str = Depends(csrf_de_sesion)):
     directorio = directorio_datos_web()
-    email = panel_comun.resumen_suscripcion(directorio, inquilino.id)["suscripcion"].email
+    suscripcion = panel_comun.resumen_suscripcion(directorio, inquilino.id)["suscripcion"]
+    email = suscripcion.email
     try:
+        if suscripcion.stripe_suscripcion and suscripcion.estado != "cancelada" and suscripcion.stripe_cliente:
+            # Ya paga una: cambiar de plan se hace en el portal de Stripe. Un Checkout nuevo abriría
+            # una segunda suscripción y seguiría cobrando la vieja.
+            url = pagos.crear_portal(suscripcion.stripe_cliente, pagos.url_publica(str(request.base_url)))
+            return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)
         url = pagos.crear_checkout(inquilino.id, plan, email, pagos.url_publica(str(request.base_url)))
     except pagos.ErrorDePago as exc:
         return await _pagina(request, inquilino, csrf, 400, error=str(exc))

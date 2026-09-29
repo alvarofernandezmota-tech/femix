@@ -29,9 +29,10 @@ _ENSENANZA = re.compile(
     r"apunta que|a partir de ahora)\s*(.+)$",
     re.I | re.S,
 )
+# Primera persona al principio del dato: "el trabajo de mechas dura 2 horas" es del negocio.
 _PERSONAL = re.compile(
-    r"\b(soy|me llamo|mi nombre|mis?|prefiero|me gusta|no me gusta|tengo|vivo|trabajo|estoy|"
-    r"llámame|llamame|mi hij[oa]|mi mujer|mi marido|mi pareja|alérgic[oa]|alergic[oa])\b",
+    r"^(?:yo\s+)?(?:no\s+)?(soy|me llamo|mi nombre|mis?|prefiero|me gusta|tengo|vivo|trabajo en|estoy|"
+    r"llámame|llamame|alérgic[oa]|alergic[oa])\b|\b(soy|estoy)\s+alérgic|\balergic[oa]\b|\balérgic[oa]\b",
     re.I,
 )
 _PETICION = re.compile(r"^(quiero|quería|queria|mejor|prefiero ir|puedo|podéis|podeis|dame|ponme|reserva)\b", re.I)

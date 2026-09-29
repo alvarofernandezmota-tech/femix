@@ -54,7 +54,8 @@ def test_revisar_suscripciones_una_vez_por_motivo(tmp_path):
     almacen.guardar(Suscripcion("impaga", plan="pro", estado="impagada", email="c@b.es"))
     mandados = []
 
-    def mandar(tipo, destino, **datos):
+    def mandar(tipo, destino, en_segundo_plano=True, **datos):
+        assert en_segundo_plano is False   # solo se apunta si el SMTP lo aceptó
         mandados.append((tipo, destino, datos))
         return True
 

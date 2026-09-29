@@ -157,13 +157,20 @@ def _inquilino_de(objeto: dict, almacen) -> "str | None":
     return encontrada.inquilino_id if encontrada else None
 
 
-def aplicar_evento(evento: dict, almacen) -> "str | None":
-    """Actualiza la suscripción del inquilino según el aviso. Devuelve su id, o None si no aplica."""
+def aplicar_evento(evento: dict, almacen, existe=None) -> "str | None":
+    """Actualiza la suscripción del inquilino según el aviso. Devuelve su id, o None si no aplica.
+    Con `existe`, un aviso de un inquilino borrado no le vuelve a crear la suscripción."""
     tipo = evento.get("type", "")
     objeto = (evento.get("data") or {}).get("object") or {}
     inquilino_id = _inquilino_de(objeto, almacen)
-    if not inquilino_id:
+    if not inquilino_id or (existe is not None and not existe(inquilino_id)):
         return None
+    if tipo != "checkout.session.completed":
+        # Avisos de otra suscripción (una vieja, o llegados fuera de orden) no pisan la vigente.
+        suscripcion = objeto.get("id") if objeto.get("object") == "subscription" else objeto.get("subscription")
+        guardada = almacen.obtener(inquilino_id).stripe_suscripcion
+        if isinstance(suscripcion, str) and suscripcion and guardada and suscripcion != guardada:
+            return None
     if tipo == "checkout.session.completed":
         cambios = {"estado": "activa", "stripe_cliente": objeto.get("customer") or "",
                    "stripe_suscripcion": objeto.get("subscription") or ""}

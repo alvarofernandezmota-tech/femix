@@ -15,7 +15,7 @@ import os
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 
-from telegram.error import InvalidToken
+from telegram.error import Forbidden, InvalidToken
 
 from femix.bot.fabrica import almacen_dominio, construir_femix, inquilino_desde_entorno
 from femix.dominio.personal.recordatorios import Recordatorios
@@ -188,8 +188,12 @@ def avisos_pendientes(directorio_datos: str, inquilino_id: str, permitidos, relo
     for usuario in almacen.usuarios("recordatorios"):
         if not (usuario.isascii() and usuario.isdigit()) or (permitidos is not None and int(usuario) not in permitidos):
             continue
-        recordatorios = Recordatorios(usuario, reloj=reloj, almacen=almacen)
-        pendientes += [(usuario, recordatorios, i, r) for i, r in recordatorios.por_avisar()]
+        try:
+            recordatorios = Recordatorios(usuario, reloj=reloj, almacen=almacen)
+            pendientes += [(usuario, recordatorios, i, r) for i, r in recordatorios.por_avisar()]
+        except Exception:
+            # Un dato malo de un usuario no puede dejar sin avisos al resto del inquilino.
+            _log.warning("Recordatorios ilegibles de %s en %s; se saltan", usuario, inquilino_id, exc_info=True)
     return pendientes
 
 
@@ -202,6 +206,11 @@ async def avisar_recordatorios(app, directorio_datos: str, inquilino_id: str, re
     for usuario, recordatorios, posicion, recordatorio in pendientes:
         try:
             await app.bot.send_message(chat_id=int(usuario), text=f"⏰ Recordatorio: {recordatorio.texto}")
+        except Forbidden:
+            # Nos ha bloqueado: reintentar cada minuto para siempre no sirve de nada.
+            _log.info("Bot de %s: %s bloqueó el bot; recordatorio descartado", inquilino_id, usuario)
+            await asyncio.to_thread(recordatorios.marcar_avisado, posicion)
+            continue
         except Exception as exc:
             _log.warning("Bot de %s: no se pudo avisar a %s (%s); se reintenta", inquilino_id, usuario, type(exc).__name__)
             continue
@@ -222,6 +231,10 @@ async def recordar_citas(app, inquilino_id: str) -> int:
                  "Si no puedes venir, dímelo y la anulo.")
         try:
             await app.bot.send_message(chat_id=int(cita["usuario_id"]), text=texto)
+        except Forbidden:
+            _log.info("Bot de %s: el cliente de la cita %s bloqueó el bot", inquilino_id, cita["id"])
+            await asyncio.to_thread(reservas.marcar_recordada, cita["id"])
+            continue
         except Exception as exc:
             _log.warning("Bot de %s: no se pudo recordar la cita %s (%s); se reintenta",
                          inquilino_id, cita["id"], type(exc).__name__)

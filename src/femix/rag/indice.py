@@ -7,7 +7,7 @@ from .documentos import Documento, Fragmento, ResultadoBusqueda
 from .embeddings_local import similitud_coseno
 from .embeddings_ollama import motor_embeddings_desde_entorno
 from .fragmentos import fragmentar, fragmentar_por_secciones
-from .palabras import bm25, fusionar
+from .palabras import bm25, contar_palabras, fusionar
 from .persistencia import persistencia_desde_entorno
 from .rutas import directorio_rag, ruta_indice, ruta_indice_heredada, validar_inquilino_id
 
@@ -146,6 +146,13 @@ class IndiceEmbeddings:
             self.reindexados = len(viejos)
             self._guardar()
 
+    def _palabras(self, texto: str):
+        """Palabras de cada fragmento, contadas una sola vez mientras el índice vive en caché."""
+        cache = self.__dict__.setdefault("_cache_palabras", {})
+        if texto not in cache:
+            cache[texto] = contar_palabras(texto)
+        return cache[texto]
+
     def buscar(self, consulta: str, k: int = 3) -> list[ResultadoBusqueda]:
         if not consulta:
             return []
@@ -158,7 +165,7 @@ class IndiceEmbeddings:
         # Búsqueda híbrida: por significado (embeddings) y por palabras exactas (BM25), y se
         # juntan los dos órdenes (RRF). Cada resultado lleva las dos puntuaciones.
         cosenos = [similitud_coseno(vector_consulta, f.vector) for f in propios]
-        palabras = bm25(consulta, [f.texto for f in propios])
+        palabras = bm25(consulta, [self._palabras(f.texto) for f in propios])
         por_significado = sorted(range(len(propios)), key=lambda i: cosenos[i], reverse=True)
         por_palabras = [i for i in sorted(range(len(propios)), key=lambda i: palabras[i], reverse=True) if palabras[i] > 0]
         puntos = fusionar(por_significado, por_palabras)

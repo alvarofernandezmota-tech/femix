@@ -14,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 
 from femix.saas import datos_empresa, pagos, registro_abierto, saas_activo
 from femix.saas.planes import DIAS_PRUEBA, planes_publicos
+from femix.inquilino.perfil import AlmacenPerfiles
 from femix.saas.suscripciones import AlmacenSuscripciones, nueva_prueba
 
 from .auth import AlmacenInquilinos, abrir_sesion, directorio_datos_web
@@ -119,5 +120,12 @@ async def webhook_stripe(request: Request):
     except ValueError as exc:
         _log.warning("Webhook de Stripe rechazado: %s", exc)
         return JSONResponse({"error": "firma"}, status_code=400)
-    inquilino_id = pagos.aplicar_evento(evento, AlmacenSuscripciones(directorio_datos_web()))
+    try:
+        inquilino_id = pagos.aplicar_evento(evento, AlmacenSuscripciones(directorio_datos_web()),
+                                            existe=AlmacenPerfiles(directorio_datos_web()).existe)
+    except Exception:
+        # Un aviso firmado que no se puede aplicar no se arregla reintentando: Stripe lo repetiría
+        # durante días. Se apunta y se contesta 200.
+        _log.exception("Webhook de Stripe %s no aplicado", evento.get("id"))
+        return {"recibido": True, "inquilino": False}
     return {"recibido": True, "inquilino": bool(inquilino_id)}

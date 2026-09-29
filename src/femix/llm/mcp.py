@@ -44,6 +44,10 @@ def _respuesta_jsonrpc(respuesta: requests.Response, id_peticion: int) -> dict:
     return respuesta.json()
 
 
+ESPERA_LISTA = 5      # segundos para pedir la lista de herramientas (va en cada mensaje)
+ESPERA_CAIDO = 120    # tras un fallo, este tiempo sin volver a intentarlo
+
+
 class ClienteMCP:
     def __init__(self, url: str, cabecera: str = "", timeout: float = 30):
         self._url = url
@@ -52,6 +56,7 @@ class ClienteMCP:
         self._sesion: "str | None" = None
         self._cerrojo = threading.Lock()
         self._lista: "tuple[float, list] | None" = None
+        self._caido_hasta = 0.0
 
     def _cabeceras(self) -> dict:
         cabeceras = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json",
@@ -94,7 +99,17 @@ class ClienteMCP:
         with self._cerrojo:
             if self._lista and time.monotonic() - self._lista[0] < CADUCIDAD_LISTA:
                 return self._lista[1]
-            lista = self._con_sesion("tools/list").get("tools") or []
+            if time.monotonic() < self._caido_hasta:
+                # Caído hace poco: no se vuelve a esperar su timeout en cada mensaje.
+                raise ErrorMCP("el servidor no respondía hace un momento")
+            timeout, self._timeout = self._timeout, min(self._timeout, ESPERA_LISTA)
+            try:
+                lista = self._con_sesion("tools/list").get("tools") or []
+            except Exception:
+                self._caido_hasta = time.monotonic() + ESPERA_CAIDO
+                raise
+            finally:
+                self._timeout = timeout
             self._lista = (time.monotonic(), lista[:MAXIMO_HERRAMIENTAS])
             return self._lista[1]
 
