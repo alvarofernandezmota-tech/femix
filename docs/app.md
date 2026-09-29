@@ -1,63 +1,84 @@
-# La app (panel en el móvil) y los asistentes personales
+# La app (el panel en el móvil) y los asistentes personales
 
 ## Qué es
 
-El panel de femix es una **app instalable** (PWA): se abre desde el icono del móvil, a pantalla
-completa, en Android y en iPhone, sin tienda de aplicaciones. Es la misma web que corre en el
-contenedor `femix`, así que no hay nada más que desplegar.
+El panel de femix es una **app instalable** (PWA): icono en el móvil, pantalla completa, en Android
+y en iPhone, sin tienda. Es la misma web que corre en el contenedor `femix`: no hay nada más que
+desplegar. El **chat de la app es un conector más** sobre el mismo `Femix` que atiende en Telegram
+y WhatsApp: misma memoria, mismos datos, mismas herramientas.
 
-Pantallas de una persona (`/usuario/`):
-- **Hoy**: agenda, citas de clientes (si es un negocio), recordatorios y tareas de hoy. Se apunta,
-  se quita y se marca desde ahí.
-- **Semana**: lo mismo para los próximos 7 días.
-- **Mi bot**: configuración del bot, documentos, aprendizaje, plan y datos.
+Pantallas de una persona (tras `/login`):
 
-Todo lo que se apunta en la app lo ve el bot de Telegram, y al revés: se guarda con el ID de
-Telegram de la persona (el primero de "permitidos" en su perfil). Desde el bot, `/hoy` y
-`/semana` dan el mismo resumen en texto, y con palabras: «¿qué tengo esta semana?».
+| Pantalla | Qué hay |
+|---|---|
+| **Chat** (`/usuario/chat`, la de inicio) | Hablar con el bot: la respuesta aparece según la escribe; micrófono para notas de voz (mantener pulsado); historial de la conversación. |
+| **Hoy** (`/usuario/`) | Agenda, citas de clientes (si es un negocio), recordatorios y tareas de hoy. Apuntar, quitar y marcar. |
+| **Semana** (`/usuario/semana`) | Lo mismo para los próximos 7 días. |
+| **Mi bot** (`/usuario/panel`) | Configuración del bot, documentos, aprendizaje, plan y datos. |
+
+Todo se guarda con el **ID de Telegram** de la persona (el primero de «permitidos» en su perfil), así
+que lo que se hace en la app lo ve su bot de Telegram y al revés. Sin ID de Telegram, la app usa el
+identificador del inquilino y funciona igual (solo con la app).
+
+Desde el bot, `/hoy` y `/semana` dan el mismo resumen en texto, y con palabras: «¿qué tengo esta
+semana?», «apunta médico el lunes a las 10», «avísame mañana a las 9 de llamar al banco».
+
+### Recordatorios
+
+- Por Telegram los manda el bot a su hora (bucle de avisos de la flota).
+- En la app, mientras está abierta, salen como notificación del móvil (pide permiso la primera
+  vez que escribes) y en el chat. Con la app cerrada no llegan: para eso está Telegram o, más
+  adelante, notificaciones push (ver [mejoras.md](mejoras.md)).
+
+### Lo que necesita el chat
+
+- La respuesta llega por SSE (`text/event-stream`); el token CSRF va en la cabecera `X-CSRF`.
+- La voz se transcribe con Whisper en local (`faster-whisper`), en el contenedor; hace falta la
+  capacidad `voz` en el perfil. Audio de hasta 8 MB.
+- Un mensaje a la vez por inquilino (el modelo en CPU no va más rápido con dos).
 
 ## Instalarla en el móvil
 
-Hace falta llegar al panel desde el móvil: con el perfil `publico` (HTTPS con Caddy, ver
-[saas.md](saas.md)) o, en casa, por Tailscale/túnel SSH al puerto 8000 de madre.
+Hace falta llegar al panel por **HTTPS** (la sesión va en una cookie solo-HTTPS):
 
-- **Android (Chrome)**: abrir la web → menú ⋮ → «Instalar aplicación» (o «Añadir a pantalla de inicio»).
-- **iPhone (Safari)**: abrir la web → botón compartir → «Añadir a pantalla de inicio».
+- **Hoy, sin dominio**: Tailscale Serve en madre (ver [PRODUCCION_MADRE.md](PRODUCCION_MADRE.md)).
+  Vale para ti y para quien esté en tu red Tailscale.
+- **Para clientes**: dominio propio con el perfil `publico` (Caddy), ver [saas.md](saas.md).
 
-La app guarda solo los estilos y el icono; los datos se piden siempre al servidor (no quedan
-copias en el móvil). Ficheros: `web/static/manifest.json`, `web/static/sw.js` (servido en `/sw.js`),
-`web/static/icono.svg`.
+Luego, en el navegador del móvil:
+- **Android (Chrome)**: menú ⋮ → «Instalar aplicación» (o «Añadir a pantalla de inicio»).
+- **iPhone (Safari)**: compartir → «Añadir a pantalla de inicio».
 
-### Y una APK para Google Play
-
-La PWA se puede empaquetar como app Android sin reescribir nada (Trusted Web Activity):
-
-1. Tener el panel en HTTPS con dominio propio (perfil `publico`).
-2. En un ordenador con Node: `npx @bubblewrap/cli init --manifest https://TU-DOMINIO/static/manifest.json`
-   y `npx @bubblewrap/cli build` → genera el `.apk` / `.aab`.
-3. Subirlo a Google Play (cuenta de desarrollador, pago único) o instalar el `.apk` a mano.
-
-No está hecho todavía: requiere el dominio público y el SDK de Android. Es el siguiente paso si se
-quiere en la tienda; para uso propio, la PWA instalada es lo mismo.
+La app guarda solo estilos e icono; los datos se piden siempre al servidor. Ficheros:
+`web/static/manifest.json`, `web/static/sw.js` (servido en `/sw.js`), `web/static/icono.svg`,
+`web/static/js/chat.js`.
 
 ## Dar de alta un asistente personal (madre, hermana, Paula…)
 
-Cada persona es un inquilino de tipo `persona` con su propio bot. Sus datos van separados.
+Cada persona es un inquilino de tipo `persona` con su propio bot y sus datos separados.
 
 1. La persona (o tú) crea un bot en Telegram con `@BotFather` → `/newbot` → guarda el **token**.
+   Si solo va a usar la app, este paso se puede saltar.
 2. Su **ID de Telegram**: que escriba a `@userinfobot`.
-3. En el panel del dueño (`/admin`) → «Nuevo inquilino»: identificador (`mama`), nombre, tipo
-   `persona`, nombre del asistente, el token, su ID en «permitidos» y, si quiere usar la app, una
-   contraseña. El bot arranca solo en un minuto.
-4. Le pasas el usuario del bot y, si quiere la app, la dirección del panel con su identificador y
-   contraseña.
+3. En `/admin` → «Nuevo inquilino»: identificador (`mama`), nombre, tipo `persona`, nombre del
+   asistente, el token, su ID en «permitidos» y una **contraseña** para la app. El bot arranca solo
+   en un minuto.
+4. Le pasas el usuario del bot y la dirección de la app con su usuario (`mama`) y contraseña.
+   En su móvil: abrir → entrar → «Añadir a pantalla de inicio».
 
 Capacidades por defecto de una persona: memoria, voz, documentos y herramientas (agenda, tareas,
-recordatorios, diario). Sin reservas de negocio.
+recordatorios, diario). Sin reservas de negocio. Para un **negocio**: tipo `empresa`, horario,
+capacidad `reservas` y el bot abierto a cualquiera.
 
-## Tu bot como bot de la plataforma
+## Tú, como dueño de la plataforma
 
-Con `FEMIX_AVISOS_TELEGRAM=<tu ID>` en el `.env`, tu bot:
-- te manda los fallos nuevos de todos los bots (cada 10 min como mucho);
-- contesta a `/plataforma` con el estado de cada bot, mensajes e incidencias de hoy por inquilino y
-  lo que tardan las respuestas. Solo a tu ID.
+- `/admin`: todos los inquilinos, estado de cada bot, actividad e incidencias, ficha de cada uno
+  (incluido su acceso a la app y su contraseña).
+- Con `FEMIX_AVISOS_TELEGRAM=<tu ID>` en el `.env`, tu bot te manda los fallos nuevos de todos los
+  bots y contesta a `/plataforma` con el estado de cada bot, mensajes, tiempos y fallos del día.
+
+## Google Play y anuncios
+
+La PWA se empaqueta como app Android sin reescribir nada. Plan a un mes, con los pasos y las
+condiciones (cuenta de desarrollador, prueba cerrada de 14 días, Capacitor para AdMob), en
+[mejoras.md](mejoras.md).

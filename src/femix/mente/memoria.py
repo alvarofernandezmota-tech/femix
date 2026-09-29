@@ -72,6 +72,11 @@ class Memoria:
         finally:
             os.close(cerrojo)   # cerrar suelta el bloqueo
 
+    def turnos(self, inquilino_id: str, usuario_id: str) -> list:
+        """`[{"entrada", "salida"}]` del más antiguo al más nuevo (el historial del chat de la app)."""
+        self._recargar_si_cambio()
+        return [asdict(t) for t in self._historial.get(self.clave(inquilino_id, usuario_id), [])]
+
     def contexto(self, inquilino_id: str, usuario_id: str) -> str:
         k = self.clave(inquilino_id, usuario_id)
         self._recargar_si_cambio()
@@ -86,6 +91,9 @@ class MemoriaDesactivada:
 
     def contexto(self, inquilino_id: str, usuario_id: str) -> str:
         return ""
+
+    def turnos(self, inquilino_id: str, usuario_id: str) -> list:
+        return []
 
 
 class MemoriaEnAlmacen:
@@ -103,6 +111,9 @@ class MemoriaEnAlmacen:
         turnos = self._almacen.cargar("memoria", usuario_id)
         turnos.append(asdict(Turno(entrada, salida)))
         self._almacen.guardar("memoria", usuario_id, turnos[-self.maximo_turnos:])
+
+    def turnos(self, inquilino_id: str, usuario_id: str) -> list:
+        return [asdict(Turno(**t)) for t in self._almacen.cargar("memoria", usuario_id)]
 
     def contexto(self, inquilino_id: str, usuario_id: str) -> str:
         turnos = [Turno(**t) for t in self._almacen.cargar("memoria", usuario_id)]

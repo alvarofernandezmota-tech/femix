@@ -164,8 +164,11 @@
 {% include "comun/_aprendizaje.html" %}
 
 <section class="tarjeta">
-    <h3>Acceso a su panel</h3>
-    <p class="secundario">{{ "Tiene contraseña para entrar en /login." if acceso_panel else "No tiene acceso a su panel." }}</p>
+    <h3>Acceso a su app</h3>
+    <p>Usuario: <code>{{ inquilino_id }}</code> · entra en <code>/login</code> y la app abre en <code>/usuario/chat</code> (chat, Hoy, Semana, Mi bot).
+       En el móvil: «Añadir a pantalla de inicio».</p>
+    <p class="secundario">{{ "Tiene contraseña." if acceso_panel else "Sin contraseña todavía: ponle una para que pueda entrar." }}
+       {% if perfil and perfil.telegram_permitidos %}Sus datos (agenda, tareas, chat) van con su ID de Telegram {{ perfil.telegram_permitidos[0] }}: lo mismo en la app y en el bot.{% else %}Sin ID de Telegram permitido: la app guarda sus datos con el usuario <code>{{ inquilino_id }}</code>.{% endif %}</p>
     <form method="post" action="/admin/inquilinos/{{ inquilino_id }}/password" class="formulario">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <label>{{ "Nueva contraseña" if acceso_panel else "Contraseña" }}

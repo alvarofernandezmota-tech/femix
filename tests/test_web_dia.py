@@ -81,4 +81,4 @@ def test_service_worker_en_la_raiz(tmp_path, monkeypatch):
     cliente, _ = _entrar(tmp_path, monkeypatch)
     r = cliente.get("/sw.js")
     assert r.status_code == 200 and "serviceWorker" not in r.text and "femix-v1" in r.text
-    assert cliente.get("/static/manifest.json").json()["start_url"] == "/usuario/"
+    assert cliente.get("/static/manifest.json").json()["start_url"] == "/usuario/chat"

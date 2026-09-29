@@ -76,6 +76,7 @@ class Femix:
         herramientas=None,
         control=None,
         actividad=None,
+        corrector=None,
     ):
         self._selector = selector_modelos or SelectorDeModelos()
         self._motor = motor or self._selector.motor(tipo_tarea=TAREA_RAPIDA)
@@ -87,6 +88,10 @@ class Femix:
         self._control = control
         # Mensajes e incidencias para el panel (`infraestructura/actividad.py`). None = no se guardan.
         self._actividad = actividad
+        # Entiende mensajes con faltas y abreviaturas (`mente/normalizar.py`): el texto normalizado
+        # decide el camino, busca y aprende; al modelo y a la memoria va el original.
+        from ..mente.normalizar import Corrector
+        self._corrector = corrector or Corrector()
         self._memoria = memoria or Memoria()
         self._inquilino_id = inquilino_id
         self._directorio_datos = directorio_datos
@@ -119,6 +124,11 @@ class Femix:
         cadena = CadenaDeAgentes([AgenteTareas(directorio_datos=self._directorio_datos, almacen=self._almacen)])
         return Subagente(cadena, motor=motor, selector=self._selector, buscador=buscador)
 
+    def historial(self, usuario_id: str) -> list:
+        """Los últimos turnos de ese usuario (para enseñar el chat en la app)."""
+        turnos = getattr(self._memoria, "turnos", None)
+        return turnos(self._inquilino_id, usuario_id) if turnos else []
+
     def procesar(self, usuario_id: str, texto: str, al_avanzar=None) -> str:
         """La respuesta al mensaje. Con `al_avanzar(texto_parcial)`, el camino rápido la va
         entregando según el modelo escribe (Telegram la enseña crecer)."""
@@ -134,7 +144,12 @@ class Femix:
             )
             self._registrar_mensaje(usuario_id, "comando", inicio, texto, respuesta)
             return respuesta
-        frecuente, contexto_frecuente = self._pregunta_frecuente(texto)
+        try:
+            texto_n = self._corrector.normalizar(texto)
+        except Exception:
+            _log.warning("El corrector falló; se sigue con el texto tal cual", exc_info=True)
+            texto_n = texto
+        frecuente, contexto_frecuente = self._pregunta_frecuente(texto_n)
         if frecuente is not None:
             self._registrar_memoria(usuario_id, texto, frecuente)
             self._registrar_mensaje(usuario_id, "frecuente", inicio, texto, frecuente)
@@ -148,10 +163,10 @@ class Femix:
             contexto = f"{ahora}\n{contexto}" if contexto else ahora
         if contexto_frecuente:
             contexto = f"{contexto_frecuente}\n{contexto}" if contexto else contexto_frecuente
-        aprendido = self._aprender(usuario_id, texto)
+        aprendido = self._aprender(usuario_id, texto_n)
         if aprendido:
             contexto = f"{aprendido}\n{contexto}" if contexto else aprendido
-        respuesta, camino = self._responder(usuario_id, texto, contexto, intencion, al_avanzar)
+        respuesta, camino = self._responder(usuario_id, texto, contexto, intencion, al_avanzar, texto_n)
         # Un modelo local puede devolver la cadena vacía. Telegram rechaza un mensaje vacío
         # ("Message text is empty") y el usuario se quedaría sin nada; mejor decírselo.
         if not respuesta or not respuesta.strip():
@@ -223,18 +238,20 @@ class Femix:
             return en_directo(contexto=contexto, entrada=texto, al_avanzar=al_avanzar)
         return self._motor.generar(contexto=contexto, entrada=texto)
 
-    def _responder(self, usuario_id: str, texto: str, contexto: str, intencion: str, al_avanzar=None) -> "tuple[str, str]":
+    def _responder(self, usuario_id: str, texto: str, contexto: str, intencion: str, al_avanzar=None,
+                   texto_n: "str | None" = None) -> "tuple[str, str]":
         """Delega si toca, y si la delegación falla o no produce nada, responde como siempre.
 
         Un agente caído nunca debe dejar al usuario sin respuesta. Devuelve también el camino
         que se tomó (`herramientas`, `rápido`, `agente` o `agente→rápido`), para el registro de mensajes.
         """
-        if self._herramientas is not None and necesita_herramientas(texto):
+        texto_n = texto_n or texto
+        if self._herramientas is not None and necesita_herramientas(texto_n):
             respuesta = self._con_herramientas(usuario_id, texto, contexto)
             if respuesta:
                 return respuesta, "herramientas"
-        if self._buscador is not None and es_consulta(texto):
-            respuesta = self._consulta(texto, contexto, al_avanzar)
+        if self._buscador is not None and es_consulta(texto_n):
+            respuesta = self._consulta(texto, contexto, al_avanzar, texto_n)
             if respuesta:
                 return respuesta, "consulta"
         if self._subagente is not None and necesita_agente(texto, contexto):
@@ -276,19 +293,19 @@ class Femix:
             except Exception:
                 _log.warning("No se pudo apuntar la pregunta sin respuesta", exc_info=True)
 
-    def _consulta(self, texto: str, contexto: str, al_avanzar=None) -> "str | None":
+    def _consulta(self, texto: str, contexto: str, al_avanzar=None, texto_n: "str | None" = None) -> "str | None":
         """Pregunta sobre el negocio: se buscan sus documentos y contesta el modelo rápido (en
         directo). None si no hay nada en los documentos: sigue el camino de siempre."""
         from ..agentes.agente_busqueda import consulta_de_busqueda
         try:
-            encontrado = self._buscador.buscar(self._inquilino_id, consulta_de_busqueda(texto, contexto), 3)
+            encontrado = self._buscador.buscar(self._inquilino_id, consulta_de_busqueda(texto_n or texto, contexto), 3)
         except Exception as exc:
             _log.warning("La búsqueda en documentos falló", exc_info=True)
             self._incidencia("busqueda", f"{type(exc).__name__}: {exc}")
             return None
         if not encontrado or not encontrado.strip():
-            if es_pregunta(texto):
-                self._sin_respuesta(texto)   # el dueño la verá en su panel para contestarla
+            if es_pregunta(texto_n or texto):
+                self._sin_respuesta(texto_n or texto)   # el dueño la verá en su panel para contestarla
             return None
         documentos = ("Información encontrada en los documentos del negocio (si la usas, di de qué documento "
                       f"sale, y no añadas datos que no estén aquí):\n{encontrado}")

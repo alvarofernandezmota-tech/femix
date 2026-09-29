@@ -665,3 +665,16 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
 - **Alta en un paso** desde `/admin`: token del bot, IDs permitidos y nombre del asistente en el
   mismo formulario; el bot arranca solo.
 - `docs/app.md`: instalar la app, alta de asistentes personales y cómo empaquetar una APK.
+
+## 2026-09-30 — Chat en la app, corrector de texto y todo enlazado (`feat/panel-web`)
+- **Chat en la app** (`/usuario/chat`): hablar con el bot desde el móvil sin Telegram; respuesta en
+  directo (SSE), notas de voz (Whisper local) y recordatorios como notificación mientras la app está
+  abierta. Misma memoria y mismos datos que el bot de Telegram (ID de Telegram de la persona).
+- **Corrector de texto** (`mente/normalizar.py`): el bot entiende «resrva pa el jueves k hora
+  abris?¿?¿». Abreviaturas, repeticiones y faltas corregidas con el vocabulario del dominio y del
+  perfil; nunca toca palabras reales ni nombres. Solo para entender: al modelo va el original.
+  Nueva dependencia ligera `pyspellchecker` (MIT).
+- **Admin ↔ usuario**: la ficha del inquilino explica su acceso a la app (usuario, ID de Telegram);
+  pestañas Hoy/Semana/Chat/Mi bot en todo el panel de la persona.
+- Docs nuevas: `comprension.md`, `mejoras.md` (investigación open source, plan Google Play y
+  anuncios), `app.md` al día y `PRODUCCION_MADRE.md` con Tailscale Serve y SaaS público.
