@@ -1,88 +1,105 @@
-# Femix en Producción (madre)
+# Femix en producción (madre): cómo proceder
 
-## Estado
+Guía paso a paso para desplegar, comprobar y mantener femix en `madre`. Detalle de Docker en
+[`docker.md`](docker.md); operación diaria (copias, avisos, incidencias) en [`operacion.md`](operacion.md).
 
-- ✅ Bot corriendo en `madre`
-- ✅ RAG por inquilino, conectado al bot
-- ✅ Multi-usuario + Multi-inquilino
-- ✅ Dockerizado (bot de Telegram en Docker, Ollama en el host) — ver `docs/docker.md`
+## Cómo está montado
 
-## Configuración
+- **Contenedor `femix`**: los bots de Telegram de todos los inquilinos y el panel web
+  (`conectores/arranque.py`), con healthcheck sobre `/health`.
+- **Contenedor `femix-db`**: Postgres 16 (todos los datos, siempre con `inquilino_id`).
+- **Ollama en el host, fuera de Docker** (dio problemas dockerizado). Lo vigila el temporizador
+  `femix-vigila-ollama` (lo reinicia si deja de responder).
+- **Canal principal: Telegram.** WhatsApp es un conector más sobre el mismo bot.
+- `main` en GitHub es lo que corre en madre.
 
-### Variables de entorno
-
-Solo estas las lee el código (en Docker van en `.env`; ver `.env.example`):
-
-```bash
-TELEGRAM_BOT_TOKEN="..."                 # conectores/telegram/bot.py
-FEMIX_TELEGRAM_PERMITIDOS="123456"       # IDs de Telegram que pueden usar el bot (vacío = nadie)
-FEMIX_INQUILINO_ID="tu_inquilino"        # índice RAG que usa el bot
-HUGIN_LLM_PROVEEDOR="ollama"             # ollama | openai
-HUGIN_LLM_MODELO="mistral"               # modelo base
-HUGIN_LLM_MODELO_RAPIDO="llama3.2"       # opcional: respuestas rápidas
-HUGIN_LLM_MODELO_COMPLEJO="qwen3.5"      # opcional: subagente / tareas complejas
-OLLAMA_URL="http://localhost:11434/api/chat"
-```
-
-Si se usa Ollama por su API compatible con OpenAI en vez de la nativa:
-
-```bash
-HUGIN_LLM_PROVEEDOR="openai"
-OPENAI_BASE_URL="http://localhost:11434/v1"
-OPENAI_API_KEY="ollama"
-```
-
-> Hasta el 2026-09-23 este documento listaba `FEMIX_MODELO_BASE`, `FEMIX_MODELO_RAPIDO`,
-> `FEMIX_MODELO_PENSAMIENTO` y `FEMIX_USUARIO_ID`. **El código no las lee**: los modelos se
-> configuran con `HUGIN_LLM_MODELO*` (arriba) y el usuario es el id de Telegram de quien escribe.
-> Con aquellas variables el bot usaba en silencio los valores por defecto.
-
-### Datos
-
-```
-datos/
-├── {inquilino_id}/
-│   └── rag/
-│       └── indice.json
-├── memoria.json                    # historial de conversación (clave inquilino:usuario)
-├── tareas_{usuario_id}.json        # dominio personal (aún sin carpeta por inquilino, Fase 2)
-├── diario_{usuario_id}.json
-├── recordatorios_{usuario_id}.json
-├── inquilinos.json                 # panel web
-└── sesiones.json                   # panel web
-```
-
-En Docker, todo esto vive en el volumen `femix-datos`.
-
-## Ejecución
-
-Con Docker (recomendado):
+## 1. Primera vez
 
 ```bash
 cd ~/GitHub/personal/femix
-docker compose up -d --build
-docker compose logs -f femix
+cp .env.example .env && nano .env        # tokens, FEMIX_DB_CLAVE, FEMIX_WEB_ADMIN_TOKEN...
+scripts/instalar-vigilante-ollama.sh     # vigilante de Ollama (systemd)
+scripts/instalar-hooks.sh                # tests antes de cada git push
 ```
 
-Sin Docker:
+En `.env` no pueden faltar:
+
+| Variable | Para qué |
+|---|---|
+| `TELEGRAM_BOT_TOKEN`, `FEMIX_TELEGRAM_PERMITIDOS` | el bot del `.env` y quién puede usarlo |
+| `FEMIX_DB_CLAVE` | clave de Postgres |
+| `FEMIX_WEB_ADMIN_TOKEN` | entrar en el panel del dueño (`/admin`) |
+| `HUGIN_LLM_MODELO`, `HUGIN_LLM_MODELO_RAPIDO`, `HUGIN_LLM_KEEP_ALIVE=-1` | modelos de Ollama, siempre cargados |
+| `FEMIX_EMPRESA_NOMBRE`, `_NIF`, `_DIRECCION`, `_EMAIL` | datos legales en términos y privacidad |
+
+Ollama debe tener también `OLLAMA_KEEP_ALIVE=-1` (drop-in en
+`/etc/systemd/system/ollama.service.d/femix.conf`).
+
+**Nunca pegues tokens en el chat ni en logs.** Los scripts los leen del `.env` sin imprimirlos.
+
+## 2. Desplegar (cada vez que hay cambios en `main`)
+
+Siempre dentro de `tmux`, para que un corte del SSH del móvil no mate el montaje:
 
 ```bash
 cd ~/GitHub/personal/femix
-source .venv/bin/activate
-python -m conectores.telegram.bot     # bot de Telegram
-PYTHONPATH=src python -m femix.bot.main   # CLI
+tmux new -A -s despliegue
+until scripts/desplegar.sh --sin-ci; do echo "reintento en 20 s"; sleep 20; done
 ```
 
-## Tests
+`desplegar.sh`:
+- se para si hay cambios locales sin subir o si la `main` local no es igual a la de GitHub;
+- pasa los tests (sin `--sin-ci`) y reconstruye con la caché de BuildKit: las librerías pesadas
+  (`requirements-base.txt`) no se vuelven a descargar si no cambian;
+- espera a que el panel responda en el puerto del `.env`.
+
+Si se corta el SSH: `tmux attach -t despliegue`.
+
+## 3. Comprobar que todo funciona
 
 ```bash
-python -m pytest tests/ -v
+scripts/probar-todo.sh 2>&1 | tee ~/prueba-femix.txt
 ```
 
-## Próximos pasos
+Revisa, con `OK` / `FALLO` en cada línea: contenedores, panel y login del dueño, token del dueño,
+Ollama y modelos cargados, vigilante, bots "en marcha", errores recientes en los logs y una
+conversación real (`python -m femix.comprobacion`: base de datos, `/hoy`, preguntas frecuentes,
+modelo, RAG y aprendizaje, con datos de prueba que no tocan los reales). Sale con código 1 si algo
+falla.
 
-- [x] Panel web (FastAPI + Jinja2), en el mismo contenedor que los bots
-- [x] Docker con panel web + bot
-- [x] Probar `docker compose up -d --build` en madre contra el Ollama real (2026-09-23)
-- [x] SaaS, WhatsApp, MCP, aprendizaje y operación (ver docs/CHANGELOG.md)
-- [ ] Release v1.0.0 (etiqueta en `main` cuando se pruebe en madre)
+Si hay algún `FALLO`:
+
+```bash
+docker compose logs --tail 80 femix
+docker compose ps                         # "healthy" = el panel responde
+curl -s http://127.0.0.1:11434/api/ps     # Ollama y modelos cargados
+```
+
+Después, prueba a mano en Telegram: "hola", una pregunta de precio u horario, pedir una cita y una
+nota de voz. Apunta cuánto tarda cada una: con eso se ajusta el modelo.
+
+## 4. Problemas conocidos
+
+| Síntoma | Causa y arreglo |
+|---|---|
+| "El asistente se está reiniciando" | Ollama colgado. El vigilante lo reinicia en ≤2 min; a mano: `sudo systemctl restart ollama` |
+| Primer mensaje muy lento | Modelo sin cargar: revisa `HUGIN_LLM_KEEP_ALIVE=-1` y `OLLAMA_KEEP_ALIVE=-1` |
+| El montaje vuelve a descargarlo todo | Falta `docker-buildx` (`sudo pacman -S docker-buildx`) o cambió `requirements-base.txt` |
+| `Conflict` en Telegram | Dos procesos con el mismo token (p. ej. un bot viejo fuera de Docker) |
+| Login del panel da 429 | Demasiados intentos fallidos: espera una hora |
+
+## 5. Copias
+
+```bash
+docker compose --profile copias up -d                 # copia diaria en ./copias
+scripts/restaurar-copia.sh copias/femix-AAAA-MM-DD.sql.gz
+```
+
+La restauración guarda antes lo que hay y siempre vuelve a arrancar femix, aunque falle.
+
+## 6. Pendiente
+
+- [ ] Primer despliegue con la revisión del 2026-09-29 y salida de `probar-todo.sh`.
+- [ ] Elegir y ajustar el modelo con los tiempos reales de madre.
+- [ ] Release v1.0.0 (etiqueta en `main`).
+- [ ] Teléfono (gjallarhorn): aparcado.

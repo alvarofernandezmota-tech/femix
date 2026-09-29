@@ -15,8 +15,12 @@ Código: `conectores/telegram/persona.py`.
 ## Recordatorio de citas
 
 El día antes de cada reserva, el bot escribe al cliente: "Te recuerdo tu cita de mañana a las…".
-Se manda una sola vez por cita y solo a clientes de Telegram. Lo hace la flota en su bucle de
-avisos (`recordar_citas`, `Reservas.por_recordar`).
+Se manda una sola vez por cita. A los clientes de Telegram lo manda la flota en su bucle de avisos
+(`recordar_citas`); a los de WhatsApp, el panel cada 10 minutos con la plantilla aprobada por Meta
+(ver [whatsapp.md](whatsapp.md)). Si un cliente ha bloqueado el bot, no se reintenta.
+
+Por WhatsApp no hay recordatorios a una hora libre (`/recordatorio`): Meta solo deja escribir
+fuera de las 24 h con plantillas, así que el bot no los ofrece.
 
 ## Avisos de fallos a tu Telegram
 
@@ -38,7 +42,14 @@ Con SMTP configurado (`FEMIX_SMTP_*` en `.env`) y el SaaS activo, se mandan esto
 | Fin de prueba | A 3 días de que acabe la prueba, una vez |
 | Pago fallido | Cuando Stripe no puede cobrar. Si vuelve a fallar después de pagar, se avisa otra vez |
 
-La revisión se hace una vez al día desde la flota. Código: `saas/correo.py`.
+La revisión se hace una vez al día desde la flota. Un correo solo se da por mandado si el servidor
+SMTP lo aceptó; si falla, se reintenta al día siguiente. Código: `saas/correo.py`.
+
+## Seguridad del panel
+
+- Tras 10 intentos fallidos de login en una hora (por conexión o por cuenta), `/login` responde 429.
+- Las peticiones a la API del cliente que vienen de otra web se rechazan (cabecera `Origin`).
+- Leer una web para el RAG solo funciona con webs públicas (se comprueba la IP a la que se conecta).
 
 ## Datos (RGPD)
 

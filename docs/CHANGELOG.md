@@ -620,3 +620,9 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   aceptó; exportación RGPD completa; healthcheck del contenedor `femix`; `desplegar.sh` y
   `probar-todo.sh` leen puerto y panel del `.env`; el token ya no sale en `ps`; restaurar una copia
   siempre vuelve a arrancar femix.
+
+## 2026-09-29 — Documentación de cómo proceder en madre (`feat/panel-web`)
+- `docs/PRODUCCION_MADRE.md` reescrita como guía paso a paso: primera vez (`.env`, vigilante,
+  ganchos), desplegar en `tmux`, `probar-todo.sh`, problemas conocidos y copias.
+- `operacion.md`: recordatorios por WhatsApp, correos que se reintentan y seguridad del panel.
+- README, índice de docs y `CONTEXT.md` apuntan a la guía.

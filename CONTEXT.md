@@ -1,6 +1,6 @@
 # CONTEXT.md — femix
 
-Última actualización: 2026-09-28 (fases 7–11 y revisión completa de bot, RAG, memoria y panel)
+Última actualización: 2026-09-29 (dos revisiones completas: bot, RAG, memoria, panel, Stripe y operación)
 
 ## Fase actual del roadmap
 Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En marcha.
@@ -192,7 +192,7 @@ WhatsApp; teléfono (`gjallarhorn`); release v1.0.0.
   segundos, entrada y salida recortadas).
 
 ## Próximo paso concreto
-Desplegar `main` en `madre` (`scripts/desplegar.sh`) y pasar `scripts/probar-todo.sh`: contenedores,
+Seguir [`docs/PRODUCCION_MADRE.md`](docs/PRODUCCION_MADRE.md): desplegar `main` en `madre` (`scripts/desplegar.sh`) y pasar `scripts/probar-todo.sh`: contenedores,
 panel, base de datos, Ollama (fuera de Docker), bots y una conversación real con RAG y aprendizaje.
 Con esa salida, elegir y ajustar el modelo y sacar la v1.0.0. Canal principal: Telegram; WhatsApp es
 un conector más. El teléfono (gjallarhorn) queda para después.
