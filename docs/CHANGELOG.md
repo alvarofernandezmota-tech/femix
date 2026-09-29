@@ -646,3 +646,11 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
 ## 2026-09-29 — `.gitignore` protege las copias del `.env` (`feat/panel-web`)
 - `.env.*` (salvo `.env.example`) y `*.bak` ignorados: en madre había un `.env.bak` con secretos que
   `git add -A` habría subido.
+
+## 2026-09-29 — Madre: Ollama solo con CPU y KEEP_ALIVE arreglado (`feat/panel-web`)
+- Medido en madre: con la GTX 1060 y `nouveau` (Vulkan/NVK) `qwen2.5:3b` iba a 5,6 tokens/s; solo
+  con CPU, 11,9 tokens/s (respuesta de ~12 s a 5,8 s). Queda `solo-cpu.conf` hasta tener el driver
+  de NVIDIA.
+- `OLLAMA_KEEP_ALIVE` estaba en tres drop-in y ganaba `30m`: ahora solo en `femix.conf` (`-1`).
+- `HUGIN_LLM_MAX_TOKENS=200` en madre; bot duplicado `femix.service` desactivado.
+- Todo documentado en `docs/PRODUCCION_MADRE.md`.
