@@ -82,7 +82,7 @@ def _csv(contenido: bytes) -> str:
 
 
 class _ExtractorHTML(HTMLParser):
-    IGNORAR = {"script", "style", "noscript", "nav", "footer", "header", "svg", "form"}
+    IGNORAR = {"script", "style", "noscript", "nav", "svg", "form"}   # footer y header no: ahí suelen ir horario y dirección
     BLOQUES = {"p", "div", "li", "tr", "br", "section", "article", "table", "ul", "ol"}
 
     def __init__(self):

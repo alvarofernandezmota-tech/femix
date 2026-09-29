@@ -15,9 +15,11 @@ read -r -p "Se sustituye la base de datos por $COPIA. ¿Seguro? (escribe si) " R
 
 mkdir -p copias
 docker compose stop femix
+# Pase lo que pase (también si falla la restauración), femix vuelve a arrancar.
+SEGURIDAD=""
+trap 'docker compose start femix >/dev/null; [[ -n "$SEGURIDAD" ]] && echo "Lo que había antes está en $SEGURIDAD"' EXIT
 SEGURIDAD="copias/antes-de-restaurar-$(date +%F-%H%M%S).sql.gz"
 docker exec femix-db pg_dump --clean --if-exists -U femix femix | gzip > "$SEGURIDAD"
 echo "Copia de lo que había: $SEGURIDAD"
 gunzip -c "$COPIA" | docker exec -i femix-db psql -q -U femix -d femix -v ON_ERROR_STOP=1 >/dev/null
-docker compose start femix
 echo "Restaurada $COPIA."

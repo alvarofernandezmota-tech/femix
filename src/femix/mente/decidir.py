@@ -43,6 +43,8 @@ PALABRAS_HERRAMIENTAS = (
     "marca como hecha", "tareas pendientes", "hay hueco", "tienes libre", "tenéis libre", "teneis libre",
     "está libre", "esta libre", "qué tiempo hace", "que tiempo hace", "tiempo hará", "tiempo hara",
     "internet", "google", "noticias", "busca en internet",
+    "pedir hora", "darme hora", "me das hora", "me da hora", "mesa para", "una mesa", "cambiar mi cita",
+    "cambiar la cita", "mover la cita", "mover mi cita",
     "calendario", "correo", "correos", "email", "emails", "gmail", "notion", "evento", "eventos", "reunión", "reunion",
 )
 # Fuera a propósito (revisión del 2026-09-28): "mañana", "hecho", "completa", "libre", "pendiente" y
@@ -56,11 +58,15 @@ PALABRAS_CONSULTA = (
     "busca", "búscame", "buscame", "documento", "documentos", "según", "segun", "precio", "precios",
     "horario", "horarios", "cuánto cuesta", "cuanto cuesta", "cuánto vale", "cuanto vale", "abrís",
     "abris", "cerráis", "cerrais", "dirección", "direccion", "tarifa", "tarifas",
+    "cuesta", "cuestan", "cobráis", "cobrais", "cuánto es", "cuanto es", "abren", "cierran",
+    "hasta qué hora", "hasta que hora", "a qué hora abr", "a que hora abr", "a qué hora cerr", "a que hora cerr",
 )
 # Solo cuentan si el mensaje es una pregunta ("el servicio fue genial" no lo es).
 PALABRAS_CONSULTA_SI_PREGUNTA = (
     "dónde", "donde", "servicio", "servicios", "ofrecéis", "ofreceis", "hacéis", "haceis", "carta",
-    "menú", "menu", "abierto", "abiertos",
+    "menú", "menu", "abierto", "abiertos", "aceptáis", "aceptais", "tarjeta", "pagar", "bizum",
+    "vegano", "veganos", "vegana", "veganas", "sin gluten", "alérgenos", "alergenos", "aparcamiento",
+    "qué días", "que dias",
 )
 _INTERROGATIVO = re.compile(r"^\W*(qué|que|cuál|cual|cuáles|cuales|dónde|donde|cómo|como|cuándo|cuando|cuánto|cuanto|"
                             r"cuánta|cuanta|tenéis|teneis|hacéis|haceis|ofrecéis|ofreceis|hay|se puede|puedo|podéis|podeis)\b", re.I)

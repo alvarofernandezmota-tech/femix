@@ -597,3 +597,26 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
 - **Panel**: un número de WhatsApp no puede estar en dos inquilinos; comprobación de origen en la
   API del cliente; IP conectada comprobada al leer una web (DNS rebinding); ID de responsable
   acotado; el panel del cliente respeta el bot del `.env`.
+
+## 2026-09-29 — Segunda revisión exhaustiva: 32 fallos arreglados (`feat/panel-web`)
+- **Recordatorios**: una fecha con zona ("…Z") ya no rompe los avisos de todo el inquilino; crear y
+  marcar avisado ya no se pisan; un usuario que bloqueó el bot deja de reintentarse cada minuto.
+- **Reservas**: sin citas de 0 minutos (permitían reservar la misma hora sin fin); cerrojo entre
+  procesos (fichero o Postgres) para que Telegram y WhatsApp no den la misma hora a dos clientes.
+- **WhatsApp**: si algo falla el cliente recibe un aviso y Meta puede reintentar; no se ofrecen
+  recordatorios que nunca llegarían; un perfil roto no corta los recordatorios de los demás.
+- **Telegram**: límite de ediciones (RetryAfter) sin dejar el texto a medias; notas de voz con aviso
+  si fallan y sin ficheros temporales perdidos.
+- **Modelo**: si ya reservó/apuntó algo y luego tarda, se dice lo hecho (no se repite la acción);
+  un servidor MCP caído no añade 30-60 s a cada mensaje; fallo al guardar la memoria no pierde la respuesta.
+- **RAG y router**: singular/plural casan ("cortes"/"corte"); más preguntas de precio, horario y pago
+  van a los documentos; "pedir hora" y "mesa para" usan las herramientas; el pie de las webs (horario,
+  dirección) ya se lee; búsquedas sin cola global; BM25 sin re-tokenizar en cada mensaje; los datos
+  del negocio ya no se guardan como personales.
+- **Stripe**: cambiar de plan va al portal (no abre una segunda suscripción); avisos de una
+  suscripción vieja o de un inquilino borrado no se aplican; un aviso que no se puede aplicar no
+  hace reintentar a Stripe durante días.
+- **Panel y operación**: tope de intentos de login (429); correos solo se apuntan si el SMTP los
+  aceptó; exportación RGPD completa; healthcheck del contenedor `femix`; `desplegar.sh` y
+  `probar-todo.sh` leen puerto y panel del `.env`; el token ya no sale en `ps`; restaurar una copia
+  siempre vuelve a arrancar femix.

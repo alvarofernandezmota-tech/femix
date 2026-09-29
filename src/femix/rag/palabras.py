@@ -5,6 +5,7 @@ referencia. BM25 es justo lo contrario. Juntos (búsqueda híbrida, `fusionar`) 
 cualquiera de los dos por separado. Sin dependencias: el índice de un inquilino cabe en memoria.
 """
 import math
+from collections import Counter
 import re
 import unicodedata
 
@@ -28,9 +29,17 @@ def _sin_tildes(texto: str) -> str:
 
 def _raiz(palabra: str) -> str:
     """Raíz muy simple (plurales y poco más): "precios" y "precio" cuentan igual."""
-    for final in ("ciones", "cion", "es", "s"):
+    for final in ("ciones", "cion"):
         if len(palabra) > len(final) + 3 and palabra.endswith(final):
             return palabra[: -len(final)]
+    # "cortes" → "corte" → "cort" y "corte" → "cort": singular y plural casan aunque el plural
+    # sea en -es ("ciudades" → "ciudad", "flores" → "flor", "luces"/"luz" → "luc").
+    if len(palabra) > 4 and palabra.endswith("s"):
+        palabra = palabra[:-1]
+    if len(palabra) > 3 and palabra.endswith("e"):
+        palabra = palabra[:-1]
+    if len(palabra) > 2 and palabra.endswith("z"):
+        palabra = palabra[:-1] + "c"
     return palabra
 
 
@@ -39,24 +48,31 @@ def tokenizar(texto: str) -> list:
     return [_raiz(p) for p in _PALABRA.findall(limpio) if p not in VACIAS and len(p) > 1]
 
 
+def contar_palabras(texto: str) -> Counter:
+    """Las palabras útiles de un texto con sus veces: se calcula una vez por fragmento."""
+    return Counter(tokenizar(texto))
+
+
 def bm25(consulta: str, textos: list, k1: float = 1.5, b: float = 0.75) -> list:
-    """Puntuación BM25 de cada texto para la consulta (0 si no comparten ninguna palabra útil)."""
-    documentos = [tokenizar(t) for t in textos]
+    """Puntuación BM25 de cada texto para la consulta (0 si no comparten ninguna palabra útil).
+    `textos` pueden ser cadenas o ya `contar_palabras(...)` (más rápido: el índice los guarda)."""
+    documentos = [t if isinstance(t, Counter) else contar_palabras(t) for t in textos]
     terminos = set(tokenizar(consulta))
     if not documentos or not terminos:
         return [0.0] * len(textos)
     n = len(documentos)
-    media = sum(len(d) for d in documentos) / n or 1
+    largos = [sum(d.values()) for d in documentos]
+    media = sum(largos) / n or 1
     frecuencia_doc = {t: sum(1 for d in documentos if t in d) for t in terminos}
     puntuaciones = []
-    for doc in documentos:
+    for doc, largo in zip(documentos, largos):
         total = 0.0
         for termino in terminos:
-            f = doc.count(termino)
+            f = doc[termino]
             if not f:
                 continue
             idf = math.log(1 + (n - frecuencia_doc[termino] + 0.5) / (frecuencia_doc[termino] + 0.5))
-            total += idf * f * (k1 + 1) / (f + k1 * (1 - b + b * len(doc) / media))
+            total += idf * f * (k1 + 1) / (f + k1 * (1 - b + b * largo / media))
         puntuaciones.append(total)
     return puntuaciones
 

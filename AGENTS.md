@@ -6,6 +6,9 @@ Reglas fijas para cualquier agente (Claude Code, OpenCode, humano) que toque est
 - Nombres de carpetas y funciones en español: `dominio/`, `puertos/`, `inquilino/`, `entender.py`, `conversar.py`.
 - El LLM (Ollama) es intercambiable y no debe conocer nada de negocio ni de inquilinos.
 - Toda consulta a Postgres debe llevar `inquilino_id` obligatorio. Nunca hacer un SELECT sin ese filtro.
+  Únicas excepciones, solo para el panel del dueño de la plataforma y los avisos de Stripe sin id:
+  `AlmacenSuscripciones.listar()`, `Actividad.ultimos()` sin inquilino y el listado de perfiles.
+  Cualquier otra nueva necesita estar aquí.
 - No se hardcodea personalización de negocio en el prompt del sistema: siempre viene de `inquilino/perfil.py`.
 - Un fallo de una pieza (modelo, herramienta, búsqueda, aprendizaje) nunca deja al usuario sin
   respuesta: se captura, se apunta como incidencia (`infraestructura/actividad.py`) y sigue el camino normal.

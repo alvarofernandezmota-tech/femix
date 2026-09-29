@@ -254,10 +254,33 @@ async def formulario_login(request: Request):
     return _templates.TemplateResponse(request, "login.html", {})
 
 
+FALLOS_POR_HORA = 10
+_fallos_login: dict = {}
+
+
+def _demasiados_fallos(claves: tuple, ahora: float) -> bool:
+    for clave in claves:
+        recientes = [t for t in _fallos_login.get(clave, []) if ahora - t < 3600]
+        _fallos_login[clave] = recientes
+        if len(recientes) >= FALLOS_POR_HORA:
+            return True
+    return False
+
+
 @router.post("/login")
-async def procesar_login(inquilino_id: str = Form(...), password: str = Form(...)):
+async def procesar_login(request: Request, inquilino_id: str = Form(...), password: str = Form(...)):
+    import time
+    # Tope de intentos fallidos por conexión y por cuenta: frena la fuerza bruta y que decenas de
+    # comprobaciones de contraseña (caras a propósito) le quiten la CPU a Ollama.
+    ahora = time.time()
+    claves = (f"ip:{request.client.host if request.client else '?'}", f"id:{inquilino_id.strip().lower()[:64]}")
+    if _demasiados_fallos(claves, ahora):
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            detail="Demasiados intentos. Prueba dentro de una hora.")
     inquilino = AlmacenInquilinos().verificar_credenciales(inquilino_id, password)
     if inquilino is None or inquilino_de_baja(inquilino.id):
+        for clave in claves:
+            _fallos_login.setdefault(clave, []).append(ahora)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas")
     return abrir_sesion(inquilino)
 

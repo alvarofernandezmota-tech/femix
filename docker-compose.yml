@@ -68,6 +68,13 @@ services:
     # CPU puede tardar hasta el minuto que espera a Ollama. Con los 10 s por defecto, Docker lo
     # mataba a medias y esa respuesta se perdía (Telegram ya había dado el mensaje por entregado).
     stop_grace_period: 90s
+    # "healthy" solo si el panel responde (sin panel, FEMIX_PANEL=0, basta con que el proceso viva).
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,urllib.request; os.environ.get('FEMIX_PANEL')=='0' or urllib.request.urlopen('http://127.0.0.1:'+os.environ.get('FEMIX_WEB_PORT','8000')+'/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     volumes:
       - femix-datos:/app/datos
       - ./documentos:/app/documentos:ro

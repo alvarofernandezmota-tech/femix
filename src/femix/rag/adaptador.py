@@ -37,7 +37,8 @@ class IndiceEmbeddingsBuscador(Buscador):
         self._motor_embeddings = motor_embeddings or motor_embeddings_desde_entorno()
         self._limite_caracteres = limite_caracteres
         self._cache: dict = {}            # inquilino_id -> (versión, índice)
-        self._cerrojo = threading.Lock()  # varios bots buscan a la vez desde hilos distintos
+        self._cerrojos: dict = {}          # uno por inquilino: uno lento no para a los demás
+        self._cerrojo = threading.Lock()   # solo para crear esos cerrojos
         # Cada motor puntúa en su escala: el de palabras roza 0 con lo irrelevante; uno semántico, no.
         self._puntuacion_minima = (
             puntuacion_minima if puntuacion_minima is not None
@@ -87,6 +88,8 @@ class IndiceEmbeddingsBuscador(Buscador):
         if not texto or not texto.strip():
             return ""
         with self._cerrojo:
+            cerrojo = self._cerrojos.setdefault(inquilino_id, threading.Lock())
+        with cerrojo:
             indice = self._indice_al_dia(inquilino_id)
             resultados = indice.buscar(texto, k=maximo)
             if indice.reindexados:

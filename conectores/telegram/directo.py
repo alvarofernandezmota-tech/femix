@@ -12,7 +12,7 @@ import logging
 import time
 
 from telegram.constants import ChatAction
-from telegram.error import BadRequest, NetworkError, TimedOut
+from telegram.error import BadRequest, NetworkError, RetryAfter, TimedOut
 
 INTERVALO = 1.5              # segundos entre ediciones del mensaje
 MINIMO_PARA_ENSENAR = 25     # caracteres antes de enseñar el primer trozo
@@ -90,7 +90,15 @@ class RespuestaEnDirecto:
             if self._mensaje is not None:
                 try:
                     if primero != self._ensenado:
-                        await self._mensaje.edit_text(primero)
+                        try:
+                            await self._mensaje.edit_text(primero)
+                        except RetryAfter as exc:
+                            # Límite de ediciones (la última va justo detrás de otra): se espera y
+                            # se reintenta una vez; sin esto se quedaba el texto a medias con ▌.
+                            await asyncio.sleep(min(float(getattr(exc, "retry_after", 1) or 1), 30))
+                            await self._mensaje.edit_text(primero)
+                except RetryAfter:
+                    await self._update.message.reply_text(primero)
                 except (TimedOut, NetworkError):
                     # Puede que la edición sí llegara: reenviar duplicaría la respuesta.
                     _log.warning("Sin confirmación al cerrar la respuesta en directo; no se reenvía")

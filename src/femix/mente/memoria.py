@@ -42,6 +42,17 @@ class Memoria:
         # Atómico: cortar a medias una escritura (disco lleno, `docker stop`) no deja el fichero roto.
         escribir_json_atomico(self._ruta, bruto)
 
+    def _recargar_si_cambio(self):
+        """Otro proceso puede haber escrito: se relee solo si el fichero cambió."""
+        try:
+            estado = os.stat(self._ruta)
+            firma = (estado.st_mtime_ns, estado.st_size, estado.st_ino)
+        except FileNotFoundError:
+            firma = None
+        if firma != getattr(self, "_firma", None):
+            self._historial = self._cargar()
+            self._firma = firma
+
     def clave(self, inquilino_id: str, usuario_id: str) -> str:
         return f"{inquilino_id}:{usuario_id}"
 
@@ -63,7 +74,7 @@ class Memoria:
 
     def contexto(self, inquilino_id: str, usuario_id: str) -> str:
         k = self.clave(inquilino_id, usuario_id)
-        self._historial = self._cargar()
+        self._recargar_si_cambio()
         # "Asistente" y no un nombre: cada inquilino puede llamar a su bot como quiera.
         return "\n".join(f"Usuario: {t.entrada}\nAsistente: {t.salida}" for t in self._historial.get(k, []))
 

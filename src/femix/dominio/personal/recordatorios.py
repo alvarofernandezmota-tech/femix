@@ -1,5 +1,6 @@
 """Recordatorios del usuario: se guardan y la flota los avisa por Telegram al vencer."""
 from ...infraestructura.almacen_json import AlmacenJson
+import threading
 from dataclasses import dataclass, asdict
 from datetime import datetime
 
@@ -14,6 +15,20 @@ class Recordatorio:
 
 def esta_vencido(cuando: datetime, ahora: datetime) -> bool:
     return ahora >= cuando
+
+
+# Crear (hilo del mensaje) y marcar avisado (bucle de avisos) releen y escriben la lista entera: con
+# este cerrojo no se comen lo que ha guardado el otro.
+_ESCRIBIENDO = threading.Lock()
+
+
+def _sin_zona(cuando: datetime, zona: "str | None") -> datetime:
+    """Todo se guarda en la hora local del inquilino sin zona, como la da `RelojZona`: una fecha con
+    zona ("…Z", "+02:00") se pasa a esa hora; si no, compararla con el reloj lanzaría TypeError."""
+    if cuando.tzinfo is None:
+        return cuando
+    from zoneinfo import ZoneInfo
+    return cuando.astimezone(ZoneInfo(zona) if zona else None).replace(tzinfo=None)
 
 class Recordatorios:
     def __init__(self, usuario_id: str, directorio_datos: str = "datos", reloj: "Reloj | None" = None, almacen=None):
@@ -35,27 +50,44 @@ class Recordatorios:
     def crear(self, texto: str, cuando: "datetime | str") -> str:
         if not texto:
             raise ValueError("texto no puede estar vacío")
-        cuando_iso = cuando.isoformat() if isinstance(cuando, datetime) else cuando
-        self._recordatorios.append(Recordatorio(texto, cuando_iso))
-        self._guardar()
+        if not isinstance(cuando, datetime):
+            cuando = datetime.fromisoformat(cuando)
+        cuando_iso = _sin_zona(cuando, getattr(self._reloj, "zona", None)).isoformat()
+        with _ESCRIBIENDO:
+            self._recordatorios = self._cargar()
+            self._recordatorios.append(Recordatorio(texto, cuando_iso))
+            self._guardar()
         return f"Recordatorio creado: {texto} ({cuando_iso})"
 
     def por_avisar(self) -> list:
         """Vencidos y sin avisar: `[(posición, Recordatorio)]`, del más antiguo al más nuevo."""
         ahora = self._reloj.ahora()
         vencidos = [(i, r) for i, r in enumerate(self._recordatorios)
-                    if not r.avisado and esta_vencido(datetime.fromisoformat(r.cuando), ahora)]
+                    if not r.avisado and esta_vencido(self._fecha(r.cuando), ahora)]
         return sorted(vencidos, key=lambda par: par[1].cuando)
 
+    def _fecha(self, cuando: str) -> datetime:
+        return _sin_zona(datetime.fromisoformat(cuando), getattr(self._reloj, "zona", None))
+
     def marcar_avisado(self, posicion: int) -> None:
-        """Se marca uno a uno y solo después de enviarlo: si el envío falla, se reintenta."""
-        self._recordatorios[posicion].avisado = True
-        self._guardar()
+        """Se marca uno a uno y solo después de enviarlo: si el envío falla, se reintenta.
+
+        Se relee antes y se busca por texto y fecha (no por posición): mientras se mandaba el aviso
+        el usuario pudo crear otro recordatorio, y reescribir la lista vieja lo borraría."""
+        objetivo = self._recordatorios[posicion]
+        with _ESCRIBIENDO:
+            self._recordatorios = self._cargar()
+            for recordatorio in self._recordatorios:
+                if (not recordatorio.avisado and recordatorio.texto == objetivo.texto
+                        and recordatorio.cuando == objetivo.cuando):
+                    recordatorio.avisado = True
+                    break
+            self._guardar()
 
     def listar_pendientes(self) -> list[dict]:
         ahora = self._reloj.ahora()
         return [
             {"texto": r.texto, "cuando": r.cuando}
             for r in self._recordatorios
-            if not esta_vencido(datetime.fromisoformat(r.cuando), ahora)
+            if not esta_vencido(self._fecha(r.cuando), ahora)
         ]

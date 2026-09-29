@@ -117,6 +117,7 @@ def test_registro_limitado_por_ip(entorno, monkeypatch):
 
 def test_webhook_de_stripe(entorno, monkeypatch):
     monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", "whsec")
+    AlmacenPerfiles(str(entorno)).crear(PerfilInquilino("acme", "ACME", tipo="empresa"))
     AlmacenSuscripciones(str(entorno)).cambiar("acme", plan="basico", estado="activa", stripe_cliente="cus_1")
     cuerpo = json.dumps({"type": "invoice.payment_failed", "data": {"object": {"customer": "cus_1"}}}).encode()
     t = int(time.time())
