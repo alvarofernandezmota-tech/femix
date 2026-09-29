@@ -76,3 +76,29 @@ terceros, salvo que se indique.
 - **LangChain / LlamaIndex**: añaden capas y dependencias para lo que aquí son 900 líneas
   propias y probadas (`rag/`, `agentes/`). Se revisará si el RAG crece mucho.
 - **App nativa desde cero (Kotlin/Swift)**: dos códigos que mantener; la web ya es la app.
+
+## Competencia (búsqueda del 2026-09-30)
+
+**Bots de WhatsApp para negocios en España.** Precios de mercado: WhatIBot 29/69/149 €/mes;
+Engrana 89 €/mes; agencias 290–500 € de instalación + 49–97 €/mes; rango habitual para pymes
+150–600 €/mes más implantación. Nuestros planes (Básico 19 €, Pro 49 €) están por debajo: con lo
+que ya hay, 29 € y 79 € son razonables (`saas/planes.py`).
+
+**Plataformas de reservas** (Booksy, Treatwell, Timify, Marai, Asistiva). Treatwell cobra 25–35 %
+por reserva; Booksy es la más completa pero sin bot de WhatsApp con IA; solo Asistiva y Marai
+tienen IA conversacional en WhatsApp. Tienen y no tenemos: página pública de reservas, varios
+empleados, señal/pago por adelantado, pedir reseñas, estadísticas, Google Calendar. Tenemos y no
+tienen: lenguaje libre (con faltas), documentos propios, aprendizaje aprobado por el dueño,
+asistente personal, todo en servidor propio sin comisiones.
+
+**Open source parecido** (ForgeAI, FiveAgent, KinBot, whaagent): más canales (Discord, Slack,
+Signal), tienda de plugins, tareas programadas. Ninguno es un SaaS multi-inquilino con panel por
+cliente en español.
+
+**Por añadir, por valor**: 1) página pública de reservas por negocio; 2) resúmenes automáticos
+(semana los lunes, citas de mañana cada noche); 3) pedir reseña tras la cita; 4) lista de espera;
+5) varios empleados; 6) señal por Stripe; 7) estadísticas; 8) Google Calendar en dos direcciones.
+
+Fuentes: engrana.es, whatibot.com, recepcionista.com, potenciaredes.com, citaflow.com, sapi.es,
+getapp.es (Booksy vs Treatwell), maraiagenda.com, asistiva.app, chatpalbot.com, github.com
+(ForgeAI, FiveAgent, Awesome-AI-Agents), vellum.ai.
