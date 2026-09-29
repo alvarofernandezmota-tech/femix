@@ -55,18 +55,6 @@ class CrearRecordatorioPeticion(BaseModel):
         return valor
 
 
-@router.get("/")
-async def dashboard(request: Request, inquilino: Inquilino = Depends(obtener_inquilino_actual)):
-    directorio = _carpeta(inquilino)
-    tareas = Tareas(inquilino.id, directorio, almacen=_almacen(inquilino)).listar()
-    recordatorios = Recordatorios(inquilino.id, directorio, almacen=_almacen(inquilino)).listar_pendientes()
-    return _templates.TemplateResponse(
-        request,
-        "usuario/dashboard.html",
-        {"inquilino": inquilino, "tareas": tareas, "recordatorios": recordatorios},
-    )
-
-
 @router.get("/tareas")
 async def listar_tareas(inquilino: Inquilino = Depends(obtener_inquilino_actual)):
     return {"tareas": Tareas(inquilino.id, _carpeta(inquilino), almacen=_almacen(inquilino)).listar()}

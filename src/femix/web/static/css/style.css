@@ -150,3 +150,26 @@ body {
     padding: 0.75rem;
     font-size: 0.85em;
 }
+
+/* --- Mi día (móvil primero) --- */
+.pestanas { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+.pestanas a { padding: 0.4rem 0.9rem; border-radius: 999px; background: #e8e8ef; color: #1a1a2e; text-decoration: none; }
+.pestanas a.activa { background: #1a1a2e; color: #fff; }
+.lista { list-style: none; padding: 0; margin: 0 0 0.5rem; }
+.lista li { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid #eee; }
+.lista .hora { font-variant-numeric: tabular-nums; color: #444; min-width: 5.5rem; }
+.lista .dia { font-weight: 600; }
+.inline { display: inline; margin-left: auto; }
+.lista li .inline.primero { margin-left: 0; }
+button.quitar, button.hecha, button.enlace { background: none; border: none; cursor: pointer; font-size: 1.1rem; color: #666; padding: 0.2rem 0.4rem; }
+button.hecha { font-size: 1.3rem; }
+button.enlace { text-decoration: underline; font-size: 0.9rem; }
+.formulario.compacto { margin-top: 0.5rem; }
+.formulario.fila { flex-direction: row; gap: 0.5rem; }
+.formulario.fila input { flex: 1; }
+details summary { cursor: pointer; color: #1a1a2e; font-weight: 600; margin-top: 0.5rem; }
+@media (max-width: 600px) {
+    .contenido { margin: 1rem auto; padding: 0 1rem; }
+    .tarjeta { padding: 0.9rem 1rem; }
+    .cabecera { position: sticky; top: 0; z-index: 1; }
+}

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ 'Hoy' if dias == 1 else 'Semana' }} — {{ inquilino.nombre }}{% endblock %}
+
+{% block content %}
+<nav class="pestanas">
+    <a href="/usuario/" class="{{ 'activa' if dias == 1 else '' }}">Hoy</a>
+    <a href="/usuario/semana" class="{{ 'activa' if dias == 7 else '' }}">Semana</a>
+    <a href="/usuario/panel">Mi bot</a>
+</nav>
+<h2>{{ titulo }}</h2>
+{% if aviso %}<p class="aviso aviso-ok">{{ aviso }}</p>{% endif %}
+{% if error %}<p class="aviso aviso-error">{{ error }}</p>{% endif %}
+
+{% macro cuando(fecha, hora) -%}
+{%- if dias > 1 %}<span class="dia">{{ fecha[8:] }}/{{ fecha[5:7] }}</span> {% endif %}{{ hora or 'todo el día' }}
+{%- endmacro %}
+
+<section class="tarjeta">
+    <h3>🗓 Agenda</h3>
+    <ul class="lista">
+        {% for c in agenda %}
+        <li><span class="hora">{{ cuando(c.fecha, c.hora) }}</span> {{ c.texto }}
+            <form method="post" action="/usuario/agenda/{{ c.id }}/cancelar" class="inline">
+                <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="dias" value="{{ dias }}">
+                <button type="submit" class="quitar" title="Quitar">✕</button></form></li>
+        {% else %}<li class="secundario">Nada en la agenda.</li>{% endfor %}
+    </ul>
+    <details><summary>Apuntar</summary>
+        <form method="post" action="/usuario/agenda" class="formulario compacto">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="dias" value="{{ dias }}">
+            <label>Qué <input name="texto" required maxlength="200" placeholder="Médico"></label>
+            <label>Fecha <input type="date" name="fecha" required value="{{ hoy }}"></label>
+            <label>Hora <small>(opcional)</small> <input type="time" name="hora"></label>
+            <button type="submit">Apuntar</button>
+        </form>
+    </details>
+</section>
+
+{% if con_reservas %}
+<section class="tarjeta">
+    <h3>💇 Reservas de clientes</h3>
+    <ul class="lista">
+        {% for c in reservas %}
+        <li><span class="hora">{{ cuando(c.fecha, c.hora) }}</span> {{ c.nombre }}{% if c.servicio %} · {{ c.servicio }}{% endif %} <small>({{ c.duracion }} min)</small>
+            <form method="post" action="/usuario/reservas/{{ c.id }}/anular" class="inline" onsubmit="return confirm('¿Anular esta reserva?');">
+                <input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit" class="quitar" title="Anular">✕</button></form></li>
+        {% else %}<li class="secundario">Sin reservas.</li>{% endfor %}
+    </ul>
+</section>
+{% endif %}
+
+<section class="tarjeta">
+    <h3>⏰ Recordatorios</h3>
+    <ul class="lista">
+        {% for r in recordatorios %}
+        <li><span class="hora">{{ cuando(r.fecha, r.hora) }}</span> {{ r.texto }}</li>
+        {% else %}<li class="secundario">Sin recordatorios.</li>{% endfor %}
+    </ul>
+    <details><summary>Crear recordatorio</summary>
+        <form method="post" action="/usuario/recordatorios/nuevo" class="formulario compacto">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="dias" value="{{ dias }}">
+            <label>Avísame de <input name="texto" required maxlength="200" placeholder="Llamar al banco"></label>
+            <label>Fecha <input type="date" name="fecha" required value="{{ hoy }}"></label>
+            <label>Hora <input type="time" name="hora" required></label>
+            <button type="submit">Crear</button>
+        </form>
+        <p class="secundario">Te avisa tu bot de Telegram a esa hora.</p>
+    </details>
+</section>
+
+<section class="tarjeta">
+    <h3>✅ Tareas pendientes</h3>
+    <ul class="lista">
+        {% for t in tareas %}
+        {% set indice = t.split('.')[0] %}
+        <li><form method="post" action="/usuario/tareas/{{ indice }}/hecha" class="inline primero">
+                <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="dias" value="{{ dias }}">
+                <button type="submit" class="hecha" title="Hecha">☐</button></form> {{ t.split('] ', 1)[1] }}</li>
+        {% else %}<li class="secundario">Nada pendiente.</li>{% endfor %}
+    </ul>
+    <form method="post" action="/usuario/tareas/nueva" class="formulario fila">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="dias" value="{{ dias }}">
+        <input name="descripcion" required maxlength="200" placeholder="Nueva tarea">
+        <button type="submit">Añadir</button>
+    </form>
+</section>
+
+<p class="secundario">Todo esto también se lo puedes pedir a tu bot con palabras: «apunta médico el lunes a las 10», «avísame mañana a las 9 de…», «¿qué tengo esta semana?».</p>
+<form method="post" action="/logout"><button type="submit" class="enlace">Cerrar sesión</button></form>
+{% endblock %}

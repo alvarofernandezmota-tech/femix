@@ -410,9 +410,13 @@ async def crear_inquilino_formulario(
     nombre: str = Form(...),
     tipo: str = Form("persona"),
     password: str = Form(""),
+    telegram_token: str = Form(""),
+    permitidos: str = Form(""),
+    nombre_asistente: str = Form(""),
 ):
     try:
-        _crear_inquilino(inquilino_id, nombre, tipo, password)
+        _crear_inquilino(inquilino_id, nombre, tipo, password, telegram_token=telegram_token.strip(),
+                         permitidos=leer_ids_telegram(permitidos), nombre_asistente=nombre_asistente)
     except ValueError as exc:
         directorio = directorio_datos_web()
         filas = _inquilinos(directorio)
@@ -558,12 +562,15 @@ class CrearInquilinoPeticion(BaseModel):
     tipo: str = "persona"
 
 
-def _crear_inquilino(inquilino_id: str, nombre: str, tipo: str, password: str) -> PerfilInquilino:
-    """Perfil siempre; acceso a su panel solo si trae contraseña. Todo validado antes de escribir
-    nada, para no dejar un inquilino a medias."""
+def _crear_inquilino(inquilino_id: str, nombre: str, tipo: str, password: str, telegram_token: str = "",
+                     permitidos=(), nombre_asistente: str = "") -> PerfilInquilino:
+    """Perfil siempre; acceso a su panel solo si trae contraseña. Con token y permitidos (un
+    asistente personal: la persona y su bot) queda listo en un paso y arranca en la siguiente
+    vuelta de la flota. Todo validado antes de escribir nada, para no dejar un inquilino a medias."""
     directorio = directorio_datos_web()
     perfiles, accesos = AlmacenPerfiles(directorio), AlmacenInquilinos(directorio)
-    perfil = PerfilInquilino(inquilino_id=inquilino_id, nombre=nombre, tipo=tipo).validado()
+    perfil = PerfilInquilino(inquilino_id=inquilino_id, nombre=nombre, tipo=tipo, telegram_token=telegram_token,
+                             telegram_permitidos=list(permitidos), nombre_asistente=nombre_asistente).validado()
     if perfiles.existe(perfil.inquilino_id) or accesos.obtener(perfil.inquilino_id) is not None:
         raise ValueError(f"El inquilino '{perfil.inquilino_id}' ya existe")
     perfil = perfiles.crear(perfil)

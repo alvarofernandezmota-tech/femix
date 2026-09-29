@@ -26,6 +26,7 @@ from femix.inquilino.perfil import AlmacenPerfiles
 from .acceso import comprobar_acceso
 from .directo import RespuestaEnDirecto
 from .persona import comando_responder, pasar_a_persona
+from .plataforma import comando_plataforma
 from .flota import FlotaDeBots, bot_del_entorno, sincronizar_entorno
 from .voz import manejar_nota_de_voz
 
@@ -85,6 +86,7 @@ def construir_aplicacion(token: str, femix, permitidos=frozenset(), voz: bool = 
     app.add_handler(TypeHandler(Update, comprobar_acceso), group=-1)
     app.add_handler(CommandHandler("start", comando_start))
     app.add_handler(CommandHandler("responder", comando_responder))
+    app.add_handler(CommandHandler("plataforma", comando_plataforma))
     app.add_handler(MessageHandler(filters.VOICE, manejar_voz if voz else voz_desactivada))
     # filters.TEXT incluye los comandos (/tarea, /hoy...), que resuelve Femix.procesar. Con
     # `~filters.COMMAND` se descartaban sin respuesta. /start lo atiende antes su propio handler.

@@ -13,6 +13,7 @@
 - [saas.md](saas.md): planes, Stripe, alta pública, HTTPS y copias.
 - [whatsapp.md](whatsapp.md): canal de WhatsApp (Cloud API de Meta).
 - [mcp.md](mcp.md): conectores MCP (calendario, correo, Notion...).
+- [app.md](app.md): la app del móvil (PWA), «Hoy» y «Semana», alta de asistentes personales, `/plataforma` y cómo hacer la APK.
 - [operacion.md](operacion.md): pasar a una persona, recordatorio de citas, avisos de fallos, correos y RGPD.
 
 ## Operación
