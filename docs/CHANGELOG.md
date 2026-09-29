@@ -634,3 +634,11 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
 - `.claude/settings.json`: permite los scripts de despliegue y prueba; bloquea leer `.env` y
   `docker compose config` (imprime los secretos).
 - Sección en `docs/PRODUCCION_MADRE.md` para instalarlo y usarlo desde el móvil (`claude remote-control`).
+
+## 2026-09-29 — Primer `probar-todo` real en madre (`feat/panel-web`)
+- En madre salió un bot duplicado: el antiguo `femix.service` (systemd de usuario, fuera de Docker)
+  con el mismo token daba `Conflict` y se quedaba con parte de los mensajes.
+- `probar-todo.sh`: busca "en marcha" desde el último arranque del contenedor (los errores tapaban
+  las últimas 300 líneas), detecta bots fuera de Docker y cuenta los `Conflict`.
+- `/diagnosticar`: qwen2.5:3b a 5,6 tokens/s porque la GTX 1060 va con `nouveau`. Anotado en
+  problemas conocidos de `PRODUCCION_MADRE.md` con el arreglo (driver NVIDIA + CUDA).
