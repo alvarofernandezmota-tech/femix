@@ -1,14 +1,41 @@
 {
   "name": "Femix",
   "short_name": "Femix",
-  "description": "Tu asistente: agenda, citas, recordatorios y tareas.",
-  "start_url": "/usuario/",
+  "description": "Tu asistente, siempre a mano: chat, agenda, citas, recordatorios y tareas.",
+  "start_url": "/usuario/chat",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f5f5f5",
-  "theme_color": "#1a1a2e",
+  "theme_color": "#22255e",
   "lang": "es",
   "icons": [
-    { "src": "/static/icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    {
+      "src": "/static/icono-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icono-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icono-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/static/icono.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": [
+    "productivity",
+    "business"
   ]
 }

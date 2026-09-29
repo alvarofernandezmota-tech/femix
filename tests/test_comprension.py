@@ -169,3 +169,12 @@ def test_el_bot_contesta_las_frecuentes_sin_modelo(tmp_path):
     assert motor.contextos == []
     femix.procesar("7", "¿el aparcamiento es para clientes o para todos?")
     assert "Respuesta oficial del negocio" in motor.contextos[-1]
+
+
+def test_pregunta_frecuente_con_faltas(tmp_path):
+    motor = MotorFalso()
+    femix = construir_femix(directorio_datos=str(tmp_path), inquilino_id="ana", motor=motor,
+                            memoria=Memoria(ruta=str(tmp_path / "m.json")), capacidades=())
+    femix._preguntas.anadir("¿Tenéis aparcamiento?", "Sí, gratis en la calle de atrás.")
+    assert femix.procesar("7", "teneis aparcamineto?¿?¿") == "Sí, gratis en la calle de atrás."
+    assert motor.contextos == []

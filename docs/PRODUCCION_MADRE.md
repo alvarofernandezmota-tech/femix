@@ -124,6 +124,34 @@ Comandos:
 
 No cambia código en madre: propone el arreglo, y el cambio va por rama y PR.
 
+## Panel y app en el móvil, hoy (sin dominio): Tailscale Serve
+
+Madre ya está en Tailscale. `tailscale serve` publica el panel con **HTTPS** dentro de tu red
+Tailscale (certificado automático `*.ts.net`), que es lo que necesita la sesión del panel (cookie
+solo por HTTPS) y la instalación como app:
+
+```bash
+sudo tailscale serve --bg 8000          # publica http://127.0.0.1:8000 como https://madre.<tu-tailnet>.ts.net
+tailscale serve status                  # enseña la URL exacta
+```
+
+Hace falta tener activados MagicDNS y HTTPS en la consola de Tailscale (DNS → HTTPS Certificates).
+Desde el móvil con Tailscale encendido: `https://madre.<tu-tailnet>.ts.net/admin/login` (dueño) y
+`https://madre.<tu-tailnet>.ts.net/login` (cada persona; luego «Añadir a pantalla de inicio»).
+Para que otra persona entre así tiene que estar en tu tailnet (invitación) o usar el dominio público.
+
+Para quitarlo: `sudo tailscale serve --bg off` (o `tailscale serve reset`).
+
+## SaaS público (clientes de fuera): dominio + HTTPS
+
+```bash
+# .env: FEMIX_DOMINIO=femix.tudominio.es  y  FEMIX_URL_PUBLICA=https://femix.tudominio.es
+docker compose --profile publico up -d    # Caddy saca el certificado; puertos 80 y 443 abiertos hacia madre
+```
+
+Con eso, `/registro` (si `FEMIX_SAAS_REGISTRO=1`), `/login` y la app funcionan desde cualquier
+móvil sin Tailscale. Ver [saas.md](saas.md).
+
 ## 4. Problemas conocidos
 
 | Síntoma | Causa y arreglo |

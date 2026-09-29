@@ -6,6 +6,7 @@
 - [../CONTRIBUTING.md](../CONTRIBUTING.md): ramas, CI local, despliegue y reglas.
 
 ## Funcionamiento
+- [comprension.md](comprension.md): cómo entiende un mensaje: corrector de faltas, comandos, preguntas frecuentes y router.
 - [rag.md](rag.md): documentos (PDF, Word, Excel, webs), búsqueda híbrida y preguntas frecuentes.
 - [velocidad.md](velocidad.md): router, respuesta en directo, precalentado y diagnóstico.
 - [aprendizaje.md](aprendizaje.md): qué aprende el bot y cómo lo aprueba el dueño.
@@ -23,5 +24,6 @@
 
 ## Proyecto
 - [ROADMAP.md](ROADMAP.md): fases y estado.
+- [mejoras.md](mejoras.md): investigación de mejoras open source: hecho, siguiente, descartado; plan de Google Play y anuncios.
 - [CHANGELOG.md](CHANGELOG.md): historial de cambios.
 - [historico/](historico/): encargos, bitácoras y planes antiguos (solo consulta).

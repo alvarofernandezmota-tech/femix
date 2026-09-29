@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block titulo %}Chat — {{ inquilino.nombre }}{% endblock %}
+
+{% block content %}
+<nav class="pestanas">
+    <a href="/usuario/">Hoy</a>
+    <a href="/usuario/semana">Semana</a>
+    <a href="/usuario/chat" class="activa">Chat</a>
+    <a href="/usuario/panel">Mi bot</a>
+</nav>
+
+<section class="chat" id="chat" data-csrf="{{ csrf }}" data-bot="{{ nombre_bot }}">
+    <div class="mensajes" id="mensajes">
+        {% for t in historial %}
+        <div class="burbuja yo">{{ t.entrada }}</div>
+        <div class="burbuja bot">{{ t.salida }}</div>
+        {% else %}
+        <p class="secundario centrado">Escribe a {{ nombre_bot }}: «apunta médico el lunes a las 10», «¿qué tengo esta semana?», «avísame mañana a las 9 de llamar al banco»…</p>
+        {% endfor %}
+    </div>
+    <form id="formulario" class="entrada" autocomplete="off">
+        <textarea id="texto" rows="1" placeholder="Escribe…" maxlength="4000"></textarea>
+        {% if con_voz %}<button type="button" id="grabar" title="Nota de voz">🎤</button>{% endif %}
+        <button type="submit" id="enviar" title="Enviar">➤</button>
+    </form>
+</section>
+<script src="/static/js/chat.js"></script>
+{% endblock %}

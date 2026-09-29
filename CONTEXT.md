@@ -1,6 +1,6 @@
 # CONTEXT.md — femix
 
-Última actualización: 2026-09-30 (desplegado en madre; app del móvil, «Hoy»/«Semana», `/plataforma`, alta de asistentes personales)
+Última actualización: 2026-09-30 (madre desplegada; app con chat, voz y avisos; corrector de texto; `/plataforma`; alta en un paso)
 
 ## Fase actual del roadmap
 Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En marcha.
@@ -192,10 +192,12 @@ WhatsApp; teléfono (`gjallarhorn`); release v1.0.0.
   segundos, entrada y salida recortadas).
 
 ## Próximo paso concreto
-Madre ya corre `main` con Docker, Ollama solo CPU (11,9 tokens/s con qwen2.5:3b) y `probar-todo.sh`
-en verde. Siguiente: dar de alta los tres asistentes personales (madre, hermana, Paula) según
-[`docs/app.md`](docs/app.md), que usen la app y el bot, y sacar la v1.0.0. Después: driver de NVIDIA
-para el 7b, y APK si se quiere en Google Play. El teléfono (gjallarhorn) queda para después.
+Madre corre `main` con Docker, Ollama solo CPU (11,9 tokens/s con qwen2.5:3b) y `probar-todo.sh` en
+verde. La app (PWA) tiene chat en directo, voz, Hoy/Semana y avisos; el bot entiende faltas y
+abreviaturas. Siguiente: publicar el panel con Tailscale Serve (hoy) o dominio (perfil `publico`),
+dar de alta los tres asistentes personales (madre, hermana, Paula) según [`docs/app.md`](docs/app.md),
+y sacar la v1.0.0. Plan a un mes: cuenta de Google Play, Capacitor + AdMob ([`docs/mejoras.md`](docs/mejoras.md)).
+Después: driver de NVIDIA para el 7b. El teléfono (gjallarhorn) queda para después.
 
 ## Repos relacionados
 - `hugin`: lógica de negocio a migrar (citas, Postgres, teléfono).

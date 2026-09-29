@@ -53,6 +53,25 @@ def del_perfil(directorio_datos: str, inquilino_id: str) -> "tuple[tuple, str | 
         return POR_DEFECTO, None
     return tuple(perfil.capacidades), prompt_sistema_de(perfil)
 
+def vocabulario_del_perfil(directorio_datos: str, inquilino_id: str, preguntas=None) -> list:
+    """Palabras propias del negocio para el corrector: nombre, descripción, asistente y sus preguntas
+    frecuentes. Si algo no se puede leer, lista vacía (el corrector sigue con el vocabulario base)."""
+    from ..inquilino.perfil import AlmacenPerfiles
+    palabras = []
+    try:
+        perfil = AlmacenPerfiles(directorio_datos).obtener(inquilino_id)
+        if perfil is not None:
+            palabras += [perfil.nombre, perfil.descripcion, perfil.nombre_asistente]
+    except Exception:
+        pass
+    try:
+        if preguntas is not None:
+            palabras += [p.get("pregunta", "") + " " + p.get("respuesta", "") for p in preguntas.listar()]
+    except Exception:
+        pass
+    return palabras
+
+
 def almacen_dominio(directorio_datos: str, inquilino_id: str):
     """Fase 4: con `FEMIX_BASE_DATOS_URL`, Postgres (atado a este inquilino); sin ella, los JSON de
     siempre en `datos/{inquilino_id}/`."""
@@ -125,6 +144,10 @@ def construir_femix(
         # Respuestas exactas del dueño (panel): se contestan al momento, sin el modelo.
         from ..inquilino.preguntas import PreguntasFrecuentes
         extra["preguntas"] = PreguntasFrecuentes(almacen)
+    if "corrector" not in extra:
+        # Entiende faltas y abreviaturas con el vocabulario de este negocio (perfil y preguntas).
+        from ..mente.normalizar import Corrector
+        extra["corrector"] = Corrector(vocabulario_del_perfil(directorio_datos, inquilino_id, extra["preguntas"]))
     if "aprendizaje" not in extra and MEMORIA in capacidades:
         # Lo que aprende con el uso: del cliente (al momento) y del negocio (si lo aprueba el dueño).
         from ..mente.aprendizaje import Aprendizaje
