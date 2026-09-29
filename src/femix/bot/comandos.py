@@ -4,7 +4,7 @@ Se resuelven sin el modelo, contra el dominio del inquilino y usuario.
 """
 from datetime import datetime
 
-from ..dominio.personal.hoy import resumen_del_dia
+from ..dominio.personal.resumen import resumen as resumen_de_dias
 from ..dominio.personal.tareas import Tareas
 from ..dominio.personal.diario import Diario
 from ..dominio.personal.recordatorios import Recordatorios
@@ -13,7 +13,8 @@ from ..dominio.negocio.reservas import MOTIVOS
 
 AYUDA = (
     "Comandos disponibles:\n"
-    "/hoy\n"
+    "/hoy (lo de hoy: agenda, reservas, avisos y tareas)\n"
+    "/semana (lo de esta semana)\n"
     "/tarea crear <texto>\n"
     "/tarea listar\n"
     "/tarea completar <n>\n"
@@ -44,8 +45,9 @@ def ejecutar_comando(
     comando = partes[0].lower()
     resto = partes[1] if len(partes) > 1 else ""
 
-    if comando == "/hoy":
-        return resumen_del_dia(usuario_id, reloj=reloj)
+    if comando in ("/hoy", "/semana"):
+        return resumen_de_dias(usuario_id, 1 if comando == "/hoy" else 7, directorio_datos=directorio_datos,
+                               almacen=almacen, reloj=reloj, reservas=reservas)
     if comando == "/tarea":
         return _comando_tarea(usuario_id, resto, directorio_datos, almacen)
     if comando == "/diario":

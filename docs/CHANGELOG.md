@@ -654,3 +654,14 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
 - `OLLAMA_KEEP_ALIVE` estaba en tres drop-in y ganaba `30m`: ahora solo en `femix.conf` (`-1`).
 - `HUGIN_LLM_MAX_TOKENS=200` en madre; bot duplicado `femix.service` desactivado.
 - Todo documentado en `docs/PRODUCCION_MADRE.md`.
+
+## 2026-09-30 — App del móvil, «Hoy»/«Semana», `/plataforma` y alta en un paso (`feat/panel-web`)
+- **App (PWA)**: el panel se instala en el móvil (manifest, service worker en `/sw.js`, icono).
+  Pantalla «Hoy» y «Semana» (`/usuario/`, `/usuario/semana`): agenda, reservas, recordatorios y
+  tareas con apuntar, quitar y marcar. Usa el ID de Telegram de la persona: lo que ve su bot.
+- **Bot**: `/hoy` ahora resume agenda, reservas, recordatorios y tareas; nuevo `/semana`.
+- **`/plataforma`**: el dueño (`FEMIX_AVISOS_TELEGRAM`) ve desde su bot el estado de todos los bots,
+  mensajes, tiempos y fallos del día por inquilino.
+- **Alta en un paso** desde `/admin`: token del bot, IDs permitidos y nombre del asistente en el
+  mismo formulario; el bot arranca solo.
+- `docs/app.md`: instalar la app, alta de asistentes personales y cómo empaquetar una APK.

@@ -120,12 +120,13 @@ def test_formulario_del_cliente_guarda_whatsapp(tmp_path, monkeypatch):
 
 
 def test_recordatorio_de_cita_por_plantilla(tmp_path, monkeypatch):
-    from datetime import datetime, timedelta
+    from datetime import timedelta
     from femix.bot.fabrica import almacen_dominio
     from femix.dominio.negocio.reservas import Reservas
     from femix.inquilino.perfil import Franja
 
-    manana = datetime.now() + timedelta(days=1)
+    from femix.dominio.personal.reloj import RelojZona
+    manana = RelojZona().ahora() + timedelta(days=1)   # la misma zona que usa el recordatorio
     dia = ("lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo")[manana.weekday()]
     monkeypatch.delenv("FEMIX_BASE_DATOS_URL", raising=False)
     AlmacenPerfiles(str(tmp_path)).crear(PerfilInquilino(

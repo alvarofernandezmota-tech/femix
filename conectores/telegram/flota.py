@@ -472,6 +472,7 @@ class FlotaDeBots:
             )
             app = self._construir_app(config.token, femix, config.permitidos, voz=VOZ in config.capacidades)
             app.bot_data["inquilino_id"] = inquilino_id
+            app.bot_data["directorio_datos"] = self._directorio
             app.bot_data["abierto"] = config.abierto
             app.bot_data["responsable"] = config.responsable
             await app.initialize()

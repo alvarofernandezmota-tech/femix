@@ -443,3 +443,17 @@ def test_la_personalidad_se_edita_y_se_ve_el_prompt(entorno):
     assert "Eres Lola, asistente de ACME" in ficha
     assert "Formal, de usted." in ficha and "lunes: de 09:00 a 14:00" in ficha
     assert "&lt;b&gt;barato&lt;/b&gt;" in ficha  # escapado también en la vista previa
+
+
+def test_alta_de_asistente_personal_en_un_paso(entorno):
+    cliente, csrf = _entrar(entorno)
+    token = "444444444:" + "D" * 35
+    r = _crear(cliente, csrf, "mama", nombre="Mamá", tipo="persona", telegram_token=token,
+               permitidos="123456789", nombre_asistente="Lola")
+    assert r.status_code == 303
+    perfil = AlmacenPerfiles(str(entorno)).obtener("mama")
+    assert (perfil.telegram_token, perfil.telegram_permitidos, perfil.nombre_asistente) == (token, [123456789], "Lola")
+    assert "reservas" not in perfil.capacidades and "tool_calling" in perfil.capacidades
+    # El mismo token en otro inquilino se rechaza al crearlo.
+    assert _crear(cliente, csrf, "paula", nombre="Paula", tipo="persona", telegram_token=token).status_code == 400
+    assert AlmacenPerfiles(str(entorno)).obtener("paula") is None

@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block titulo %}Femix{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="icon" href="/static/icono.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/static/icono.svg">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Femix">
 </head>
 <body>
     <header class="cabecera">
@@ -14,5 +20,6 @@
         {% block content %}{% endblock %}
     </main>
     <script src="/static/js/app.js"></script>
+    <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(function () {});</script>
 </body>
 </html>

@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .limites import LimiteDeCuerpo
 from .rutas.admin import router as admin_router
+from .rutas.dia import router as dia_router
 from .rutas.admin import router_acceso as admin_acceso_router
 from .rutas.auth import directorio_datos_web
 from .rutas.auth import router as auth_router
@@ -58,7 +59,16 @@ app.add_middleware(LimiteDeCuerpo)
 if os.path.isdir(_DIRECTORIO_STATIC):
     app.mount("/static", StaticFiles(directory=_DIRECTORIO_STATIC), name="static")
 
+
+@app.get("/sw.js", include_in_schema=False)
+async def service_worker():
+    # En la raíz para que su alcance sea toda la web (desde /static solo valdría para /static).
+    from fastapi.responses import FileResponse
+    return FileResponse(os.path.join(_DIRECTORIO_STATIC, "sw.js"), media_type="application/javascript",
+                        headers={"Service-Worker-Allowed": "/"})
+
 app.include_router(auth_router)
+app.include_router(dia_router)      # antes que usuario: se queda con GET /usuario/
 app.include_router(usuario_router)
 # Antes que el panel: /admin/login no puede exigir sesión de administrador.
 app.include_router(admin_acceso_router)

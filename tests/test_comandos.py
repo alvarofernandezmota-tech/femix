@@ -5,7 +5,7 @@ from femix.bot.comandos import ejecutar_comando, AYUDA
 
 def test_hoy_devuelve_resumen(tmp_path):
     respuesta = ejecutar_comando("usuario1", "/hoy", directorio_datos=str(tmp_path))
-    assert respuesta.startswith("Hoy es")
+    assert respuesta.startswith("📅 Hoy es")
 
 def test_tarea_crear_listar_completar(tmp_path):
     d = str(tmp_path)

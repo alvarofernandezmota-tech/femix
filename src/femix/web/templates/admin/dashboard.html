@@ -56,12 +56,21 @@
                 {% for tipo in tipos %}<option value="{{ tipo }}">{{ tipo }}</option>{% endfor %}
             </select>
         </label>
+        <label>Nombre del asistente <small>(opcional: cómo se presenta el bot)</small>
+            <input name="nombre_asistente" maxlength="40" placeholder="Femix">
+        </label>
+        <label>Token del bot de Telegram <small>(de @BotFather; opcional, se puede poner después)</small>
+            <input type="password" name="telegram_token" autocomplete="off">
+        </label>
+        <label>IDs de Telegram que pueden usarlo <small>(uno por línea o separados por comas; para un asistente personal, el de esa persona)</small>
+            <textarea name="permitidos" rows="2" placeholder="123456789"></textarea>
+        </label>
         <label>Contraseña de su panel <small>(opcional; sin ella no puede entrar al suyo)</small>
             <input type="password" name="password" autocomplete="new-password">
         </label>
         <button type="submit">Crear</button>
     </form>
-    <p class="secundario">El token del bot, los permitidos, el horario y las capacidades se ponen en su ficha, después.</p>
+    <p class="secundario">Con token y un ID permitido, el bot arranca solo en un minuto. El horario, las capacidades y lo demás se ajustan en su ficha.</p>
 </section>
 
 <section class="tarjeta">
