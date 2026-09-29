@@ -642,3 +642,7 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   las últimas 300 líneas), detecta bots fuera de Docker y cuenta los `Conflict`.
 - `/diagnosticar`: qwen2.5:3b a 5,6 tokens/s porque la GTX 1060 va con `nouveau`. Anotado en
   problemas conocidos de `PRODUCCION_MADRE.md` con el arreglo (driver NVIDIA + CUDA).
+
+## 2026-09-29 — `.gitignore` protege las copias del `.env` (`feat/panel-web`)
+- `.env.*` (salvo `.env.example`) y `*.bak` ignorados: en madre había un `.env.bak` con secretos que
+  `git add -A` habría subido.
