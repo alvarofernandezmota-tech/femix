@@ -17,7 +17,7 @@
 
 ## Operación
 - [docker.md](docker.md): despliegue con Docker y Ollama en el host.
-- [PRODUCCION_MADRE.md](PRODUCCION_MADRE.md): la máquina de producción.
+- [PRODUCCION_MADRE.md](PRODUCCION_MADRE.md): **cómo proceder en madre**: primera vez, desplegar, `probar-todo.sh` y problemas conocidos.
 - [INFRAESTRUCTURA.md](INFRAESTRUCTURA.md): servicios y cómo revivirlo todo.
 
 ## Proyecto

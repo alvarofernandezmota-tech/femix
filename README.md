@@ -31,7 +31,8 @@ docker compose logs -f femix
 ```
 
 - Panel: `ssh -L 8000:localhost:8000 madre` y abre `http://localhost:8000/admin/login`.
-- Actualizar a lo último de GitHub: `scripts/desplegar.sh`.
+- Actualizar a lo último de GitHub: `scripts/desplegar.sh`; comprobarlo todo: `scripts/probar-todo.sh`.
+- Guía paso a paso en madre: **[docs/PRODUCCION_MADRE.md](docs/PRODUCCION_MADRE.md)**.
 - Medir la velocidad del modelo: `docker compose exec femix python -m femix.llm.diagnostico`.
 
 Opcionales: `--profile publico` (HTTPS con Caddy), `--profile copias` (copia diaria de Postgres),
