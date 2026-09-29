@@ -48,10 +48,22 @@ fi
 systemctl is-active --quiet femix-vigila-ollama.timer && ok "vigilante activo" || fallo "vigilante sin instalar (scripts/instalar-vigilante-ollama.sh)"
 
 seccion "Bots de Telegram"
-logs=$(docker compose logs --tail 300 femix 2>&1)
+# Desde el último arranque del contenedor (no solo las últimas líneas: los errores pueden taparlas).
+desde=$(docker inspect -f '{{.State.StartedAt}}' femix 2>/dev/null)
+logs=$(docker compose logs ${desde:+--since "$desde"} femix 2>&1)
 en_marcha=$(grep -o 'Bot de [^ ]* en marcha: @[^ ]*' <<<"$logs" | sort -u)
 [[ -n "$en_marcha" ]] && while read -r linea; do ok "$linea"; done <<<"$en_marcha" || fallo "ningún bot en marcha (mira: docker compose logs femix)"
-errores=$(grep -ciE 'traceback|error' <<<"$logs")
+# Otra copia del bot fuera de Docker con el mismo token: Telegram da "Conflict" y se roban los mensajes.
+# (los procesos del contenedor también se ven desde el host: se descartan los que salen en `docker top`)
+dentro=$(docker top femix -eo pid 2>/dev/null | tail -n +2 | tr -s ' \n' ' ')
+fuera=""
+for pid in $(pgrep -f 'conectores\.telegram|conectores/arranque' 2>/dev/null); do
+  [[ " $dentro " == *" $pid "* ]] || fuera="$fuera $pid"
+done
+[[ -z "$fuera" ]] || fallo "bot corriendo FUERA de Docker (PID$fuera): systemctl --user list-units | grep -iE 'femix|hugin' y systemctl --user disable --now <servicio>"
+conflictos=$(grep -c 'Conflict' <<<"$logs")
+[[ "$conflictos" -eq 0 ]] || fallo "$conflictos avisos 'Conflict' de Telegram: otra copia del bot usa el mismo token"
+errores=$(tail -300 <<<"$logs" | grep -ciE 'traceback|error')
 [[ "$errores" -eq 0 ]] && ok "sin errores en las últimas 300 líneas" || fallo "$errores líneas con error (docker compose logs --tail 300 femix | grep -i error)"
 
 seccion "Bot de punta a punta"

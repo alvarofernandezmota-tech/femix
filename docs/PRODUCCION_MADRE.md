@@ -106,7 +106,8 @@ No cambia código en madre: propone el arreglo, y el cambio va por rama y PR.
 | "El asistente se está reiniciando" | Ollama colgado. El vigilante lo reinicia en ≤2 min; a mano: `sudo systemctl restart ollama` |
 | Primer mensaje muy lento | Modelo sin cargar: revisa `HUGIN_LLM_KEEP_ALIVE=-1` y `OLLAMA_KEEP_ALIVE=-1` |
 | El montaje vuelve a descargarlo todo | Falta `docker-buildx` (`sudo pacman -S docker-buildx`) o cambió `requirements-base.txt` |
-| `Conflict` en Telegram | Dos procesos con el mismo token (p. ej. un bot viejo fuera de Docker) |
+| `Conflict` en Telegram | Otra copia del bot con el mismo token fuera de Docker (el antiguo `femix.service` de usuario o `hugin-telegram`): `systemctl --user disable --now femix.service`. `probar-todo.sh` ya lo detecta |
+| Respuestas lentas (≈5 tokens/s) con la GTX 1060 | Ollama usa el driver libre `nouveau` (Vulkan). Instala el driver propietario de NVIDIA y Ollama con CUDA; mientras tanto compara con solo CPU (`OLLAMA_VULKAN=0`) y usa `HUGIN_LLM_MAX_TOKENS=200` |
 | Login del panel da 429 | Demasiados intentos fallidos: espera una hora |
 
 ## 5. Copias
