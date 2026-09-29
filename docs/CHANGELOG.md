@@ -626,3 +626,11 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   ganchos), desplegar en `tmux`, `probar-todo.sh`, problemas conocidos y copias.
 - `operacion.md`: recordatorios por WhatsApp, correos que se reintentan y seguridad del panel.
 - README, índice de docs y `CONTEXT.md` apuntan a la guía.
+
+## 2026-09-29 — Claude Code preparado para madre (`feat/panel-web`)
+- `CLAUDE.md`: Claude Code lee este fichero (no `AGENTS.md`); ahora importa las reglas de `AGENTS.md`
+  y añade las de producción (sin secretos, sin tocar código en madre, Ollama fuera de Docker).
+- Comandos `/desplegar`, `/probar` y `/diagnosticar` en `.claude/commands/`.
+- `.claude/settings.json`: permite los scripts de despliegue y prueba; bloquea leer `.env` y
+  `docker compose config` (imprime los secretos).
+- Sección en `docs/PRODUCCION_MADRE.md` para instalarlo y usarlo desde el móvil (`claude remote-control`).
