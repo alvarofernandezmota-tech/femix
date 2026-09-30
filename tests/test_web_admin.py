@@ -184,3 +184,16 @@ def test_el_dueno_entra_en_admin_con_su_sesion_de_la_app(tmp_path, monkeypatch):
     # Sin FEMIX_WEB_DUENO, la sesión de la app no vale para el admin.
     monkeypatch.delenv("FEMIX_WEB_DUENO")
     assert cliente.get("/admin/", headers={"Accept": "text/html"}, follow_redirects=False).status_code == 303
+
+
+def test_dar_acceso_desde_la_terminal(tmp_path, monkeypatch, capsys):
+    from femix.web.acceso import dar_acceso, main
+    from femix.web.rutas.auth import AlmacenInquilinos
+    monkeypatch.setenv("FEMIX_WEB_DATOS_DIR", str(tmp_path))
+    monkeypatch.delenv("FEMIX_BASE_DATOS_URL", raising=False)
+    generada = dar_acceso("varo", "Varo")
+    assert len(generada) >= 8 and AlmacenInquilinos(str(tmp_path)).verificar_credenciales("varo", generada)
+    assert main(["varo", "Varo", "OtraClave12"]) == 0 and "OtraClave12" in capsys.readouterr().out
+    assert AlmacenInquilinos(str(tmp_path)).verificar_credenciales("varo", "OtraClave12")
+    assert not AlmacenInquilinos(str(tmp_path)).verificar_credenciales("varo", generada)   # la vieja ya no vale
+    assert main(["varo", "Varo", "corta"]) == 1 and main([]) == 2

@@ -152,6 +152,17 @@ Para quitarlo: `sudo tailscale serve --bg off` (o `tailscale serve reset`).
   mismos del SaaS) y el webhook de Stripe apuntando a `https://<dominio>/stripe/webhook` con el
   evento `checkout.session.completed`. Los euros se ponen por negocio en «Mi bot» o en `/admin`.
 
+### Tu usuario y contraseña de la app (una sola entrada)
+
+```bash
+docker compose exec femix python -m femix.web.acceso varo "Varo"   # imprime una contraseña nueva (o pásala como 3.er argumento)
+grep -q '^FEMIX_WEB_DUENO=' .env || echo 'FEMIX_WEB_DUENO=varo' >> .env
+docker compose up -d femix
+```
+
+Entras en `/login` con `varo` y esa contraseña y te aparece la pestaña «🛠 Admin». El mismo comando
+sirve para dar o cambiar la contraseña de cualquier persona (`mama`, `hermana`…).
+
 ### Dar de alta a cada persona (mañana)
 
 1. En `/admin` → «Nuevo inquilino»: `mama` / `hermana` / `paula`, tipo `persona`, token de su bot

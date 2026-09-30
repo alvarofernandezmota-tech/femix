@@ -731,3 +731,5 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
 - `FEMIX_WEB_DUENO=<inquilino>`: el dueño de la plataforma entra en la app con su usuario y
   contraseña y ve la pestaña «🛠 Admin»; su sesión vale en `/admin` (con su CSRF). El token sigue
   valiendo. `web/dueno.py`, `requerir_admin`, `comun/_pestanas.html`. Test en `test_web_admin.py`.
+- `python -m femix.web.acceso <inquilino> <nombre> [contraseña]`: da o cambia la contraseña de la app
+  desde la terminal de madre (cierra las sesiones abiertas).
