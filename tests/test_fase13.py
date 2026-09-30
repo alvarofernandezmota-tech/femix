@@ -101,6 +101,10 @@ def test_lista_de_espera_avisa_cuando_se_libera(tmp_path):
 def test_espera_por_herramienta_y_comando(tmp_path):
     r = _reservas(tmp_path, datetime(2026, 10, 5, 8, 0))
     herramientas = {h.nombre: h for h in herramientas_reservas("7", r)}
+    assert "huecos libres" in herramientas["apuntar_lista_espera"].funcion(fecha="2026-10-06", nombre="Ana")   # día con sitio: no
+    for dia in ("2026-10-06", "2026-10-07"):
+        for hora in ("09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "12:00", "12:30", "13:00", "13:30"):
+            r.reservar(dia, hora, "Lleno")
     assert "lista de espera" in herramientas["apuntar_lista_espera"].funcion(fecha="2026-10-06", nombre="Ana")
     assert "No apuntado" in herramientas["apuntar_lista_espera"].funcion(fecha="2026-10-01", nombre="Ana")
     assert "Apuntado" in ejecutar_comando("7", "/reserva espera 2026-10-07 Ana", reservas=r)

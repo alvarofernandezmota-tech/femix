@@ -20,6 +20,7 @@ Reglas (las mismas que en hugin, con sus porqués):
 - Anular **borra** la cita: una anulada que sigue ocupando sitio es peor que no anularla.
 """
 import contextlib
+import secrets
 import threading
 import unicodedata
 from dataclasses import dataclass
@@ -42,8 +43,9 @@ MOTIVOS = {
     "duracion": "la duración tiene que ser de 5 a 600 minutos",
     "sin_nombre": "falta el nombre",
     "empleado": "no hay nadie con ese nombre en el equipo",
+    "hay_hueco": "ese día todavía tiene huecos libres: se puede reservar directamente",
 }
-SENAL_MINUTOS = 30   # lo que se guarda el hueco mientras el cliente paga la señal
+SENAL_MINUTOS = 45   # lo que se guarda el hueco mientras el cliente paga la señal (más que la sesión de Stripe)
 
 # Reservar y anular son leer-comprobar-escribir: sin esto, dos mensajes a la vez pasan los dos la
 # comprobación del hueco y una de las dos citas desaparece.
@@ -138,6 +140,10 @@ class Reservas:
             return None
         if not self._empleados:
             return solapadas[0]
+        # Una cita de antes de tener equipo (o de alguien que ya no está) no es de nadie: ocupa a todos.
+        de_nadie = next((c for c in solapadas if c.get("empleado") not in self._empleados), None)
+        if de_nadie is not None:
+            return de_nadie
         if empleado:
             return next((c for c in solapadas if c.get("empleado") == empleado), None)
         return solapadas[0] if self.libre_para(fecha, inicio, duracion) is None else None
@@ -145,6 +151,8 @@ class Reservas:
     def libre_para(self, fecha: str, inicio: int, duracion: int) -> "str | None":
         """El primer empleado del equipo sin cita a esa hora (None si no hay equipo o están todos)."""
         ocupados = {c.get("empleado") for c in self._solapadas(fecha, inicio, duracion)}
+        if any(e not in self._empleados for e in ocupados):
+            return None
         return next((e for e in self._empleados if e not in ocupados), None)
 
     def por_que_no(self, fecha: str, hora: str, duracion: int, empleado: "str | None" = None) -> "str | None":
@@ -242,16 +250,20 @@ class Reservas:
             if senal_pendiente:
                 cita["senal_pendiente"] = True
                 cita["senal_hasta"] = (ahora + timedelta(minutes=SENAL_MINUTOS)).strftime("%Y-%m-%d %H:%M")
+                # Los ids se reutilizan cuando la última cita desaparece: el pago se ata a esta cita
+                # con una referencia que Stripe devuelve en el webhook, no solo con el id.
+                cita["senal_ref"] = secrets.token_urlsafe(12)
             self._guardar(citas + [cita])
             return cita
 
     # -- señal por adelantado -----------------------------------------------------------------
 
-    def marcar_senal_pagada(self, id_cita: int) -> "dict | None":
-        """Stripe confirmó el pago: la cita deja de estar en el aire."""
+    def marcar_senal_pagada(self, id_cita: int, ref: "str | None" = None) -> "dict | None":
+        """Stripe confirmó el pago: la cita deja de estar en el aire. Con `ref`, solo si es la misma
+        cita que se mandó a pagar (un id reutilizado no cuenta). None si ya no existe."""
         with self._escribiendo():
             citas = self._almacen.cargar(COLECCION, AGENDA)
-            cita = next((c for c in citas if c["id"] == id_cita), None)
+            cita = next((c for c in citas if c["id"] == id_cita and (ref is None or c.get("senal_ref") == ref)), None)
             if cita is not None:
                 cita.pop("senal_pendiente", None)
                 cita.pop("senal_hasta", None)
@@ -334,6 +346,9 @@ class Reservas:
             raise ValueError("pasado")
         if not (nombre or "").strip():
             raise ValueError("sin_nombre")
+        if self.huecos(fecha, int(duracion), tope=1):
+            # Si no, en la siguiente vuelta del bucle se le avisaría «se ha liberado un hueco» sin serlo.
+            raise ValueError("hay_hueco")
         with self._escribiendo():
             lista = self._almacen.cargar(COLECCION, ESPERA)
             repetida = next((e for e in lista if e["fecha"] == fecha and e["usuario_id"] == str(usuario_id)), None)

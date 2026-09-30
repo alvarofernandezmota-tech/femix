@@ -97,6 +97,29 @@ class Recordatorios:
                     break
             self._guardar()
 
+    def reclamar_vencidos(self) -> list:
+        """Los vencidos sin avisar, ya marcados como avisados, todo bajo el bloqueo: dos avisadores
+        (el bot de Telegram y el push de la app, en procesos distintos) no se llevan el mismo.
+        Quien lo reclama y no consigue mandarlo lo devuelve con `reabrir`."""
+        with self._escribiendo():
+            self._recordatorios = self._cargar()
+            vencidos = [r for _, r in self.por_avisar()]
+            for r in vencidos:
+                r.avisado = True
+            if vencidos:
+                self._guardar()
+            return vencidos
+
+    def reabrir(self, recordatorio) -> None:
+        """Deshace `reclamar_vencidos` para uno que no se pudo mandar: lo intentará otro (u otro canal)."""
+        with self._escribiendo():
+            self._recordatorios = self._cargar()
+            for r in self._recordatorios:
+                if r.avisado and r.texto == recordatorio.texto and r.cuando == recordatorio.cuando:
+                    r.avisado = False
+                    break
+            self._guardar()
+
     def listar_pendientes(self) -> list[dict]:
         ahora = self._reloj.ahora()
         return [

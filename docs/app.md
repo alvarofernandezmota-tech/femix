@@ -78,6 +78,8 @@ el campo `dueno_id` del negocio, que apunta a la persona.
   volver a entrar (`POST /usuario/cambiar`, solo entre cuentas vinculadas).
 - El bot del negocio se pone en «Mi bot» de esa cuenta (otro token de `@BotFather`); hasta
   entonces el negocio se lleva desde la app.
+- Las dos cuentas van con el **mismo plan** (la nueva hereda la suscripción de la primera); en modo
+  SaaS solo se puede añadir la segunda con el plan activo.
 
 ## Calendario en Google Calendar o iPhone
 
@@ -91,7 +93,9 @@ dirección» invalida la anterior. Código: `web/rutas/calendario.py`.
 Con claves VAPID en el `.env` (`docker compose exec femix python -m femix.web.push` las genera:
 `FEMIX_PUSH_VAPID_PRIVADA`, `FEMIX_PUSH_VAPID_PUBLICA`, `FEMIX_PUSH_VAPID_EMAIL`), la app pide
 permiso de notificaciones y los recordatorios llegan aunque esté cerrada (Web Push). Sin claves,
-los avisos siguen llegando cuando la app está abierta y por Telegram. Código: `web/push.py`,
+los avisos siguen llegando cuando la app está abierta y por Telegram. Cada recordatorio lo manda
+un solo canal: el push de la app y el bot de Telegram lo «reclaman» bajo el mismo bloqueo
+(`Recordatorios.reclamar_vencidos`) y, si el envío falla, lo devuelven para el otro. Código: `web/push.py`,
 `web/rutas/push.py`, `web/static/sw.js`.
 
 ## Dar de alta un asistente personal (madre, hermana, Paula…)

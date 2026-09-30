@@ -32,7 +32,7 @@ AYUDA_RESERVA = (
     "/reserva huecos [AAAA-MM-DD] [minutos]\n"
     "/reserva <AAAA-MM-DD> <HH:MM> <nombre> [| servicio | minutos]\n"
     "/reserva mias\n"
-    "/reserva anular <n>"
+    "/reserva anular <n>\n"
     "/reserva espera <AAAA-MM-DD> <nombre>   (te aviso si se libera un hueco)"
 )
 

@@ -24,7 +24,7 @@ router = APIRouter(prefix="/r", tags=["reservas-publicas"])
 _templates = plantillas()
 _log = logging.getLogger(__name__)
 AVISOS_SENAL = {
-    "pagada": "Señal recibida: tu reserva queda confirmada. Gracias.",
+    "pagada": "Pago enviado. En cuanto Stripe lo confirme (segundos), tu reserva queda cerrada; si algo fallara, el negocio te avisaría.",
     "cancelada": f"No se pagó la señal: el hueco se libera en {SENAL_MINUTOS} minutos si no vuelves a intentarlo.",
 }
 
@@ -108,7 +108,8 @@ async def reservar(request: Request, inquilino_id: str, fecha: str = Form(...), 
         # El hueco queda guardado SENAL_MINUTOS; Stripe avisa por el webhook cuando está pagada.
         try:
             url = pagos.crear_checkout_senal(perfil.inquilino_id, cita["id"], perfil.senal_euros, perfil.nombre,
-                                             str(request.base_url).rstrip("/"), f"/r/{perfil.inquilino_id}")
+                                             str(request.base_url).rstrip("/"), f"/r/{perfil.inquilino_id}",
+                                             ref=cita.get("senal_ref", ""))
         except pagos.ErrorDePago as exc:
             _log.warning("Señal de %s: %s", perfil.inquilino_id, exc)
             reservas.anular(cita["id"])

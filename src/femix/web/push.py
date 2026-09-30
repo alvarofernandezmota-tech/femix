@@ -108,10 +108,13 @@ def avisar_pendientes(directorio: str, enviar_uno=_enviar_real) -> int:
                 continue
             try:
                 recordatorios = Recordatorios(usuario, reloj=reloj, almacen=almacen)
-                for posicion, r in recordatorios.por_avisar():
+                # Se reclaman (marcan) antes de mandar, bajo el bloqueo: el bot de Telegram, en otro
+                # proceso, no manda el mismo aviso. Si el push no llega a nadie, se devuelve al bot.
+                for r in recordatorios.reclamar_vencidos():
                     if enviar(directorio, perfil.inquilino_id, usuario, "⏰ Recordatorio", r.texto, enviar_uno=enviar_uno):
-                        recordatorios.marcar_avisado(posicion)
                         mandados += 1
+                    else:
+                        recordatorios.reabrir(r)
             except Exception:
                 _log.warning("Push: fallo con %s/%s", perfil.inquilino_id, usuario, exc_info=True)
     return mandados

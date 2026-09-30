@@ -110,6 +110,12 @@ def crear_cuenta_vinculada(inquilino: Inquilino, nombre: str) -> str:
         raise ValueError("Tu cuenta todavía no tiene perfil: pídeselo a quien te dio de alta.")
     if cuentas_vinculadas(inquilino.id):
         raise ValueError("Ya tienes las dos cuentas.")
+    from femix.saas import saas_activo
+    from femix.saas.suscripciones import AlmacenSuscripciones
+    suscripciones = AlmacenSuscripciones(directorio)
+    propia = suscripciones.obtener(inquilino.id)
+    if saas_activo() and not propia.vigente(datetime.now()):
+        raise ValueError("Tu plan no está activo: la segunda cuenta va con el mismo plan que la tuya.")
     nombre = " ".join(nombre.split())[:80]
     if not nombre:
         raise ValueError("Ponle un nombre.")
@@ -117,7 +123,12 @@ def crear_cuenta_vinculada(inquilino: Inquilino, nombre: str) -> str:
     nuevo_id = (inquilino.id[:22] + ("-negocio" if es_persona else "-vida"))
     if perfiles.existe(nuevo_id) or accesos.obtener(nuevo_id) is not None:
         raise ValueError("Esa cuenta ya existe; pídele a quien te dio de alta que la vincule.")
-    comunes = dict(telegram_permitidos=list(propio.telegram_permitidos), telegram_usuario_panel=propio.telegram_usuario_panel,
+    # La persona: sus permitidos van también a su negocio. Un negocio: a la vida privada del dueño
+    # solo va el dueño (el usuario de la app o el primero), no todo su equipo.
+    permitidos = list(propio.telegram_permitidos) if es_persona else (
+        [propio.telegram_usuario_panel] if propio.telegram_usuario_panel in propio.telegram_permitidos
+        else propio.telegram_permitidos[:1])
+    comunes = dict(telegram_permitidos=permitidos, telegram_usuario_panel=propio.telegram_usuario_panel if permitidos else 0,
                    nombre_asistente=propio.nombre_asistente, tono=propio.tono)
     if es_persona:
         nuevo = PerfilInquilino(inquilino_id=nuevo_id, nombre=nombre, tipo="empresa", dueno_id=inquilino.id,
@@ -129,6 +140,9 @@ def crear_cuenta_vinculada(inquilino: Inquilino, nombre: str) -> str:
         perfiles.modificar(inquilino.id, lambda actual: replace_perfil(actual, dueno_id=nuevo_id))
     import secrets
     accesos.crear(nuevo_id, nombre, secrets.token_urlsafe(24))   # se entra desde «Cambiar»; sin contraseña propia
+    # Las dos mitades van con el mismo plan: sin esto la nueva nacería «interna» (gratis, sin tope).
+    from dataclasses import replace as _replace
+    suscripciones.guardar(_replace(propia, inquilino_id=nuevo_id))
     return nuevo_id
 
 

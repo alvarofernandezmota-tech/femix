@@ -41,10 +41,15 @@ primero libre) y el bot lo entiende con palabras («con Luis el jueves»). En el
 
 Con «Señal al reservar desde la web» (euros) y Stripe configurado (`STRIPE_SECRET_KEY`,
 `STRIPE_WEBHOOK_SECRET`), la página pública cobra la señal por tarjeta: la cita queda guardada
-30 minutos mientras el cliente paga (Stripe Checkout, pago único); el webhook
-(`checkout.session.completed` con `metadata.tipo=senal`) la confirma (💶 en el panel) y, si no
-se paga, el hueco se libera solo (⏳ mientras tanto). Sin Stripe, la señal no se cobra y se
-reserva sin más. Código: `Reservas.marcar_senal_pagada`, `caducar_senales`, `pagos.crear_checkout_senal`.
+45 minutos mientras el cliente paga (Stripe Checkout de 35 minutos, pago único); el webhook
+(`checkout.session.completed` o `async_payment_succeeded` con `metadata.tipo=senal` y
+`payment_status=paid`) la confirma (💶 en el panel) y, si no se paga, el hueco se libera solo (⏳
+mientras tanto). Cada cita lleva una referencia (`senal_ref`) que viaja en los metadatos: un
+aviso tardío no confirma una cita distinta con el mismo número. Si el pago llega cuando la cita ya
+caducó, se devuelve el dinero (`POST /refunds`) y queda una incidencia `senal`. En el webhook de
+Stripe hay que activar `checkout.session.completed`, `checkout.session.async_payment_succeeded` y
+`checkout.session.async_payment_failed`. Sin Stripe, la señal no se cobra y se reserva sin más.
+Código: `Reservas.marcar_senal_pagada`, `caducar_senales`, `pagos.crear_checkout_senal`, `pagos.senal_de`.
 
 ## Resúmenes automáticos
 
@@ -69,8 +74,9 @@ Solo citas de hoy o de ayer (al activarlo no se molesta a clientes antiguos). C�
 
 Si un día está lleno, el bot ofrece apuntar al cliente en la lista de espera (herramienta
 `apuntar_lista_espera` o `/reserva espera <fecha> <nombre>`). Cuando se libera un hueco ese día
-(una anulación), el bot avisa a quien esperaba y lo quita de la lista. Solo clientes de Telegram
-(a los de la web no hay a quién avisar). Código: `Reservas.apuntar_espera`, `flota.avisar_lista_espera`.
+(una anulación), el bot avisa a quien esperaba y lo quita de la lista. Solo en días llenos (si
+quedan huecos, se reserva directamente) y solo clientes de Telegram (a los de la web no hay a
+quién avisar). Código: `Reservas.apuntar_espera`, `flota.avisar_lista_espera`.
 
 ## En números
 

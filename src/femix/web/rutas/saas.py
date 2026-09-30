@@ -121,7 +121,7 @@ async def webhook_stripe(request: Request):
         return JSONResponse({"error": "firma"}, status_code=400)
     senal = pagos.senal_de(evento)
     if senal is not None:
-        return {"recibido": True, "senal": _aplicar_senal(*senal)}
+        return {"recibido": True, "senal": _aplicar_senal(senal) if senal["pagada"] else False}
     try:
         inquilino_id = pagos.aplicar_evento(evento, AlmacenSuscripciones(directorio_datos_web()),
                                             existe=AlmacenPerfiles(directorio_datos_web()).existe)
@@ -133,15 +133,26 @@ async def webhook_stripe(request: Request):
     return {"recibido": True, "inquilino": bool(inquilino_id)}
 
 
-def _aplicar_senal(inquilino_id: str, cita_id: int) -> bool:
-    """La señal de una reserva web está pagada: la cita deja de estar en el aire."""
+def _aplicar_senal(senal: dict) -> bool:
+    """La señal de una reserva web está pagada: la cita deja de estar en el aire. Si la cita ya
+    no existe (caducó antes de que llegara el aviso), se devuelve el dinero y queda apuntado."""
     from .. import panel_comun
+    from femix.infraestructura.actividad import Actividad
+    inquilino_id, cita_id = senal["inquilino_id"], senal["cita_id"]
     try:
         reservas = panel_comun.reservas_de(directorio_datos_web(), inquilino_id)
-        cita = reservas.marcar_senal_pagada(cita_id) if reservas is not None else None
+        cita = reservas.marcar_senal_pagada(cita_id, senal["ref"] or None) if reservas is not None else None
     except Exception:
         _log.exception("Señal de %s/%s no aplicada", inquilino_id, cita_id)
         return False
-    if cita is None:
-        _log.warning("Señal pagada de una reserva que ya no existe: %s/%s", inquilino_id, cita_id)
-    return cita is not None
+    if cita is not None:
+        return True
+    devuelto = pagos.reembolsar(senal["payment_intent"])
+    _log.warning("Señal pagada de una reserva que ya no existe: %s/%s (reembolso: %s)", inquilino_id, cita_id, devuelto)
+    try:
+        Actividad(directorio_datos_web()).incidencia(
+            inquilino_id, "senal", f"Señal pagada de la cita {cita_id}, que ya había caducado; "
+            + ("dinero devuelto." if devuelto else "NO se pudo devolver: revisar en Stripe."))
+    except Exception:
+        _log.warning("No se pudo apuntar la incidencia de la señal", exc_info=True)
+    return False

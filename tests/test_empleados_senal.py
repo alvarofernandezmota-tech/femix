@@ -87,16 +87,21 @@ def test_perfil_valida_equipo_y_senal():
 def test_senal_guarda_el_hueco_y_caduca(tmp_path):
     r = _reservas(tmp_path, empleados=())
     cita = r.reservar("2026-10-05", "09:00", "Web", usuario_id="web600", senal_pendiente=True)
-    assert cita["senal_pendiente"] and cita["senal_hasta"] == "2026-10-05 08:30"
+    assert cita["senal_pendiente"] and cita["senal_hasta"] == "2026-10-05 08:45" and len(cita["senal_ref"]) >= 12
     assert [h.hora for h in r.huecos("2026-10-05", tope=10)] == ["09:30"]      # el hueco está guardado
     assert r.caducar_senales() == 0
     assert r.marcar_senal_pagada(cita["id"])["senal_pagada"] is True
     assert "senal_pendiente" not in r.citas()[0] and r.caducar_senales() == 0
     otra = r.reservar("2026-10-05", "09:30", "Web2", usuario_id="web601", senal_pendiente=True)
-    tarde = _reservas(tmp_path, ahora=LUNES + timedelta(minutes=31), empleados=())
+    tarde = _reservas(tmp_path, ahora=LUNES + timedelta(minutes=46), empleados=())
     assert tarde.caducar_senales() == 1
-    assert [c["id"] for c in tarde.citas()] == [cita["id"]] and tarde.marcar_senal_pagada(otra["id"]) is None
+    assert [c["id"] for c in tarde.citas()] == [cita["id"]] and tarde.marcar_senal_pagada(otra["id"], otra["senal_ref"]) is None
     assert [h.hora for h in tarde.huecos("2026-10-05", tope=10)] == ["09:30"]
+    # El id caducado lo reutiliza otra reserva: el pago tardío de la primera no la marca como pagada.
+    tercera = tarde.reservar("2026-10-05", "09:30", "Otro", usuario_id="web602", senal_pendiente=True)
+    assert tercera["id"] == otra["id"]
+    assert tarde.marcar_senal_pagada(tercera["id"], otra["senal_ref"]) is None
+    assert tarde.marcar_senal_pagada(tercera["id"], tercera["senal_ref"])["senal_pagada"] is True
 
 
 def test_checkout_de_senal_y_evento(monkeypatch):
@@ -107,15 +112,24 @@ def test_checkout_de_senal_y_evento(monkeypatch):
         enviados.update(ruta=ruta, datos=datos)
         return {"url": "https://checkout.stripe.com/x"}
     monkeypatch.setattr(pagos, "_post", falso_post)
-    url = pagos.crear_checkout_senal("pelu", 7, 10, "Pelu Ana", "https://femix.es", "/r/pelu")
+    url = pagos.crear_checkout_senal("pelu", 7, 10, "Pelu Ana", "https://femix.es", "/r/pelu", ref="abc")
     assert url.startswith("https://checkout.stripe.com/") and enviados["ruta"] == "/checkout/sessions"
     d = enviados["datos"]
     assert d["mode"] == "payment" and d["line_items[0][price_data][unit_amount]"] == "1000"
-    assert d["metadata[tipo]"] == "senal" and d["metadata[cita_id]"] == "7" and d["success_url"] == "https://femix.es/r/pelu?senal=pagada"
-    evento = {"type": "checkout.session.completed", "data": {"object": {"metadata": {"tipo": "senal", "inquilino_id": "pelu", "cita_id": "7"}}}}
-    assert pagos.senal_de(evento) == ("pelu", 7)
+    assert d["metadata[tipo]"] == "senal" and d["metadata[cita_id]"] == "7" and d["metadata[ref]"] == "abc"
+    assert d["success_url"] == "https://femix.es/r/pelu?senal=pagada"
+    assert int(d["expires_at"]) - time.time() > 34 * 60   # Stripe exige 30 min como mínimo
+    meta = {"tipo": "senal", "inquilino_id": "pelu", "cita_id": "7", "ref": "abc"}
+    evento = {"type": "checkout.session.completed", "data": {"object": {"metadata": meta, "payment_status": "paid", "payment_intent": "pi_1"}}}
+    assert pagos.senal_de(evento) == {"inquilino_id": "pelu", "cita_id": 7, "ref": "abc", "pagada": True, "payment_intent": "pi_1"}
+    # Pago diferido (SEPA…): «completed» sin cobrar no confirma; lo hace «async_payment_succeeded».
+    assert pagos.senal_de({"type": "checkout.session.completed", "data": {"object": {"metadata": meta, "payment_status": "unpaid"}}})["pagada"] is False
+    assert pagos.senal_de({"type": "checkout.session.async_payment_succeeded", "data": {"object": {"metadata": meta, "payment_status": "paid"}}})["pagada"] is True
+    assert pagos.senal_de({"type": "checkout.session.async_payment_failed", "data": {"object": {"metadata": meta}}})["pagada"] is False
     assert pagos.senal_de({"type": "checkout.session.completed", "data": {"object": {"metadata": {"inquilino_id": "pelu"}}}}) is None
     assert pagos.aplicar_evento(evento, None) is None     # no toca ninguna suscripción
+    assert pagos.reembolsar("pi_1") is True and enviados["ruta"] == "/refunds" and enviados["datos"] == {"payment_intent": "pi_1"}
+    assert pagos.reembolsar("") is False
     with pytest.raises(pagos.ErrorDePago):
         pagos.crear_checkout_senal("pelu", 7, 0, "Pelu", "https://femix.es", "/r/pelu")
 
@@ -165,15 +179,27 @@ def test_reserva_web_con_senal_pasa_por_stripe_y_el_webhook_la_confirma(tmp_path
     from femix.web import panel_comun
     cita = panel_comun.reservas_de(str(tmp_path), "pelu").citas()[0]
     assert cita["senal_pendiente"] is True
-    cuerpo = json.dumps({"type": "checkout.session.completed", "data": {"object": {
-        "metadata": {"tipo": "senal", "inquilino_id": "pelu", "cita_id": str(cita["id"])}}}}).encode()
-    t = int(time.time())
-    firma = hmac.new(b"whsec", f"{t}.".encode() + cuerpo, hashlib.sha256).hexdigest()
-    r = cliente.post("/stripe/webhook", content=cuerpo, headers={"stripe-signature": f"t={t},v1={firma}"})
+
+    def webhook(objeto, tipo="checkout.session.completed"):
+        cuerpo = json.dumps({"type": tipo, "data": {"object": objeto}}).encode()
+        t = int(time.time())
+        firma = hmac.new(b"whsec", f"{t}.".encode() + cuerpo, hashlib.sha256).hexdigest()
+        return cliente.post("/stripe/webhook", content=cuerpo, headers={"stripe-signature": f"t={t},v1={firma}"})
+
+    meta = {"tipo": "senal", "inquilino_id": "pelu", "cita_id": str(cita["id"]), "ref": cita["senal_ref"]}
+    # Una referencia que no es la de esta cita (un id reutilizado) no la confirma: se devuelve el dinero.
+    reembolsos = []
+    monkeypatch.setattr(pagos, "reembolsar", lambda pi: reembolsos.append(pi) or True)
+    r = webhook({"metadata": {**meta, "ref": "otra"}, "payment_status": "paid", "payment_intent": "pi_viejo"})
+    assert r.status_code == 200 and r.json() == {"recibido": True, "senal": False} and reembolsos == ["pi_viejo"]
+    assert "senal_pagada" not in panel_comun.reservas_de(str(tmp_path), "pelu").citas()[0]
+    # Sin cobrar (pago diferido) tampoco.
+    assert webhook({"metadata": meta, "payment_status": "unpaid"}).json() == {"recibido": True, "senal": False}
+    r = webhook({"metadata": meta, "payment_status": "paid", "payment_intent": "pi_1"})
     assert r.status_code == 200 and r.json() == {"recibido": True, "senal": True}
     cita = panel_comun.reservas_de(str(tmp_path), "pelu").citas()[0]
-    assert cita.get("senal_pagada") is True and "senal_pendiente" not in cita
-    assert "Señal recibida" in cliente.get(f"/r/pelu?fecha={dia}&senal=pagada").text
+    assert cita.get("senal_pagada") is True and "senal_pendiente" not in cita and len(reembolsos) == 1
+    assert "Pago enviado" in cliente.get(f"/r/pelu?fecha={dia}&senal=pagada").text
     # Stripe caído: no se deja una cita en el aire.
     def roto(ruta, datos):
         raise pagos.ErrorDePago("Stripe: caído")
@@ -215,3 +241,14 @@ def test_panel_guarda_equipo_y_senal_y_conserva_lo_del_admin(tmp_path, monkeypat
     assert p.dueno_id == "ana"     # lo que puso el admin no se pierde al guardar «Mi bot»
     r = cliente.post("/usuario/bot", data={"csrf": csrf, "nombre": "Pelu", "tipo": "empresa", "senal_euros": "mil"})
     assert r.status_code == 400 and "euros enteros" in r.text
+
+
+def test_citas_de_antes_del_equipo_ocupan_a_todos(tmp_path):
+    sin = _reservas(tmp_path, empleados=())
+    sin.reservar("2026-10-05", "09:00", "Antigua")            # de cuando no había equipo
+    con = _reservas(tmp_path)                                  # hoy se activa el equipo
+    assert [h.hora for h in con.huecos("2026-10-05", tope=10)] == ["09:30"]
+    assert con.por_que_no("2026-10-05", "09:00", 30, "Ana") == "ocupado"
+    with pytest.raises(ValueError, match="ocupado"):
+        con.reservar("2026-10-05", "09:00", "Nueva")
+    assert con.libre_para("2026-10-05", 9 * 60, 30) is None

@@ -178,7 +178,9 @@ INTERVALO_AVISOS = 60.0
 
 
 def avisos_pendientes(directorio_datos: str, inquilino_id: str, permitidos, reloj) -> list:
-    """`[(usuario_id, Recordatorios, posición, Recordatorio)]` vencidos y sin avisar.
+    """`[(usuario_id, Recordatorios, Recordatorio)]` vencidos y sin avisar, ya reclamados (marcados)
+    bajo el bloqueo: el push de la app, en otro proceso, no manda el mismo. Si el envío falla se
+    devuelven con `reabrir` y se reintentan en la siguiente vuelta.
 
     Solo de usuarios permitidos con ID de Telegram (el panel usa el id del inquilino como usuario:
     a ese no hay a quién escribirle).
@@ -190,7 +192,7 @@ def avisos_pendientes(directorio_datos: str, inquilino_id: str, permitidos, relo
             continue
         try:
             recordatorios = Recordatorios(usuario, reloj=reloj, almacen=almacen)
-            pendientes += [(usuario, recordatorios, i, r) for i, r in recordatorios.por_avisar()]
+            pendientes += [(usuario, recordatorios, r) for r in recordatorios.reclamar_vencidos()]
         except Exception:
             # Un dato malo de un usuario no puede dejar sin avisos al resto del inquilino.
             _log.warning("Recordatorios ilegibles de %s en %s; se saltan", usuario, inquilino_id, exc_info=True)
@@ -203,18 +205,17 @@ async def avisar_recordatorios(app, directorio_datos: str, inquilino_id: str, re
     permitidos = None if app.bot_data.get("abierto") else app.bot_data.get("permitidos", frozenset())
     pendientes = await asyncio.to_thread(avisos_pendientes, directorio_datos, inquilino_id, permitidos, reloj)
     enviados = 0
-    for usuario, recordatorios, posicion, recordatorio in pendientes:
+    for usuario, recordatorios, recordatorio in pendientes:
         try:
             await app.bot.send_message(chat_id=int(usuario), text=f"⏰ Recordatorio: {recordatorio.texto}")
         except Forbidden:
-            # Nos ha bloqueado: reintentar cada minuto para siempre no sirve de nada.
+            # Nos ha bloqueado: reintentar cada minuto para siempre no sirve de nada (queda marcado).
             _log.info("Bot de %s: %s bloqueó el bot; recordatorio descartado", inquilino_id, usuario)
-            await asyncio.to_thread(recordatorios.marcar_avisado, posicion)
             continue
         except Exception as exc:
             _log.warning("Bot de %s: no se pudo avisar a %s (%s); se reintenta", inquilino_id, usuario, type(exc).__name__)
+            await asyncio.to_thread(recordatorios.reabrir, recordatorio)
             continue
-        await asyncio.to_thread(recordatorios.marcar_avisado, posicion)
         enviados += 1
     return enviados
 

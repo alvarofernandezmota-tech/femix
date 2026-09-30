@@ -167,8 +167,45 @@ def test_anadir_mi_vida_desde_un_negocio(tmp_path, monkeypatch):
     r = cliente.post("/usuario/negocio/crear", data={"csrf": csrf, "nombre": "Ana"}, follow_redirects=False)
     assert r.status_code == 303 and "hecho=vida" in r.headers["location"]
     assert AlmacenPerfiles(str(tmp_path)).obtener("pelu").dueno_id == "pelu-vida"
-    assert AlmacenPerfiles(str(tmp_path)).obtener("pelu-vida").tipo == "persona"
+    vida = AlmacenPerfiles(str(tmp_path)).obtener("pelu-vida")
+    assert vida.tipo == "persona" and vida.telegram_permitidos == [5]    # solo el dueño, no todo el equipo
     assert "Mi vida" in cliente.get("/usuario/").text
+
+
+def test_la_cuenta_vinculada_hereda_el_plan(tmp_path, monkeypatch):
+    from datetime import datetime
+    from femix.saas.suscripciones import AlmacenSuscripciones, nueva_prueba
+    cliente, csrf = _entrar(tmp_path, monkeypatch)
+    monkeypatch.setenv("FEMIX_SAAS", "1")
+    suscripciones = AlmacenSuscripciones(str(tmp_path))
+    suscripciones.guardar(nueva_prueba("mama", "m@x.es", datetime(2020, 1, 1)))       # prueba caducada
+    r = cliente.post("/usuario/negocio/crear", data={"csrf": csrf, "nombre": "Pelu"})
+    assert r.status_code == 400 and "plan no está activo" in r.text
+    suscripciones.cambiar("mama", plan="pro", estado="activa")
+    r = cliente.post("/usuario/negocio/crear", data={"csrf": csrf, "nombre": "Pelu"}, follow_redirects=False)
+    assert r.status_code == 303
+    nueva = suscripciones.obtener("mama-negocio")
+    assert nueva.plan == "pro" and nueva.estado == "activa"     # no nace «interna» (gratis y sin tope)
+
+
+def test_push_y_telegram_no_se_llevan_el_mismo_aviso(tmp_path):
+    from datetime import datetime
+    from femix.dominio.personal.recordatorios import Recordatorios
+
+    class Reloj:
+        zona = "Europe/Madrid"
+        def ahora(self): return datetime(2026, 10, 5, 10, 0)
+
+    almacen = almacen_dominio(str(tmp_path), "mama")
+    uno = Recordatorios("111", reloj=Reloj(), almacen=almacen)
+    uno.crear("Llamar al banco", "2026-10-05 09:00")
+    otro = Recordatorios("111", reloj=Reloj(), almacen=almacen)      # otro proceso
+    reclamados = uno.reclamar_vencidos()
+    assert [r.texto for r in reclamados] == ["Llamar al banco"]
+    assert otro.reclamar_vencidos() == [] and otro.por_avisar() == []   # ya no está para nadie más
+    uno.reabrir(reclamados[0])                                           # no se pudo mandar: vuelve
+    assert [r.texto for r in Recordatorios("111", reloj=Reloj(), almacen=almacen).reclamar_vencidos()] == ["Llamar al banco"]
+
 
 
 def test_resumenes_a_la_hora_que_eligio_cada_persona(tmp_path):

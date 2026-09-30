@@ -716,6 +716,13 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
 - **Capacitor**: `capacitor.config.json` y `docs/apk.md` (APK, AdMob, ficha de Play).
 - Arreglo: «Mi bot» borraba el dueño y el usuario de la app del perfil al guardar, y no guardaba el
   enlace de reseñas.
+- Revisión adversarial (11 hallazgos, todos arreglados): la cuenta vinculada hereda el plan (antes
+  nacía «interna», gratis y sin tope) y en SaaS exige plan activo; la «vida» creada desde un
+  negocio solo permite al dueño, no a todo el equipo; señal con referencia por cita (un id
+  reutilizado no se confirma), `payment_status` comprobado, `async_payment_succeeded`, hueco 45 min
+  frente a sesión de 35, reembolso e incidencia si el pago llega tarde; citas de antes del equipo
+  ocupan a todos; push y Telegram reclaman cada recordatorio bajo el bloqueo (sin duplicados ni
+  pérdidas); lista de espera solo en días llenos; ayuda de `/reserva` con salto de línea.
 - Docs: `app.md`, `operacion.md`, `rag.md`, `PRODUCCION_MADRE.md` (push, señal, alta de mañana),
   `ROADMAP.md`, `mejoras.md`. Tests: `test_web_dia.py`, `test_empleados_senal.py`,
   `test_calendario_push.py`, `test_reranker.py` (1067 en verde).
