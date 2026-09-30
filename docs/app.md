@@ -91,7 +91,7 @@ dirección» invalida la anterior. Código: `web/rutas/calendario.py`.
 ## Avisos con la app cerrada
 
 Con claves VAPID en el `.env` (`docker compose exec femix python -m femix.web.push` las genera:
-`FEMIX_PUSH_VAPID_PRIVADA`, `FEMIX_PUSH_VAPID_PUBLICA`, `FEMIX_PUSH_VAPID_EMAIL`), la app pide
+`FEMIX_PUSH_VAPID_PRIVADA`, `FEMIX_PUSH_VAPID_PUBLICA`, `FEMIX_PUSH_EMAIL`), la app pide
 permiso de notificaciones y los recordatorios llegan aunque esté cerrada (Web Push). Sin claves,
 los avisos siguen llegando cuando la app está abierta y por Telegram. Cada recordatorio lo manda
 un solo canal: el push de la app y el bot de Telegram lo «reclaman» bajo el mismo bloqueo
