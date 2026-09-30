@@ -119,6 +119,9 @@ async def webhook_stripe(request: Request):
     except ValueError as exc:
         _log.warning("Webhook de Stripe rechazado: %s", exc)
         return JSONResponse({"error": "firma"}, status_code=400)
+    senal = pagos.senal_de(evento)
+    if senal is not None:
+        return {"recibido": True, "senal": _aplicar_senal(*senal)}
     try:
         inquilino_id = pagos.aplicar_evento(evento, AlmacenSuscripciones(directorio_datos_web()),
                                             existe=AlmacenPerfiles(directorio_datos_web()).existe)
@@ -128,3 +131,17 @@ async def webhook_stripe(request: Request):
         _log.exception("Webhook de Stripe %s no aplicado", evento.get("id"))
         return {"recibido": True, "inquilino": False}
     return {"recibido": True, "inquilino": bool(inquilino_id)}
+
+
+def _aplicar_senal(inquilino_id: str, cita_id: int) -> bool:
+    """La señal de una reserva web está pagada: la cita deja de estar en el aire."""
+    from .. import panel_comun
+    try:
+        reservas = panel_comun.reservas_de(directorio_datos_web(), inquilino_id)
+        cita = reservas.marcar_senal_pagada(cita_id) if reservas is not None else None
+    except Exception:
+        _log.exception("Señal de %s/%s no aplicada", inquilino_id, cita_id)
+        return False
+    if cita is None:
+        _log.warning("Señal pagada de una reserva que ya no existe: %s/%s", inquilino_id, cita_id)
+    return cita is not None

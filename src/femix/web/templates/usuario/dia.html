@@ -39,7 +39,7 @@
     <h3>💇 Reservas de clientes</h3>
     <ul class="lista">
         {% for c in reservas %}
-        <li><span class="hora">{{ cuando(c.fecha, c.hora) }}</span> {{ c.nombre }}{% if c.servicio %} · {{ c.servicio }}{% endif %} <small>({{ c.duracion }} min)</small>
+        <li><span class="hora">{{ cuando(c.fecha, c.hora) }}</span> {{ c.nombre }}{% if c.servicio %} · {{ c.servicio }}{% endif %}{% if c.empleado %} · con {{ c.empleado }}{% endif %} <small>({{ c.duracion }} min)</small>{% if c.senal_pagada %} 💶{% elif c.senal_pendiente %} ⏳{% endif %}
             <form method="post" action="/usuario/reservas/{{ c.id }}/anular" class="inline" onsubmit="return confirm('¿Anular esta reserva?');">
                 <input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit" class="quitar" title="Anular">✕</button></form></li>
         {% else %}<li class="secundario">Sin reservas.</li>{% endfor %}

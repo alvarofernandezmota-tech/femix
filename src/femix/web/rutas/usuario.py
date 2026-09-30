@@ -270,8 +270,11 @@ async def guardar_bot(
     quitar_whatsapp: bool = Form(False),
     whatsapp_plantilla_cita: str = Form(""),
     enlace_resenas: str = Form(""),
+    empleados: str = Form(""),
+    senal_euros: str = Form(""),
 ):
-    from .admin import leer_horario, leer_responsable
+    from femix.inquilino.perfil import leer_empleados
+    from .admin import leer_horario, leer_responsable, leer_senal
     directorio = directorio_datos_web()
     almacen = AlmacenPerfiles(directorio)
     # Solo las que permite su plan; las que tenga encendidas fuera del plan se conservan (vuelven
@@ -285,7 +288,8 @@ async def guardar_bot(
             horario=leer_horario(horario), capacidades=[c for c in capacidades if c in permitidas] + fuera_del_plan,
             nombre_asistente=nombre_asistente, tono=tono, telegram_abierto=abierto,
             telegram_responsable=leer_responsable(responsable),
-            telegram_permitidos=leer_ids_telegram(permitidos),
+            telegram_permitidos=leer_ids_telegram(permitidos), enlace_resenas=enlace_resenas.strip(),
+            empleados=leer_empleados(empleados), senal_euros=leer_senal(senal_euros),
         )
 
         # El bot del .env: su token y sus permitidos los manda el .env, no el formulario.
@@ -304,8 +308,11 @@ async def guardar_bot(
         def con_whatsapp(anterior, token_actual, whatsapp_actual) -> PerfilInquilino:
             return _replace(
                 base, telegram_token="" if quitar_token else (telegram_token.strip() or token_actual),
-                # Los conectores MCP solo los toca el dueño de la plataforma: se conservan.
+                # Los conectores MCP, el dueño y el usuario de la app los pone el dueño de la
+                # plataforma (o Ajustes): se conservan, que este formulario no los conoce.
                 mcp_servidores=anterior.mcp_servidores if anterior else [],
+                dueno_id=anterior.dueno_id if anterior else "",
+                telegram_usuario_panel=anterior.telegram_usuario_panel if anterior else 0,
                 whatsapp_telefono_id="" if quitar_whatsapp else whatsapp_telefono_id,
                 whatsapp_plantilla_cita="" if quitar_whatsapp else whatsapp_plantilla_cita,
                 whatsapp_token="" if quitar_whatsapp else (whatsapp_token.strip() or whatsapp_actual),

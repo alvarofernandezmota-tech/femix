@@ -22,7 +22,7 @@ from pydantic import BaseModel
 from femix.bot.fabrica import almacen_dominio
 from femix.inquilino.capacidades import CATALOGO
 from femix.inquilino.perfil import (
-    DIAS, TIPOS, AlmacenPerfiles, Franja, PerfilIlegible, PerfilInquilino, leer_ids_telegram,
+    DIAS, TIPOS, AlmacenPerfiles, Franja, PerfilIlegible, PerfilInquilino, leer_empleados, leer_ids_telegram,
 )
 from femix.inquilino.personalidad import prompt_sistema_de
 from femix.llm.prompts import PROMPT_SISTEMA
@@ -267,6 +267,16 @@ def leer_horario(texto: str) -> list:
 
 
 
+def leer_senal(texto: str) -> int:
+    """Euros de la señal del formulario: vacío = 0."""
+    texto = (texto or "").strip().replace("€", "").strip()
+    if not texto:
+        return 0
+    if not texto.isdigit():
+        raise ValueError("La señal son euros enteros (0 = sin señal)")
+    return int(texto)
+
+
 def leer_responsable(texto: str) -> int:
     """El ID del responsable desde el formulario: vacío = nadie."""
     texto = (texto or "").strip()
@@ -465,6 +475,8 @@ async def guardar_perfil(
     enlace_resenas: str = Form(""),
     usuario_panel: str = Form(""),
     dueno_id: str = Form(""),
+    empleados: str = Form(""),
+    senal_euros: str = Form(""),
     mcp: str = Form(""),
 ):
     inquilino_id = _id_valido(inquilino_id)
@@ -494,6 +506,7 @@ async def guardar_perfil(
             nombre_asistente=nombre_asistente, tono=tono,
             telegram_abierto=abierto, telegram_responsable=leer_responsable(responsable), enlace_resenas=enlace_resenas.strip(),
             telegram_usuario_panel=leer_responsable(usuario_panel), dueno_id=dueno_id.strip(),
+            empleados=leer_empleados(empleados), senal_euros=leer_senal(senal_euros),
         )
         if contexto["perfil_ilegible"]:
             almacen.reparar(con_telegram(base, None))

@@ -7,10 +7,14 @@ un campo trampa para robots y un tope de reservas por conexión y hora.
 import re
 import time
 
-from fastapi import APIRouter, Form, HTTPException, Request, status
+import logging
 
-from femix.dominio.negocio.reservas import DURACION_POR_DEFECTO, MOTIVOS
+from fastapi import APIRouter, Form, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
+
+from femix.dominio.negocio.reservas import DURACION_POR_DEFECTO, MOTIVOS, SENAL_MINUTOS
 from femix.inquilino.perfil import AlmacenPerfiles, PerfilIlegible, validar_inquilino_id
+from femix.saas import pagos
 
 from .. import panel_comun
 from ..plantillas import plantillas
@@ -18,6 +22,11 @@ from .auth import directorio_datos_web
 
 router = APIRouter(prefix="/r", tags=["reservas-publicas"])
 _templates = plantillas()
+_log = logging.getLogger(__name__)
+AVISOS_SENAL = {
+    "pagada": "Señal recibida: tu reserva queda confirmada. Gracias.",
+    "cancelada": f"No se pagó la señal: el hueco se libera en {SENAL_MINUTOS} minutos si no vuelves a intentarlo.",
+}
 
 RESERVAS_POR_HORA = 10
 _reservas_por_ip: dict = {}
@@ -48,27 +57,33 @@ def _horario(perfil) -> list:
     return [f"{f.dia.capitalize()} {f.desde}–{f.hasta}" for f in perfil.horario]
 
 
-def _pagina(request: Request, perfil, reservas, fecha: str, codigo: int = 200, **extra):
+def _pagina(request: Request, perfil, reservas, fecha: str, codigo: int = 200, empleado: str = "", **extra):
+    quien = reservas.empleado_valido(empleado) if empleado else None
     try:
-        huecos = reservas.huecos(fecha, DURACION_POR_DEFECTO, tope=40)
+        huecos = reservas.huecos(fecha, DURACION_POR_DEFECTO, tope=40, empleado=quien)
     except ValueError:
-        fecha, huecos = reservas.hoy(), reservas.huecos(reservas.hoy(), DURACION_POR_DEFECTO, tope=40)
+        fecha, huecos = reservas.hoy(), reservas.huecos(reservas.hoy(), DURACION_POR_DEFECTO, tope=40, empleado=quien)
     return _templates.TemplateResponse(request, "publico/reservar.html", {
         "perfil": perfil, "fecha": fecha, "hoy": reservas.hoy(), "huecos": [h.hora for h in huecos],
-        "horario": _horario(perfil), **extra,
+        "horario": _horario(perfil), "empleados": reservas.empleados, "empleado": quien or "",
+        "senal": perfil.senal_euros if perfil.senal_euros and pagos.configurado() else 0, **extra,
     }, status_code=codigo)
 
 
 @router.get("/{inquilino_id}")
-async def reservar_formulario(request: Request, inquilino_id: str, fecha: str = ""):
+async def reservar_formulario(request: Request, inquilino_id: str, fecha: str = "", empleado: str = "", senal: str = ""):
     perfil, reservas = _negocio(inquilino_id)
-    return _pagina(request, perfil, reservas, fecha or reservas.hoy())
+    reservas.caducar_senales()
+    return _pagina(request, perfil, reservas, fecha or reservas.hoy(), empleado=empleado[:40], aviso=AVISOS_SENAL.get(senal, ""))
 
 
 @router.post("/{inquilino_id}")
 async def reservar(request: Request, inquilino_id: str, fecha: str = Form(...), hora: str = Form(...),
-                   nombre: str = Form(...), telefono: str = Form(...), servicio: str = Form(""), web: str = Form("")):
+                   nombre: str = Form(...), telefono: str = Form(...), servicio: str = Form(""), web: str = Form(""),
+                   empleado: str = Form("")):
     perfil, reservas = _negocio(inquilino_id)
+    reservas.caducar_senales()
+    empleado = empleado.strip()[:40]
     if web:   # el campo trampa: las personas no lo ven; los robots lo rellenan
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No")
     ip = request.client.host if request.client else "?"
@@ -80,10 +95,24 @@ async def reservar(request: Request, inquilino_id: str, fecha: str = Form(...), 
     if not nombre:
         return _pagina(request, perfil, reservas, fecha, 400, error="Escribe tu nombre.")
     usuario = "web" + re.sub(r"\D", "", telefono)
+    con_senal = bool(perfil.senal_euros) and pagos.configurado()
     try:
-        cita = reservas.reservar(fecha, hora, nombre, DURACION_POR_DEFECTO, servicio or None, usuario_id=usuario)
+        cita = reservas.reservar(fecha, hora, nombre, DURACION_POR_DEFECTO, servicio or None, usuario_id=usuario,
+                                 empleado=empleado or None, senal_pendiente=con_senal)
     except ValueError as exc:
         motivo = str(exc)
-        return _pagina(request, perfil, reservas, fecha, 400, error=f"No se pudo reservar: {MOTIVOS.get(motivo, motivo)}. Elige otro hueco.")
+        return _pagina(request, perfil, reservas, fecha, 400, empleado=empleado,
+                       error=f"No se pudo reservar: {MOTIVOS.get(motivo, motivo)}. Elige otro hueco.")
     _reservas_por_ip.setdefault(ip, []).append(time.time())
+    if con_senal:
+        # El hueco queda guardado SENAL_MINUTOS; Stripe avisa por el webhook cuando está pagada.
+        try:
+            url = pagos.crear_checkout_senal(perfil.inquilino_id, cita["id"], perfil.senal_euros, perfil.nombre,
+                                             str(request.base_url).rstrip("/"), f"/r/{perfil.inquilino_id}")
+        except pagos.ErrorDePago as exc:
+            _log.warning("Señal de %s: %s", perfil.inquilino_id, exc)
+            reservas.anular(cita["id"])
+            return _pagina(request, perfil, reservas, fecha, 503, empleado=empleado,
+                           error="Ahora mismo no se puede cobrar la señal. Prueba en unos minutos o escribe al negocio.")
+        return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)
     return _templates.TemplateResponse(request, "publico/reservada.html", {"perfil": perfil, "cita": cita, "telefono": telefono})

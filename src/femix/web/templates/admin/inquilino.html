@@ -97,6 +97,10 @@
             <input name="dueno_id" value="{{ perfil.dueno_id if perfil else '' }}" pattern="[A-Za-z0-9._\-]*"></label>
         <label>Enlace para reseñas <small>(Google, etc.: el bot lo manda al cliente cuando termina su cita; vacío = no pide)</small>
             <input name="enlace_resenas" type="url" value="{{ perfil.enlace_resenas if perfil else '' }}" placeholder="https://g.page/r/…/review"></label>
+        <label>Equipo <small>(nombres separados por comas si hay varias personas con agenda propia; vacío = una sola agenda)</small>
+            <input name="empleados" value="{{ perfil.empleados|join(', ') if perfil else '' }}" placeholder="Ana, Luis, Marta"></label>
+        <label>Señal al reservar desde la web <small>(euros que se cobran por tarjeta con Stripe; 0 = sin señal)</small>
+            <input name="senal_euros" inputmode="numeric" pattern="[0-9]*" value="{{ perfil.senal_euros if perfil and perfil.senal_euros else '' }}" placeholder="0"></label>
 
         <fieldset>
             <legend>Capacidades</legend>

@@ -83,6 +83,11 @@ class PerfilInquilino:
     # Un negocio puede ser de una persona que también tiene su asistente personal: el identificador
     # de ese inquilino. Con él, la app pasa de «Mi vida» a «Mi negocio» sin otro login.
     dueno_id: str = ""
+    # Varios empleados con agenda propia (peluquería con tres sillas): cada cita va con uno y los
+    # huecos se calculan por persona. Vacío = una sola agenda.
+    empleados: list = field(default_factory=list)
+    # Señal (euros) que se cobra por Stripe al reservar desde la página pública. 0 = sin señal.
+    senal_euros: int = 0
     # Fase 3: cómo se presenta y habla su bot. Vacíos = los de Femix.
     nombre_asistente: str = ""
     tono: str = ""
@@ -128,6 +133,14 @@ class PerfilInquilino:
         dueno_id = validar_inquilino_id(dueno_id.strip()) if dueno_id.strip() else ""
         if dueno_id and dueno_id == (self.inquilino_id or ""):
             raise ValueError("Un inquilino no puede ser su propio dueño")
+        empleados = _validar_empleados(self.empleados)
+        senal = self.senal_euros if self.senal_euros not in (None, "") else 0
+        try:
+            senal = int(senal)
+        except (TypeError, ValueError):
+            raise ValueError("La señal son euros enteros (0 = sin señal)") from None
+        if isinstance(self.senal_euros, bool) or senal < 0 or senal > 500:
+            raise ValueError("La señal va de 0 a 500 euros")
         enlace_resenas = self.enlace_resenas or ""
         if not isinstance(enlace_resenas, str):
             raise ValueError("El enlace de reseñas tiene que ser un texto")
@@ -171,6 +184,8 @@ class PerfilInquilino:
             enlace_resenas=enlace_resenas,
             telegram_usuario_panel=usuario_panel,
             dueno_id=dueno_id,
+            empleados=empleados,
+            senal_euros=senal,
             mcp_servidores=_validar_mcp(self.mcp_servidores),
         )
 
@@ -276,6 +291,31 @@ def _validar_permitidos(permitidos) -> list:
             raise ValueError(f"{usuario!r} no es un ID de usuario de Telegram")
         validos.add(usuario)
     return sorted(validos)
+
+
+def _validar_empleados(lista) -> list:
+    if not isinstance(lista, (list, tuple)):
+        raise ValueError("empleados tiene que ser una lista de nombres")
+    limpios = []
+    for nombre in lista:
+        if not isinstance(nombre, str):
+            raise ValueError("Cada empleado es un nombre (texto)")
+        nombre = " ".join(nombre.split())
+        if not nombre:
+            continue
+        if len(nombre) > 40 or "," in nombre:
+            raise ValueError("El nombre de un empleado no pasa de 40 caracteres ni lleva comas")
+        if nombre.lower() in (n.lower() for n in limpios):
+            raise ValueError(f"Empleado repetido: {nombre}")
+        limpios.append(nombre)
+    if len(limpios) > 20:
+        raise ValueError("Como mucho 20 empleados")
+    return limpios
+
+
+def leer_empleados(texto: "str | None") -> list:
+    """`"Ana, Luis\nMarta"` → `["Ana", "Luis", "Marta"]` (comas o líneas)."""
+    return [n.strip() for n in re.split(r"[,\n]", texto or "") if n.strip()]
 
 
 def replace_perfil(perfil: "PerfilInquilino", **cambios) -> "PerfilInquilino":

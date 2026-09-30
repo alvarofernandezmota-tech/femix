@@ -46,30 +46,44 @@ def _minutos(valor, defecto: int) -> int:
     return minutos
 
 
-def _huecos(reservas, desde: str, duracion: int) -> str:
-    huecos = reservas.proximos_huecos(desde, duracion, tope=5)
+def _huecos(reservas, desde: str, duracion: int, empleado: "str | None" = None) -> str:
+    huecos = reservas.proximos_huecos(desde, duracion, tope=5, empleado=empleado)
     return ", ".join(f"{h.fecha} {h.hora}" for h in huecos) if huecos else ""
 
 
 def herramientas_reservas(usuario_id: str, reservas) -> list:
-    def consultar_disponibilidad(fecha: str = "", duracion: int = DURACION_POR_DEFECTO) -> str:
-        desde = _fecha(fecha) if fecha else reservas.hoy()
-        libres = _huecos(reservas, desde, _minutos(duracion, DURACION_POR_DEFECTO))
-        return f"Huecos libres desde {desde}: {libres}." if libres else "No hay huecos libres en las próximas dos semanas."
+    equipo = getattr(reservas, "empleados", [])
+    con_quien = (" El negocio tiene equipo (" + ", ".join(equipo) + "): «empleado» es con quién, si el cliente lo pide.") if equipo else ""
 
-    def guardar_cita(fecha: str, hora: str, nombre: str, servicio: str = "", duracion: int = DURACION_POR_DEFECTO) -> str:
+    def _quien(empleado: str) -> "str | None":
+        if not equipo or not (empleado or "").strip():
+            return None
+        return reservas.empleado_valido(empleado) or empleado.strip()
+
+    def consultar_disponibilidad(fecha: str = "", duracion: int = DURACION_POR_DEFECTO, empleado: str = "") -> str:
+        desde = _fecha(fecha) if fecha else reservas.hoy()
+        quien = _quien(empleado)
+        if quien and quien not in equipo:
+            return f"No hay nadie llamado {quien} en el equipo. Están: {', '.join(equipo)}."
+        libres = _huecos(reservas, desde, _minutos(duracion, DURACION_POR_DEFECTO), quien)
+        con = f" con {quien}" if quien else ""
+        return f"Huecos libres{con} desde {desde}: {libres}." if libres else f"No hay huecos libres{con} en las próximas dos semanas."
+
+    def guardar_cita(fecha: str, hora: str, nombre: str, servicio: str = "", duracion: int = DURACION_POR_DEFECTO, empleado: str = "") -> str:
         fecha, hora, minutos = _fecha(fecha), _hora(hora), _minutos(duracion, DURACION_POR_DEFECTO)
         try:
-            cita = reservas.reservar(fecha, hora, nombre, minutos, servicio or None, usuario_id=usuario_id)
+            cita = reservas.reservar(fecha, hora, nombre, minutos, servicio or None, usuario_id=usuario_id, empleado=_quien(empleado))
         except ValueError as exc:
             motivo = str(exc)
             if motivo == "sin_nombre":
                 return "No reservado: falta el nombre de la persona."
-            libres = _huecos(reservas, fecha, minutos) if motivo in ("ocupado", "fuera", "cerrado") else ""
+            if motivo == "empleado":
+                return f"No reservado: no hay nadie llamado {empleado} en el equipo. Están: {', '.join(equipo)}."
+            libres = _huecos(reservas, fecha, minutos, _quien(empleado)) if motivo in ("ocupado", "fuera", "cerrado") else ""
             espera = " Si prefiere ese día, puedo apuntarle en la lista de espera (apuntar_lista_espera)." if motivo == "ocupado" else ""
             return f"No reservado: {MOTIVOS.get(motivo, motivo)}." + (f" Huecos libres: {libres}." if libres else "") + espera
         return (f"Reserva {cita['id']} hecha: {cita['fecha']} a las {cita['hora']} ({cita['duracion']} min) "
-                f"a nombre de {cita['nombre']}.")
+                f"a nombre de {cita['nombre']}" + (f" con {cita['empleado']}" if cita.get("empleado") else "") + ".")
 
     def mis_reservas() -> str:
         suyas = reservas.de_usuario(usuario_id)
@@ -96,13 +110,15 @@ def herramientas_reservas(usuario_id: str, reservas) -> list:
                            ["fecha", "nombre"]),
                     apuntar_lista_espera),
         Herramienta("consultar_disponibilidad",
-                    "Huecos libres del negocio para reservar, desde una fecha. Úsala antes de proponer una hora.",
-                    objeto({"fecha": texto(FECHA + " Vacío = hoy."), "duracion": entero("Minutos de la cita (30 si no se sabe).")}),
+                    "Huecos libres del negocio para reservar, desde una fecha. Úsala antes de proponer una hora." + con_quien,
+                    objeto({"fecha": texto(FECHA + " Vacío = hoy."), "duracion": entero("Minutos de la cita (30 si no se sabe)."),
+                            "empleado": texto("Con quién (nombre del empleado), solo si el cliente lo pide.")}),
                     consultar_disponibilidad),
         Herramienta("guardar_cita",
-                    "Reserva una cita en el negocio. Comprueba el horario y que no pise otra; si no cabe, dice por qué y propone huecos.",
+                    "Reserva una cita en el negocio. Comprueba el horario y que no pise otra; si no cabe, dice por qué y propone huecos." + con_quien,
                     objeto({"fecha": texto(FECHA), "hora": texto(HORA), "nombre": texto("Nombre de la persona que reserva."),
-                            "servicio": texto("Qué servicio quiere (opcional)."), "duracion": entero("Minutos (30 si no se sabe).")},
+                            "servicio": texto("Qué servicio quiere (opcional)."), "duracion": entero("Minutos (30 si no se sabe)."),
+                            "empleado": texto("Con quién (nombre del empleado), solo si el cliente lo pide.")},
                            ["fecha", "hora", "nombre"]),
                     guardar_cita),
         Herramienta("mis_reservas", "Las reservas que tiene hechas este usuario, de hoy en adelante, con su número.",

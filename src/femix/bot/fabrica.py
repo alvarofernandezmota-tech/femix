@@ -126,7 +126,8 @@ def construir_femix(
         extra["selector_modelos"] = SelectorDeModelos(prompt_sistema=prompt_sistema)
     buscador = extra.pop("buscador", None) or (IndiceEmbeddingsBuscador(directorio_datos=directorio_datos) if DOCUMENTOS in capacidades else None)
     if RESERVAS in capacidades and "reservas" not in extra:
-        extra["reservas"] = Reservas(_horario_del_perfil(directorio_datos, inquilino_id), almacen, reloj)
+        horario, empleados = _horario_del_perfil(directorio_datos, inquilino_id, con_empleados=True)
+        extra["reservas"] = Reservas(horario, almacen, reloj, empleados=empleados)
     if TOOL_CALLING in capacidades and "herramientas" not in extra:
         # Fase 5: el modelo llama a funciones reales, atadas a este inquilino y a cada usuario.
         from .herramientas import herramientas_para
@@ -164,11 +165,15 @@ def construir_femix(
             extra["control"] = ControlDeUso(inquilino_id, directorio_datos, reloj)
     return Femix(inquilino_id=inquilino_id, directorio_datos=carpeta, buscador=buscador, reloj=reloj, **extra)
 
-def _horario_del_perfil(directorio_datos: str, inquilino_id: str) -> list:
+def _horario_del_perfil(directorio_datos: str, inquilino_id: str, con_empleados: bool = False):
     """Sin perfil legible, sin horario: y sin horario no se reserva (regla de las reservas)."""
     from ..inquilino.perfil import AlmacenPerfiles
+    horario, empleados = [], []
     try:
         perfil = AlmacenPerfiles(directorio_datos).obtener(inquilino_id)
-        return perfil.validado().horario if perfil is not None else []
+        if perfil is not None:
+            perfil = perfil.validado()
+            horario, empleados = perfil.horario, perfil.empleados
     except ValueError:
-        return []
+        pass
+    return (horario, empleados) if con_empleados else horario

@@ -300,12 +300,20 @@ async def avisar_lista_espera(app, inquilino_id: str) -> int:
     return enviados
 
 
+async def _caducar_senales(app) -> None:
+    """Reservas web cuya señal no se pagó a tiempo: se libera el hueco (y avisa la lista de espera)."""
+    reservas = getattr(app.bot_data.get("femix"), "_reservas", None)
+    if reservas is not None:
+        await asyncio.to_thread(reservas.caducar_senales)
+
+
 async def _bucle_avisos(app, directorio_datos: str, inquilino_id: str) -> None:
     from .resumenes import enviar_resumenes
     reloj = RelojZona()
     while True:
         try:
             await avisar_recordatorios(app, directorio_datos, inquilino_id, reloj)
+            await _caducar_senales(app)
             await recordar_citas(app, inquilino_id)
             await pedir_resenas(app, directorio_datos, inquilino_id)
             await avisar_lista_espera(app, inquilino_id)

@@ -93,7 +93,8 @@ def recordar_citas_whatsapp(directorio: str, enviar=enviar_plantilla) -> int:
         if not (perfil.activo and perfil.whatsapp_token and perfil.whatsapp_telefono_id and perfil.whatsapp_plantilla_cita):
             continue
         try:
-            reservas = Reservas(perfil.validado().horario, almacen_dominio(directorio, perfil.inquilino_id), RelojZona())
+            valido = perfil.validado()
+            reservas = Reservas(valido.horario, almacen_dominio(directorio, perfil.inquilino_id), RelojZona(), empleados=valido.empleados)
             citas = reservas.por_recordar("whatsapp")
         except Exception:
             # Un perfil o una agenda rota no deja sin recordatorios a los demás inquilinos.

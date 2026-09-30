@@ -107,6 +107,47 @@ def crear_checkout(inquilino_id: str, nombre_plan: str, email: str, base: str) -
     return _post("/checkout/sessions", datos)["url"]
 
 
+def crear_checkout_senal(inquilino_id: str, cita_id: int, euros: int, concepto: str, base: str, volver: str) -> str:
+    """URL de Stripe para cobrar la señal de una reserva hecha desde la web (pago único, no suscripción)."""
+    if not configurado() or euros <= 0:
+        raise ErrorDePago("La señal por tarjeta no está disponible ahora mismo")
+    datos = {
+        "mode": "payment",
+        "line_items[0][price_data][currency]": "eur",
+        "line_items[0][price_data][unit_amount]": str(int(euros) * 100),
+        "line_items[0][price_data][product_data][name]": f"Señal de reserva · {concepto}"[:120],
+        "line_items[0][quantity]": "1",
+        "success_url": f"{base}{volver}?senal=pagada",
+        "cancel_url": f"{base}{volver}?senal=cancelada",
+        "metadata[tipo]": "senal",
+        "metadata[inquilino_id]": inquilino_id,
+        "metadata[cita_id]": str(int(cita_id)),
+        "payment_intent_data[metadata][tipo]": "senal",
+        "payment_intent_data[metadata][inquilino_id]": inquilino_id,
+        "payment_intent_data[metadata][cita_id]": str(int(cita_id)),
+        "expires_at": str(int(time.time()) + 30 * 60),
+    }
+    return _post("/checkout/sessions", datos)["url"]
+
+
+def senal_de(evento: dict) -> "tuple[str, int] | None":
+    """`(inquilino_id, cita_id)` si el aviso es el pago de una señal de reserva; None si no."""
+    objeto = (evento.get("data") or {}).get("object") or {}
+    metadatos = objeto.get("metadata") or {}
+    if evento.get("type") != "checkout.session.completed" or metadatos.get("tipo") != "senal":
+        return None
+    try:
+        return str(metadatos.get("inquilino_id") or ""), int(metadatos.get("cita_id"))
+    except (TypeError, ValueError):
+        return None
+
+
+def es_senal(evento: dict) -> bool:
+    """Cualquier aviso de un pago de señal (sesión, intento de pago…): no toca la suscripción."""
+    objeto = (evento.get("data") or {}).get("object") or {}
+    return (objeto.get("metadata") or {}).get("tipo") == "senal"
+
+
 def crear_portal(cliente_id: str, base: str) -> str:
     """URL del portal de Stripe donde el cliente cambia tarjeta, descarga facturas o cancela."""
     if not configurado() or not cliente_id:
@@ -162,6 +203,8 @@ def aplicar_evento(evento: dict, almacen, existe=None) -> "str | None":
     Con `existe`, un aviso de un inquilino borrado no le vuelve a crear la suscripción."""
     tipo = evento.get("type", "")
     objeto = (evento.get("data") or {}).get("object") or {}
+    if es_senal(evento):
+        return None    # la señal de una reserva no es una suscripción: la aplica el webhook aparte
     inquilino_id = _inquilino_de(objeto, almacen)
     if not inquilino_id or (existe is not None and not existe(inquilino_id)):
         return None

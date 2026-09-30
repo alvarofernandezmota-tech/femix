@@ -43,12 +43,14 @@ def actividad(directorio: str, inquilino_id: "str | None", limite: int = 30) -> 
             "incidencias": registro.ultimos("incidencias", inquilino_id, limite)}
 
 
-def _horario(directorio: str, inquilino_id: str) -> list:
+def _horario(directorio: str, inquilino_id: str) -> "tuple[list, list]":
+    """(horario, empleados) del perfil; vacíos si no hay perfil legible."""
     try:
         perfil = AlmacenPerfiles(directorio).obtener(inquilino_id)
-        return perfil.validado().horario if perfil else []
+        perfil = perfil.validado() if perfil else None
+        return (perfil.horario, perfil.empleados) if perfil else ([], [])
     except ValueError:
-        return []
+        return [], []
 
 
 def reservas_de(directorio: str, inquilino_id: str) -> "Reservas | None":
@@ -56,7 +58,8 @@ def reservas_de(directorio: str, inquilino_id: str) -> "Reservas | None":
     capacidades, _ = del_perfil(directorio, inquilino_id)
     if RESERVAS not in capacidades:
         return None
-    return Reservas(_horario(directorio, inquilino_id), almacen_dominio(directorio, inquilino_id), RelojZona())
+    horario, empleados = _horario(directorio, inquilino_id)
+    return Reservas(horario, almacen_dominio(directorio, inquilino_id), RelojZona(), empleados=empleados)
 
 
 def proximas_reservas(directorio: str, inquilino_id: str) -> "list | None":
