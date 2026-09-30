@@ -5,9 +5,10 @@
 {% block content %}
 <div class="barra">
     <h2>Inquilinos y sus bots</h2>
+    {% if dueno %}<a href="/usuario/">← Mi app</a>{% else %}
     <form method="post" action="/admin/logout">
         <button type="submit">Salir</button>
-    </form>
+    </form>{% endif %}
 </div>
 
 <p><a href="/admin/actividad">Mensajes y fallos de todos los bots →</a></p>

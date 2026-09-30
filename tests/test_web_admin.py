@@ -151,3 +151,36 @@ def test_admin_dashboard_html(tmp_path, monkeypatch):
     respuesta = client.get("/admin/", headers=cabeceras)
     assert respuesta.status_code == 200
     assert "ACME S.L." in respuesta.text
+
+
+def test_el_dueno_entra_en_admin_con_su_sesion_de_la_app(tmp_path, monkeypatch):
+    """Una sola entrada: FEMIX_WEB_DUENO entra en la app con usuario y contraseña y ve /admin."""
+    import re
+    from femix.web.rutas.auth import AlmacenInquilinos
+    monkeypatch.setenv("FEMIX_WEB_DATOS_DIR", str(tmp_path))
+    monkeypatch.delenv("FEMIX_BASE_DATOS_URL", raising=False)
+    monkeypatch.setenv("FEMIX_WEB_ADMIN_TOKEN", TOKEN_ADMIN)
+    monkeypatch.setenv("FEMIX_WEB_DUENO", "varo")
+    AlmacenInquilinos(str(tmp_path)).crear("varo", "Varo", "clave-secreta")
+    AlmacenInquilinos(str(tmp_path)).crear("mama", "Mamá", "clave-secreta")
+    cliente = TestClient(app, base_url="https://testserver")
+    # Otra persona con sesión en la app no entra en /admin (ni pestaña Admin).
+    cliente.post("/login", data={"inquilino_id": "mama", "password": "clave-secreta"})
+    assert "🛠 Admin" not in cliente.get("/usuario/").text
+    assert cliente.post("/admin/inquilinos/nuevo", data={"inquilino_id": "x", "nombre": "X"}).status_code == 403
+    assert cliente.get("/admin/", headers={"Accept": "text/html"}, follow_redirects=False).status_code == 303
+    # El dueño sí: mismo login que todos, pestaña Admin y los formularios con su CSRF.
+    cliente.cookies.clear()
+    cliente.post("/login", data={"inquilino_id": "varo", "password": "clave-secreta"})
+    pagina = cliente.get("/usuario/").text
+    assert "🛠 Admin" in pagina
+    csrf = re.search(r'name="csrf" value="([^"]+)"', pagina).group(1)
+    r = cliente.get("/admin/", headers={"Accept": "text/html"})
+    assert r.status_code == 200 and "Mi app" in r.text and "mama" in r.text
+    assert cliente.post("/admin/inquilinos/nuevo", data={"inquilino_id": "x", "nombre": "X"}).status_code == 403   # sin CSRF
+    r = cliente.post("/admin/inquilinos/nuevo", data={"csrf": csrf, "inquilino_id": "paula", "nombre": "Paula", "tipo": "persona"},
+                     follow_redirects=False)
+    assert r.status_code == 303
+    # Sin FEMIX_WEB_DUENO, la sesión de la app no vale para el admin.
+    monkeypatch.delenv("FEMIX_WEB_DUENO")
+    assert cliente.get("/admin/", headers={"Accept": "text/html"}, follow_redirects=False).status_code == 303

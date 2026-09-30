@@ -213,6 +213,16 @@ def token_admin_configurado() -> "str | None":
     return token
 
 
+def sesion_de_usuario_valida(session_id: "str | None") -> "dict | None":
+    """La sesión del inquilino si sigue valiendo (misma comprobación que `obtener_inquilino_actual`)."""
+    try:
+        inquilino = obtener_inquilino_actual(session_id)
+    except HTTPException:
+        return None
+    sesion = AlmacenSesiones().obtener(session_id) or {}
+    return {**sesion, "inquilino_id": inquilino.id}
+
+
 def verificar_token_admin(token: "str | None") -> bool:
     token_esperado = token_admin_configurado()
     if not token_esperado or not token:

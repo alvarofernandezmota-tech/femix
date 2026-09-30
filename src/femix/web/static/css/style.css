@@ -164,6 +164,7 @@ body {
 .pestanas a { padding: 0.4rem 0.9rem; border-radius: 999px; background: #e8e8ef; color: #1a1a2e; text-decoration: none; white-space: nowrap; }
 .pestanas a.activa { background: #22255e; color: #fff; }
 .pestanas .cuenta { margin-left: 0; }
+.pestanas a.admin { background: #fff3cd; color: #5a4300; }
 .pestanas .cuenta button { padding: 0.4rem 0.9rem; border-radius: 999px; border: 1px solid #22255e; background: #fff; color: #22255e; white-space: nowrap; cursor: pointer; }
 .lista { list-style: none; padding: 0; margin: 0 0 0.5rem; }
 .lista li { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid #eee; }

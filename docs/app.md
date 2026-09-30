@@ -117,6 +117,10 @@ capacidad `reservas` y el bot abierto a cualquiera.
 
 ## Tú, como dueño de la plataforma
 
+- **Una sola entrada**: con `FEMIX_WEB_DUENO=varo` en el `.env`, entras en la app como todos
+  (`/login`, usuario y contraseña) y te aparece la pestaña **🛠 Admin**: el panel de
+  administración con tu misma sesión, sin token. El token (`FEMIX_WEB_ADMIN_TOKEN`, `/admin/login`)
+  sigue valiendo como entrada de emergencia y para la API.
 - `/admin`: todos los inquilinos, estado de cada bot, actividad e incidencias, ficha de cada uno
   (incluido su acceso a la app y su contraseña).
 - Con `FEMIX_AVISOS_TELEGRAM=<tu ID>` en el `.env`, tu bot te manda los fallos nuevos de todos los
