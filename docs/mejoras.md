@@ -52,6 +52,9 @@ terceros, salvo que se indique.
 
 ## App en Google Play y anuncios (plan a un mes)
 
+Pasos concretos (Capacitor, AdMob, ficha de la tienda) en [apk.md](apk.md); `capacitor.config.json`
+ya está en el repo.
+
 1. **Semana 1**: dominio con HTTPS (perfil `publico`) y la PWA instalada en los móviles de las
    primeras personas. Cuenta de desarrollador de Google Play (pago único de 25 USD, verificación
    de identidad: días).
@@ -97,8 +100,10 @@ cliente en español.
 
 **Hecho el 2026-09-30**: página pública de reservas por negocio, resúmenes automáticos (semana los
 lunes, lo de mañana cada noche), reseña tras la cita, lista de espera, «En números» y precios 29/79 €
-(ver [operacion.md](operacion.md)). **Pendiente**: varios empleados, señal por Stripe, Google
-Calendar en dos direcciones.
+(ver [operacion.md](operacion.md)); después, el mismo día: varios empleados, señal por Stripe,
+calendario `.ics` para Google/iPhone, avisos push con la app cerrada, una persona con dos
+calendarios (vida + negocio) y Ajustes. **Pendiente**: Google Calendar en dos direcciones (que lo
+apuntado allí llegue aquí) y la publicación en Google Play ([apk.md](apk.md)).
 
 Fuentes: engrana.es, whatibot.com, recepcionista.com, potenciaredes.com, citaflow.com, sapi.es,
 getapp.es (Booksy vs Treatwell), maraiagenda.com, asistiva.app, chatpalbot.com, github.com

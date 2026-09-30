@@ -6,6 +6,7 @@ from ..puertos.embeddings import MotorEmbeddings
 from .contexto import construir_contexto
 from .embeddings_ollama import motor_embeddings_desde_entorno
 from .indice import IndiceEmbeddings
+from .reranker import reranker_desde_entorno
 
 PUNTUACION_MINIMA = 0.05
 
@@ -31,8 +32,11 @@ class IndiceEmbeddingsBuscador(Buscador):
         motor_embeddings: "MotorEmbeddings | None" = None,
         limite_caracteres: int = 2000,
         puntuacion_minima: "float | None" = None,
+        reranker=None,
     ):
         self._directorio_datos = directorio_datos
+        # Opcional (`FEMIX_RERANKER_MODELO`): reordena los mejores fragmentos leyendo la pregunta.
+        self._reranker = reranker or reranker_desde_entorno()
         # Uno solo para todas las búsquedas (un modelo real no se recrea en cada mensaje).
         self._motor_embeddings = motor_embeddings or motor_embeddings_desde_entorno()
         self._limite_caracteres = limite_caracteres
@@ -51,6 +55,7 @@ class IndiceEmbeddingsBuscador(Buscador):
             inquilino_id,
             directorio_datos=self._directorio_datos,
             motor_embeddings=self._motor_embeddings,
+            reranker=self._reranker,
         )
 
     def _indice_al_dia(self, inquilino_id: str) -> IndiceEmbeddings:

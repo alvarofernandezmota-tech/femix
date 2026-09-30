@@ -53,6 +53,47 @@ La app guarda solo estilos e icono; los datos se piden siempre al servidor. Fich
 `web/static/manifest.json`, `web/static/sw.js` (servido en `/sw.js`), `web/static/icono.svg`,
 `web/static/js/chat.js`.
 
+## Ajustes: el asistente a la manera de cada uno
+
+En «Ajustes» (`/usuario/ajustes`) cada persona elige:
+- cómo quiere que le llame y cómo quiere que le hable (corto, con cariño, sin emojis…): el bot lo
+  tiene en cuenta en cada respuesta, en Telegram y en la app;
+- a qué hora quiere el resumen de la noche y el de los lunes, o ninguno;
+- **qué lleva su asistente**: solo su vida, solo su negocio, o los dos.
+
+El nombre del asistente, su tono y lo que sabe hacer (voz, documentos, reservas, internet…) se
+eligen en «Mi bot». Lo que aprende de cada persona con el uso se ve allí también.
+
+## Una persona, dos calendarios: su vida y su negocio
+
+Una persona puede tener **dos cuentas vinculadas**: la suya (`ana`, tipo `persona`: agenda,
+tareas, diario, recordatorios) y la de su negocio (`ana-negocio`, tipo `empresa`: reservas de
+clientes, horario, empleados, página pública `/r/ana-negocio`). Cada una es un inquilino
+completo, con sus datos aparte, su propio bot de Telegram y su calendario; lo único que las une es
+el campo `dueno_id` del negocio, que apunta a la persona.
+
+- Se crea desde «Ajustes» → «Añadir mi negocio» (o «Añadir mi vida personal» desde un negocio),
+  o desde `/admin` poniendo «Dueño» en la ficha del negocio.
+- En la app aparecen los botones **🏠 Mi vida** y **🏪 Mi negocio** para pasar de una a otra sin
+  volver a entrar (`POST /usuario/cambiar`, solo entre cuentas vinculadas).
+- El bot del negocio se pone en «Mi bot» de esa cuenta (otro token de `@BotFather`); hasta
+  entonces el negocio se lleva desde la app.
+
+## Calendario en Google Calendar o iPhone
+
+«Hoy» → «En tu calendario» → «Activar» da una dirección `.ics` privada
+(`/calendario/<id>/<clave>.ics`) para suscribirse desde Google Calendar («Añadir por URL») o el
+calendario del iPhone: citas de clientes, agenda y recordatorios aparecen allí solos. «Cambiar la
+dirección» invalida la anterior. Código: `web/rutas/calendario.py`.
+
+## Avisos con la app cerrada
+
+Con claves VAPID en el `.env` (`docker compose exec femix python -m femix.web.push` las genera:
+`FEMIX_PUSH_VAPID_PRIVADA`, `FEMIX_PUSH_VAPID_PUBLICA`, `FEMIX_PUSH_VAPID_EMAIL`), la app pide
+permiso de notificaciones y los recordatorios llegan aunque esté cerrada (Web Push). Sin claves,
+los avisos siguen llegando cuando la app está abierta y por Telegram. Código: `web/push.py`,
+`web/rutas/push.py`, `web/static/sw.js`.
+
 ## Dar de alta un asistente personal (madre, hermana, Paula…)
 
 Cada persona es un inquilino de tipo `persona` con su propio bot y sus datos separados.
@@ -79,6 +120,6 @@ capacidad `reservas` y el bot abierto a cualquiera.
 
 ## Google Play y anuncios
 
-La PWA se empaqueta como app Android sin reescribir nada. Plan a un mes, con los pasos y las
-condiciones (cuenta de desarrollador, prueba cerrada de 14 días, Capacitor para AdMob), en
+La PWA se empaqueta como app Android sin reescribir nada (Capacitor, `capacitor.config.json` en
+la raíz). Pasos, AdMob y ficha de la tienda en [apk.md](apk.md); plan a un mes en
 [mejoras.md](mejoras.md).

@@ -34,6 +34,12 @@ Por cada pregunta se hacen dos búsquedas y se juntan sus órdenes con fusión p
 Un trozo llega al modelo si se parece en significado (umbral del motor) o si comparte alguna
 palabra útil con la pregunta.
 
+**Reranker opcional** (`FEMIX_RERANKER_MODELO`, `rag/reranker.py`): un *cross-encoder* que lee la
+pregunta junto a cada uno de los mejores candidatos (4 por resultado pedido) y decide el orden
+final. Más preciso, más CPU. Necesita `pip install sentence-transformers` en la imagen; modelos:
+`BAAI/bge-reranker-base` (multilingüe) o `cross-encoder/ms-marco-MiniLM-L-6-v2` (más ligero, en
+inglés). Si falta la librería o el modelo falla, se busca sin reordenar y se apunta en el log.
+
 ## 4. Preguntas de seguimiento (`agente_busqueda.consulta_de_busqueda`)
 
 "¿y los sábados?" no dice de qué habla. Si la pregunta es corta o empieza como continuación

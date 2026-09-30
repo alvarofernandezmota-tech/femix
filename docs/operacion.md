@@ -30,11 +30,30 @@ teléfono y la cita queda en la misma agenda que ve el bot y el panel, a nombre 
 Sin cuenta ni sesión: hay un campo trampa para robots y un tope de 10 reservas por conexión y
 hora. El enlace sale en «En números» del panel. Código: `web/rutas/publico.py`.
 
+### Varios empleados
+
+Con «Equipo» en el perfil (`Ana, Luis, Marta`), cada persona tiene su agenda: los huecos se
+calculan por empleado, el cliente elige «con quién» en la página pública (o «cualquiera»: el
+primero libre) y el bot lo entiende con palabras («con Luis el jueves»). En el panel, columna
+«Con». Sin equipo, una sola agenda como hasta ahora. Código: `Reservas(empleados=…)`.
+
+### Señal por Stripe
+
+Con «Señal al reservar desde la web» (euros) y Stripe configurado (`STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET`), la página pública cobra la señal por tarjeta: la cita queda guardada
+30 minutos mientras el cliente paga (Stripe Checkout, pago único); el webhook
+(`checkout.session.completed` con `metadata.tipo=senal`) la confirma (💶 en el panel) y, si no
+se paga, el hueco se libera solo (⏳ mientras tanto). Sin Stripe, la señal no se cobra y se
+reserva sin más. Código: `Reservas.marcar_senal_pagada`, `caducar_senales`, `pagos.crear_checkout_senal`.
+
 ## Resúmenes automáticos
 
 A las personas permitidas de un asistente personal (bot cerrado) el bot les manda solo:
 - **cada noche a partir de las 21:00**, lo de mañana (agenda, recordatorios, citas), si hay algo;
 - **los lunes a partir de las 8:00**, la semana.
+
+Cada persona cambia esas horas, o quita un resumen, en «Ajustes» de la app (colección
+`preferencias`).
 
 Una vez al día por persona (marca en la colección `resumenes`). A los clientes de un negocio con
 el bot abierto no se les manda nada. Código: `conectores/telegram/resumenes.py`.

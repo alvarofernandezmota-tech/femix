@@ -1,6 +1,6 @@
 # CONTEXT.md — femix
 
-Última actualización: 2026-09-30 (fase 13: reservas públicas, resúmenes automáticos, reseñas, lista de espera, «En números»; app con chat; corrector)
+Última actualización: 2026-09-30 (fase 13 completa: una persona con dos calendarios, Ajustes, empleados, señal por Stripe, `.ics`, push; reranker y Capacitor)
 
 ## Fase actual del roadmap
 Fase 1: núcleo genérico (LLM + memoria + entender.py + voz + Telegram). En marcha.
@@ -32,8 +32,13 @@ Velocidad (router acciones/consultas, respuesta en directo, precalentado, diagn�
 `scripts/ci.sh` con gancho pre-push, despliegue `scripts/desplegar.sh`): hechos el 2026-09-26.
 Operación (pasar a una persona, recordatorio de citas, avisos de fallos, correos, RGPD, restaurar
 copias), WhatsApp (Cloud API) y conectores MCP: hechos el 2026-09-26. Fases 1–11 en `docs/ROADMAP.md`.
-Siguiente: medir en madre (`python -m femix.llm.diagnostico`) y elegir modelo; plantillas de
-WhatsApp; teléfono (`gjallarhorn`); release v1.0.0.
+Fases 12 y 13 (2026-09-30): app PWA con chat, voz, Hoy/Semana, Ajustes, calendario `.ics`, push;
+corrector; una persona con dos calendarios (vida + negocio vinculados por `dueno_id`, botones
+«Mi vida»/«Mi negocio», alta desde Ajustes); reservas públicas con empleados y señal por Stripe;
+resúmenes, reseñas, lista de espera, «En números». Fase 14 en parte: reranker opcional y
+`capacitor.config.json` + `docs/apk.md`. Ver `docs/app.md`, `docs/operacion.md`.
+Siguiente: desplegar en madre y dar de alta a las tres personas (`docs/PRODUCCION_MADRE.md`);
+driver de NVIDIA y modelo; Google Play; release v1.0.0.
 
 ## Qué funciona de verdad
 - Motor Ollama conectado vía `llm/router.py`.
