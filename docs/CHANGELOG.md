@@ -682,3 +682,47 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
 ## 2026-09-30 — Competencia y plan de producto (`feat/panel-web`)
 - `docs/mejoras.md`: competencia real (bots de WhatsApp en España, Booksy/Treatwell/Asistiva, open
   source parecido), precios de mercado y lo que falta por valor. ROADMAP con las fases 12–14.
+
+## 2026-09-30 — Fase 13: lo que vende (`feat/panel-web`)
+- **Página pública de reservas** `/r/<negocio>`: el cliente reserva sin chatear (huecos del día,
+  nombre y teléfono); campo trampa y tope por IP.
+- **Resúmenes automáticos** por Telegram a los asistentes personales: lo de mañana cada noche y la
+  semana los lunes, una vez al día y solo si hay algo.
+- **Reseña tras la cita**: con el enlace del perfil, el bot lo pide una vez al terminar la cita.
+- **Lista de espera**: apuntarse a un día lleno (herramienta y `/reserva espera`); aviso al liberarse.
+- **En números** en el panel (citas, clientes, mensajes, tiempo medio, fallos). Precios 29/79 €.
+- Arreglos de la revisión del chat y el corrector: el corrector ya no toca palabras reales
+  flexionadas («muchas», «quiere») ni nombres («Cira», «Mario»); lo aprendido se guarda tal cual;
+  SSE con cola asyncio y pool propio; avisos confirmados por la app (`/avisos/vistos`); voz con
+  incidencia y tope de 5 MB; CSS versionado; usuario de la app explícito (`telegram_usuario_panel`);
+  recordatorios con cerrojo entre procesos.
+
+## 2026-09-30 — Fase 13 completa y fase 14 en parte: dos calendarios, ajustes, empleados, señal, `.ics`, push, reranker (`feat/panel-web`)
+- **Una persona, dos calendarios**: `perfil.dueno_id` vincula el negocio con la persona; en la app,
+  botones «🏠 Mi vida» / «🏪 Mi negocio» (`POST /usuario/cambiar`, solo entre cuentas vinculadas) y
+  «Añadir mi negocio» / «Añadir mi vida personal» desde Ajustes (`crear_cuenta_vinculada`): cada
+  mitad con sus datos, su bot y su calendario. En `/admin`, campo «Dueño».
+- **Ajustes** (`/usuario/ajustes`): cómo llamarle, cómo hablarle (el bot lo pone en el contexto:
+  `Femix._preferencias`), horas de los resúmenes o ninguno (`resumenes._toca`), qué lleva el
+  asistente. Pestañas comunes de la app (`comun/_pestanas.html`).
+- **Varios empleados** (`perfil.empleados`): agenda por persona en `Reservas`, selector «con quién»
+  en la página pública, `empleado` en `guardar_cita` y `consultar_disponibilidad`, columna «Con».
+- **Señal por Stripe** (`perfil.senal_euros`): reserva web → Checkout de pago único → webhook
+  `metadata.tipo=senal` la confirma; 30 minutos guardada y liberación automática (`caducar_senales`).
+- **Calendario `.ics`** (`/calendario/<id>/<clave>.ics`) para Google Calendar y iPhone; **avisos
+  push** con la app cerrada (`web/push.py`, VAPID, `python -m femix.web.push`).
+- **Reranker opcional** (`FEMIX_RERANKER_MODELO`, `rag/reranker.py`): cross-encoder sobre los
+  candidatos de la búsqueda híbrida; sin librería o con fallo, se busca como siempre.
+- **Capacitor**: `capacitor.config.json` y `docs/apk.md` (APK, AdMob, ficha de Play).
+- Arreglo: «Mi bot» borraba el dueño y el usuario de la app del perfil al guardar, y no guardaba el
+  enlace de reseñas.
+- Revisión adversarial (11 hallazgos, todos arreglados): la cuenta vinculada hereda el plan (antes
+  nacía «interna», gratis y sin tope) y en SaaS exige plan activo; la «vida» creada desde un
+  negocio solo permite al dueño, no a todo el equipo; señal con referencia por cita (un id
+  reutilizado no se confirma), `payment_status` comprobado, `async_payment_succeeded`, hueco 45 min
+  frente a sesión de 35, reembolso e incidencia si el pago llega tarde; citas de antes del equipo
+  ocupan a todos; push y Telegram reclaman cada recordatorio bajo el bloqueo (sin duplicados ni
+  pérdidas); lista de espera solo en días llenos; ayuda de `/reserva` con salto de línea.
+- Docs: `app.md`, `operacion.md`, `rag.md`, `PRODUCCION_MADRE.md` (push, señal, alta de mañana),
+  `ROADMAP.md`, `mejoras.md`. Tests: `test_web_dia.py`, `test_empleados_senal.py`,
+  `test_calendario_push.py`, `test_reranker.py` (1067 en verde).

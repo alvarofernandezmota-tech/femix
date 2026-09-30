@@ -77,13 +77,29 @@ _diccionario = None
 
 
 def _existe(palabra: str) -> bool:
-    """¿Es una palabra real del castellano? (con `pyspellchecker`; sin ella, no se sabe: False)."""
+    """¿Es una palabra real del castellano? (con `pyspellchecker`; sin ella, no se sabe: False).
+
+    El diccionario español de `pyspellchecker` es de lemas («mucho», «quier», «bueno»): se prueba la
+    palabra y sus formas sin plural, sin la vocal final y con otra vocal («muchas» → «mucha» →
+    «much» → «mucho»), para no tomar por falta una palabra flexionada."""
     global _diccionario
     if _SpellChecker is None:
         return False
     if _diccionario is None:
         _diccionario = _SpellChecker(language="es", distance=1)
-    return bool(_diccionario.known([palabra]))
+    formas = {palabra}
+    if palabra.endswith("s"):
+        formas.add(palabra[:-1])       # «haces» → «hace», «buenos» → «bueno»
+    if palabra.endswith("es"):
+        formas.add(palabra[:-2])       # «ciudades» → «ciudad»
+    for base in list(formas):
+        if len(base) > 3:
+            sin_vocal = base[:-1] if base[-1] in "aeo" else base
+            formas.add(sin_vocal)
+            formas.update(sin_vocal + v for v in "aeo")
+            formas.add(sin_vocal + "ar")
+            formas.add(sin_vocal + "er")
+    return bool(_diccionario.known([f for f in formas if len(f) > 2]))
 
 
 class Corrector:
@@ -103,7 +119,9 @@ class Corrector:
         clave = _clave(bajo)
         if clave in self._vocab:
             return palabra   # ya es del dominio (con o sin tilde): no se toca
-        if len(clave) < 4 or any(c.isdigit() for c in clave) or _existe(bajo):
+        # Con mayúscula (nombres propios: «Mario», «Cira», también al principio), palabras cortas, con
+        # cifras o que existen en castellano (o son formas de una que existe): no se tocan.
+        if palabra[0].isupper() or len(clave) < 5 or any(c.isdigit() for c in clave) or _existe(bajo):
             return palabra
         candidatos = _edits1(clave) & self._vocab.keys()
         if not candidatos and len(clave) >= 7:

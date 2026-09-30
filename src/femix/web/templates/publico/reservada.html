@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block titulo %}Reserva hecha — {{ perfil.nombre }}{% endblock %}
+
+{% block content %}
+<section class="tarjeta">
+    <h2>✅ Reserva hecha</h2>
+    <p><strong>{{ perfil.nombre }}</strong></p>
+    <p>{{ cita.fecha }} a las <strong>{{ cita.hora }}</strong>{% if cita.servicio %} · {{ cita.servicio }}{% endif %}</p>
+    <p>A nombre de {{ cita.nombre }} · {{ telefono }}</p>
+    <p class="secundario">Guarda esta pantalla. Si no puedes venir, avisa al negocio.</p>
+    <p><a href="/r/{{ perfil.inquilino_id }}">Hacer otra reserva</a></p>
+</section>
+{% endblock %}

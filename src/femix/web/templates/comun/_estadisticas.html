@@ -1,0 +1,20 @@
+{# Números del bot. Necesita: estadisticas (None = sin datos). #}
+{% if estadisticas %}
+<section class="tarjeta">
+    <h3>En números</h3>
+    <div class="cifras">
+        {% if estadisticas.con_reservas %}
+        <div class="cifra"><strong>{{ estadisticas.citas_proximas }}</strong><span>citas próximos 7 días</span></div>
+        <div class="cifra"><strong>{{ estadisticas.citas_semana_pasada }}</strong><span>citas semana pasada</span></div>
+        <div class="cifra"><strong>{{ estadisticas.clientes_30_dias }}</strong><span>clientes distintos (30 días)</span></div>
+        {% endif %}
+        <div class="cifra"><strong>{{ estadisticas.mensajes_7_dias }}</strong><span>mensajes (7 días)</span></div>
+        <div class="cifra"><strong>{{ estadisticas.usuarios_7_dias }}</strong><span>personas (7 días)</span></div>
+        <div class="cifra"><strong>{{ estadisticas.segundos_medio if estadisticas.segundos_medio is not none else '–' }} s</strong><span>respuesta media</span></div>
+        <div class="cifra {{ 'mal' if estadisticas.incidencias_7_dias else '' }}"><strong>{{ estadisticas.incidencias_7_dias }}</strong><span>fallos (7 días)</span></div>
+    </div>
+    {% if estadisticas.con_reservas and perfil %}
+    <p class="secundario">Página pública de reservas para tus clientes: <code>/r/{{ perfil.inquilino_id }}</code></p>
+    {% endif %}
+</section>
+{% endif %}

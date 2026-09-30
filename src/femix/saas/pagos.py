@@ -17,6 +17,7 @@ suscripción: los avisos posteriores de Stripe dicen así de quién son sin tene
 import hashlib
 import hmac
 import json
+import logging
 import os
 import time
 from datetime import datetime, timezone
@@ -24,6 +25,8 @@ from datetime import datetime, timezone
 import requests
 
 from .planes import PLANES
+
+_log = logging.getLogger(__name__)
 
 API = "https://api.stripe.com/v1"
 TOLERANCIA_FIRMA = 300     # segundos: un aviso más viejo se rechaza (evita repetirlo)
@@ -107,6 +110,73 @@ def crear_checkout(inquilino_id: str, nombre_plan: str, email: str, base: str) -
     return _post("/checkout/sessions", datos)["url"]
 
 
+SENAL_SESION_MINUTOS = 35   # Stripe exige 30 como mínimo; el hueco se guarda más tiempo (reservas.SENAL_MINUTOS)
+
+
+def crear_checkout_senal(inquilino_id: str, cita_id: int, euros: int, concepto: str, base: str, volver: str,
+                         ref: str = "") -> str:
+    """URL de Stripe para cobrar la señal de una reserva hecha desde la web (pago único, no suscripción)."""
+    if not configurado() or euros <= 0:
+        raise ErrorDePago("La señal por tarjeta no está disponible ahora mismo")
+    datos = {
+        "mode": "payment",
+        "line_items[0][price_data][currency]": "eur",
+        "line_items[0][price_data][unit_amount]": str(int(euros) * 100),
+        "line_items[0][price_data][product_data][name]": f"Señal de reserva · {concepto}"[:120],
+        "line_items[0][quantity]": "1",
+        "success_url": f"{base}{volver}?senal=pagada",
+        "cancel_url": f"{base}{volver}?senal=cancelada",
+        "metadata[tipo]": "senal",
+        "metadata[inquilino_id]": inquilino_id,
+        "metadata[cita_id]": str(int(cita_id)),
+        "metadata[ref]": ref,
+        "payment_intent_data[metadata][tipo]": "senal",
+        "payment_intent_data[metadata][inquilino_id]": inquilino_id,
+        "payment_intent_data[metadata][cita_id]": str(int(cita_id)),
+        "payment_intent_data[metadata][ref]": ref,
+        "expires_at": str(int(time.time()) + SENAL_SESION_MINUTOS * 60),
+    }
+    return _post("/checkout/sessions", datos)["url"]
+
+
+def senal_de(evento: dict) -> "dict | None":
+    """`{"inquilino_id", "cita_id", "ref", "pagada", "payment_intent"}` si el aviso es de la señal de una
+    reserva; None si no. `pagada` solo con el dinero cobrado: con un método de pago diferido (SEPA…)
+    `completed` llega sin cobrar y luego viene `async_payment_succeeded` (o `_failed`)."""
+    tipo = evento.get("type", "")
+    objeto = (evento.get("data") or {}).get("object") or {}
+    metadatos = objeto.get("metadata") or {}
+    if metadatos.get("tipo") != "senal" or not tipo.startswith("checkout.session."):
+        return None
+    try:
+        cita_id = int(metadatos.get("cita_id"))
+    except (TypeError, ValueError):
+        return None
+    pagada = tipo in ("checkout.session.completed", "checkout.session.async_payment_succeeded") \
+        and objeto.get("payment_status") in (None, "paid")
+    intento = objeto.get("payment_intent") if isinstance(objeto.get("payment_intent"), str) else ""
+    return {"inquilino_id": str(metadatos.get("inquilino_id") or ""), "cita_id": cita_id,
+            "ref": str(metadatos.get("ref") or ""), "pagada": pagada, "payment_intent": intento}
+
+
+def reembolsar(payment_intent: str) -> bool:
+    """Devuelve el dinero de un pago (la señal de una cita que ya no existe). False si no se pudo."""
+    if not configurado() or not payment_intent:
+        return False
+    try:
+        _post("/refunds", {"payment_intent": payment_intent})
+    except ErrorDePago as exc:
+        _log.warning("No se pudo reembolsar %s: %s", payment_intent, exc)
+        return False
+    return True
+
+
+def es_senal(evento: dict) -> bool:
+    """Cualquier aviso de un pago de señal (sesión, intento de pago…): no toca la suscripción."""
+    objeto = (evento.get("data") or {}).get("object") or {}
+    return (objeto.get("metadata") or {}).get("tipo") == "senal"
+
+
 def crear_portal(cliente_id: str, base: str) -> str:
     """URL del portal de Stripe donde el cliente cambia tarjeta, descarga facturas o cancela."""
     if not configurado() or not cliente_id:
@@ -162,6 +232,8 @@ def aplicar_evento(evento: dict, almacen, existe=None) -> "str | None":
     Con `existe`, un aviso de un inquilino borrado no le vuelve a crear la suscripción."""
     tipo = evento.get("type", "")
     objeto = (evento.get("data") or {}).get("object") or {}
+    if es_senal(evento):
+        return None    # la señal de una reserva no es una suscripción: la aplica el webhook aparte
     inquilino_id = _inquilino_de(objeto, almacen)
     if not inquilino_id or (existe is not None and not existe(inquilino_id)):
         return None

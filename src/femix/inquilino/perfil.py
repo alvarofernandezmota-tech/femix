@@ -75,6 +75,19 @@ class PerfilInquilino:
     # Conectores MCP (capacidad `conectores_mcp`): [{"nombre", "url", "cabecera"}]. Solo los pone el
     # dueño de la plataforma; la cabecera (Authorization) es secreta y nunca se enseña.
     mcp_servidores: list = field(default_factory=list)
+    # Enlace para dejar reseña (Google, etc.): el bot lo manda al terminar la cita. Vacío = no pide.
+    enlace_resenas: str = ""
+    # De quién son los datos que enseña la app (agenda, chat, tareas): un ID de Telegram de los
+    # permitidos. 0 = el primero de la lista.
+    telegram_usuario_panel: int = 0
+    # Un negocio puede ser de una persona que también tiene su asistente personal: el identificador
+    # de ese inquilino. Con él, la app pasa de «Mi vida» a «Mi negocio» sin otro login.
+    dueno_id: str = ""
+    # Varios empleados con agenda propia (peluquería con tres sillas): cada cita va con uno y los
+    # huecos se calculan por persona. Vacío = una sola agenda.
+    empleados: list = field(default_factory=list)
+    # Señal (euros) que se cobra por Stripe al reservar desde la página pública. 0 = sin señal.
+    senal_euros: int = 0
     # Fase 3: cómo se presenta y habla su bot. Vacíos = los de Femix.
     nombre_asistente: str = ""
     tono: str = ""
@@ -108,6 +121,33 @@ class PerfilInquilino:
         whatsapp_plantilla_cita = (self.whatsapp_plantilla_cita or "").strip()
         if whatsapp_plantilla_cita and not re.fullmatch(r"[a-z0-9_]{1,512}", whatsapp_plantilla_cita):
             raise ValueError("El nombre de la plantilla de WhatsApp va en minúsculas, cifras y _ (como en Meta)")
+        try:
+            usuario_panel = int(self.telegram_usuario_panel or 0)
+        except (TypeError, ValueError):
+            raise ValueError("El ID de Telegram del usuario de la app no es válido") from None
+        if isinstance(self.telegram_usuario_panel, bool) or usuario_panel < 0 or usuario_panel > 10**15:
+            raise ValueError("El ID de Telegram del usuario de la app no es válido")
+        dueno_id = self.dueno_id or ""
+        if not isinstance(dueno_id, str):
+            raise ValueError("El dueño tiene que ser el identificador de un inquilino")
+        dueno_id = validar_inquilino_id(dueno_id.strip()) if dueno_id.strip() else ""
+        if dueno_id and dueno_id == (self.inquilino_id or ""):
+            raise ValueError("Un inquilino no puede ser su propio dueño")
+        empleados = _validar_empleados(self.empleados)
+        senal = self.senal_euros if self.senal_euros not in (None, "") else 0
+        try:
+            senal = int(senal)
+        except (TypeError, ValueError):
+            raise ValueError("La señal son euros enteros (0 = sin señal)") from None
+        if isinstance(self.senal_euros, bool) or senal < 0 or senal > 500:
+            raise ValueError("La señal va de 0 a 500 euros")
+        enlace_resenas = self.enlace_resenas or ""
+        if not isinstance(enlace_resenas, str):
+            raise ValueError("El enlace de reseñas tiene que ser un texto")
+        enlace_resenas = enlace_resenas.strip()
+        if enlace_resenas and not (enlace_resenas.startswith(("http://", "https://")) and len(enlace_resenas) <= 500
+                                   and not any(c.isspace() for c in enlace_resenas)):
+            raise ValueError("El enlace de reseñas tiene que ser una dirección web (https://…)")
         nombre = (self.nombre or "").strip()
         if not nombre:
             raise ValueError("El nombre no puede estar vacío")
@@ -141,6 +181,11 @@ class PerfilInquilino:
             whatsapp_telefono_id=whatsapp_telefono_id,
             whatsapp_token=whatsapp_token,
             whatsapp_plantilla_cita=whatsapp_plantilla_cita,
+            enlace_resenas=enlace_resenas,
+            telegram_usuario_panel=usuario_panel,
+            dueno_id=dueno_id,
+            empleados=empleados,
+            senal_euros=senal,
             mcp_servidores=_validar_mcp(self.mcp_servidores),
         )
 
@@ -246,6 +291,36 @@ def _validar_permitidos(permitidos) -> list:
             raise ValueError(f"{usuario!r} no es un ID de usuario de Telegram")
         validos.add(usuario)
     return sorted(validos)
+
+
+def _validar_empleados(lista) -> list:
+    if not isinstance(lista, (list, tuple)):
+        raise ValueError("empleados tiene que ser una lista de nombres")
+    limpios = []
+    for nombre in lista:
+        if not isinstance(nombre, str):
+            raise ValueError("Cada empleado es un nombre (texto)")
+        nombre = " ".join(nombre.split())
+        if not nombre:
+            continue
+        if len(nombre) > 40 or "," in nombre:
+            raise ValueError("El nombre de un empleado no pasa de 40 caracteres ni lleva comas")
+        if nombre.lower() in (n.lower() for n in limpios):
+            raise ValueError(f"Empleado repetido: {nombre}")
+        limpios.append(nombre)
+    if len(limpios) > 20:
+        raise ValueError("Como mucho 20 empleados")
+    return limpios
+
+
+def leer_empleados(texto: "str | None") -> list:
+    """`"Ana, Luis\nMarta"` → `["Ana", "Luis", "Marta"]` (comas o líneas)."""
+    return [n.strip() for n in re.split(r"[,\n]", texto or "") if n.strip()]
+
+
+def replace_perfil(perfil: "PerfilInquilino", **cambios) -> "PerfilInquilino":
+    """Una copia del perfil con esos campos cambiados y validada (para `AlmacenPerfiles.modificar`)."""
+    return replace(perfil, **cambios).validado()
 
 
 class PerfilIlegible(ValueError):

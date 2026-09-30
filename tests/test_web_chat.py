@@ -105,5 +105,22 @@ def test_avisos_vencidos_se_entregan_una_vez(tmp_path, monkeypatch):
     almacen = almacen_dominio(str(tmp_path), "mama")
     Recordatorios("123456789", reloj=RelojZona(), almacen=almacen).crear("Llamar", RelojZona().ahora() - timedelta(minutes=5))
     Recordatorios("123456789", reloj=RelojZona(), almacen=almacen).crear("Luego", RelojZona().ahora() + timedelta(days=1))
-    assert cliente.get("/usuario/chat/avisos").json() == {"avisos": [{"texto": "Llamar", "cuando": Recordatorios("123456789", reloj=RelojZona(), almacen=almacen)._recordatorios[0].cuando}]}
+    vencido = Recordatorios("123456789", reloj=RelojZona(), almacen=almacen)._recordatorios[0].cuando
+    assert cliente.get("/usuario/chat/avisos").json() == {"avisos": [{"texto": "Llamar", "cuando": vencido}]}
+    # Sin confirmar, sigue pendiente (si la red se corta antes de enseñarlo, lo manda Telegram).
+    assert cliente.get("/usuario/chat/avisos").json()["avisos"] != []
+    r = cliente.post("/usuario/chat/avisos/vistos", json={"avisos": [{"texto": "Llamar", "cuando": vencido}]}, headers={"X-CSRF": csrf})
+    assert r.json() == {"marcados": 1}
     assert cliente.get("/usuario/chat/avisos").json() == {"avisos": []}
+
+
+def test_cuerpo_raro_y_transcripcion_con_simbolos(tmp_path, monkeypatch):
+    cliente, csrf, _, _ = _entrar(tmp_path, monkeypatch)
+    assert cliente.post("/usuario/chat/mensaje", content=b"[1]", headers={"X-CSRF": csrf, "Content-Type": "application/json"}).status_code == 400
+    assert cliente.post("/usuario/chat/mensaje", content=b"no json", headers={"X-CSRF": csrf, "Content-Type": "application/json"}).status_code == 400
+
+    async def falsa(ruta):
+        return "cuesta 20 € el corte"
+    monkeypatch.setattr(modulo_chat, "_transcribir", falsa)
+    r = cliente.post("/usuario/chat/voz", files={"audio": ("nota." + "x" * 300, b"x" * 2000, "audio/webm")}, headers={"X-CSRF": csrf})
+    assert r.status_code == 200 and json.loads(r.headers["X-Transcripcion"]) == "cuesta 20 € el corte"

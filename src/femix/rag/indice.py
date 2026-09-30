@@ -5,6 +5,7 @@ from dataclasses import asdict
 from ..puertos.embeddings import MotorEmbeddings
 from .documentos import Documento, Fragmento, ResultadoBusqueda
 from .embeddings_local import similitud_coseno
+from .reranker import CANDIDATOS_POR_RESULTADO, reordenar
 from .embeddings_ollama import motor_embeddings_desde_entorno
 from .fragmentos import fragmentar, fragmentar_por_secciones
 from .palabras import bm25, contar_palabras, fusionar
@@ -33,8 +34,10 @@ class IndiceEmbeddings:
         motor_embeddings: "MotorEmbeddings | None" = None,
         migrar_heredado: bool = True,
         persistencia=None,
+        reranker=None,
     ):
         self._inquilino_id = validar_inquilino_id(inquilino_id)
+        self._reranker = reranker
         self._directorio_datos = directorio_datos
         self._motor = motor_embeddings or motor_embeddings_desde_entorno()
         self._directorio = directorio_rag(directorio_datos, self._inquilino_id)
@@ -169,5 +172,7 @@ class IndiceEmbeddings:
         por_significado = sorted(range(len(propios)), key=lambda i: cosenos[i], reverse=True)
         por_palabras = [i for i in sorted(range(len(propios)), key=lambda i: palabras[i], reverse=True) if palabras[i] > 0]
         puntos = fusionar(por_significado, por_palabras)
-        orden = sorted(puntos, key=lambda i: puntos[i], reverse=True)[:k]
-        return [ResultadoBusqueda(propios[i], cosenos[i], palabras[i]) for i in orden]
+        # Con reranker se le enseñan más candidatos y él decide el orden final (`rag/reranker.py`).
+        cuantos = k * CANDIDATOS_POR_RESULTADO if self._reranker is not None else k
+        orden = sorted(puntos, key=lambda i: puntos[i], reverse=True)[:cuantos]
+        return reordenar(self._reranker, consulta, [ResultadoBusqueda(propios[i], cosenos[i], palabras[i]) for i in orden], k)

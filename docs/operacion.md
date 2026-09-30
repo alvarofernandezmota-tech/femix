@@ -22,6 +22,68 @@ Se manda una sola vez por cita. A los clientes de Telegram lo manda la flota en 
 Por WhatsApp no hay recordatorios a una hora libre (`/recordatorio`): Meta solo deja escribir
 fuera de las 24 h con plantillas, así que el bot no los ofrece.
 
+## Reservas desde la web, sin chat
+
+Cada negocio con la capacidad `reservas` tiene una página pública en `/r/<identificador>`
+(por ejemplo `/r/pelu-ana`): el cliente elige día y hora entre los huecos libres, pone nombre y
+teléfono y la cita queda en la misma agenda que ve el bot y el panel, a nombre de `web<teléfono>`.
+Sin cuenta ni sesión: hay un campo trampa para robots y un tope de 10 reservas por conexión y
+hora. El enlace sale en «En números» del panel. Código: `web/rutas/publico.py`.
+
+### Varios empleados
+
+Con «Equipo» en el perfil (`Ana, Luis, Marta`), cada persona tiene su agenda: los huecos se
+calculan por empleado, el cliente elige «con quién» en la página pública (o «cualquiera»: el
+primero libre) y el bot lo entiende con palabras («con Luis el jueves»). En el panel, columna
+«Con». Sin equipo, una sola agenda como hasta ahora. Código: `Reservas(empleados=…)`.
+
+### Señal por Stripe
+
+Con «Señal al reservar desde la web» (euros) y Stripe configurado (`STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET`), la página pública cobra la señal por tarjeta: la cita queda guardada
+45 minutos mientras el cliente paga (Stripe Checkout de 35 minutos, pago único); el webhook
+(`checkout.session.completed` o `async_payment_succeeded` con `metadata.tipo=senal` y
+`payment_status=paid`) la confirma (💶 en el panel) y, si no se paga, el hueco se libera solo (⏳
+mientras tanto). Cada cita lleva una referencia (`senal_ref`) que viaja en los metadatos: un
+aviso tardío no confirma una cita distinta con el mismo número. Si el pago llega cuando la cita ya
+caducó, se devuelve el dinero (`POST /refunds`) y queda una incidencia `senal`. En el webhook de
+Stripe hay que activar `checkout.session.completed`, `checkout.session.async_payment_succeeded` y
+`checkout.session.async_payment_failed`. Sin Stripe, la señal no se cobra y se reserva sin más.
+Código: `Reservas.marcar_senal_pagada`, `caducar_senales`, `pagos.crear_checkout_senal`, `pagos.senal_de`.
+
+## Resúmenes automáticos
+
+A las personas permitidas de un asistente personal (bot cerrado) el bot les manda solo:
+- **cada noche a partir de las 21:00**, lo de mañana (agenda, recordatorios, citas), si hay algo;
+- **los lunes a partir de las 8:00**, la semana.
+
+Cada persona cambia esas horas, o quita un resumen, en «Ajustes» de la app (colección
+`preferencias`).
+
+Una vez al día por persona (marca en la colección `resumenes`). A los clientes de un negocio con
+el bot abierto no se les manda nada. Código: `conectores/telegram/resumenes.py`.
+
+## Reseña después de la cita
+
+Con «Enlace para reseñas» en el perfil (Google, etc.), cuando una cita de un cliente de Telegram
+termina, el bot le escribe una vez: «Gracias por tu visita… nos ayuda mucho una reseña: <enlace>».
+Solo citas de hoy o de ayer (al activarlo no se molesta a clientes antiguos). Código:
+`Reservas.por_agradecer`, `flota.pedir_resenas`.
+
+## Lista de espera
+
+Si un día está lleno, el bot ofrece apuntar al cliente en la lista de espera (herramienta
+`apuntar_lista_espera` o `/reserva espera <fecha> <nombre>`). Cuando se libera un hueco ese día
+(una anulación), el bot avisa a quien esperaba y lo quita de la lista. Solo en días llenos (si
+quedan huecos, se reserva directamente) y solo clientes de Telegram (a los de la web no hay a
+quién avisar). Código: `Reservas.apuntar_espera`, `flota.avisar_lista_espera`.
+
+## En números
+
+En la ficha de cada inquilino (dueño) y en «Mi bot» (cliente): citas de los próximos 7 días y de la
+semana pasada, clientes distintos en 30 días, mensajes y personas en 7 días, tiempo medio de
+respuesta y fallos. Código: `panel_comun.estadisticas`.
+
 ## Avisos de fallos a tu Telegram
 
 - Con `FEMIX_AVISOS_TELEGRAM=<tu ID>`, la flota te manda un resumen de los fallos nuevos de todos

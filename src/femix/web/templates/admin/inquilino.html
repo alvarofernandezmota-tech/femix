@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
-{% block titulo %}{{ nombre }} — Femix{% include "comun/_reservas.html" %}
+{% block titulo %}{{ nombre }} — Femix{% include "comun/_estadisticas.html" %}
+{% include "comun/_reservas.html" %}
 {% include "comun/_actividad.html" %}
 
 <section class="tarjeta">
@@ -92,6 +93,14 @@
         <label>Tono <small>(cómo habla; vacío = cercano y directo)</small>
             <input name="tono" maxlength="300" value="{{ perfil.tono if perfil else '' }}" placeholder="Cercano y directo, sin formalismos excesivos.">
         </label>
+        <label>Dueño <small>(si este negocio es de una persona con su propio asistente: su identificador, p. ej. <code>ana</code>; su app tendrá «Mi negocio»)</small>
+            <input name="dueno_id" value="{{ perfil.dueno_id if perfil else '' }}" pattern="[A-Za-z0-9._\-]*"></label>
+        <label>Enlace para reseñas <small>(Google, etc.: el bot lo manda al cliente cuando termina su cita; vacío = no pide)</small>
+            <input name="enlace_resenas" type="url" value="{{ perfil.enlace_resenas if perfil else '' }}" placeholder="https://g.page/r/…/review"></label>
+        <label>Equipo <small>(nombres separados por comas si hay varias personas con agenda propia; vacío = una sola agenda)</small>
+            <input name="empleados" value="{{ perfil.empleados|join(', ') if perfil else '' }}" placeholder="Ana, Luis, Marta"></label>
+        <label>Señal al reservar desde la web <small>(euros que se cobran por tarjeta con Stripe; 0 = sin señal)</small>
+            <input name="senal_euros" inputmode="numeric" pattern="[0-9]*" value="{{ perfil.senal_euros if perfil and perfil.senal_euros else '' }}" placeholder="0"></label>
 
         <fieldset>
             <legend>Capacidades</legend>
@@ -129,6 +138,8 @@
             {% endif %}
             <label class="casilla"><input type="checkbox" name="abierto" value="true" {% if perfil and perfil.telegram_abierto %}checked{% endif %}>
                 Abierto a cualquiera (los clientes de un negocio)</label>
+            <label>ID de Telegram del usuario de la app <small>(de quién son la agenda, el chat y las tareas que enseña su app; vacío = el primero de los permitidos)</small>
+                <input name="usuario_panel" inputmode="numeric" value="{{ perfil.telegram_usuario_panel if perfil and perfil.telegram_usuario_panel else '' }}"></label>
             <label>ID de Telegram del responsable <small>(recibe los "quiero hablar con una persona" y contesta con /responder; vacío = nadie)</small>
                 <input name="responsable" inputmode="numeric" value="{{ perfil.telegram_responsable if perfil and perfil.telegram_responsable else '' }}"></label>
         </fieldset>

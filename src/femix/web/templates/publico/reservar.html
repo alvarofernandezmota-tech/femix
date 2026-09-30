@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block titulo %}Reservar — {{ perfil.nombre }}{% endblock %}
+
+{% block content %}
+<h2>Reserva en {{ perfil.nombre }}</h2>
+{% if perfil.descripcion %}<p class="secundario">{{ perfil.descripcion[:300] }}</p>{% endif %}
+{% if horario %}<p class="secundario">Horario: {{ horario|join(' · ') }}</p>{% endif %}
+{% if aviso %}<p class="aviso aviso-ok">{{ aviso }}</p>{% endif %}
+{% if error %}<p class="aviso aviso-error">{{ error }}</p>{% endif %}
+{% if senal %}<p class="secundario">Para reservar se cobra una señal de <strong>{{ senal }} €</strong> por tarjeta (se descuenta del servicio).</p>{% endif %}
+
+<section class="tarjeta">
+    <form method="get" action="" class="formulario fila">
+        <label style="flex:1">Día <input type="date" name="fecha" value="{{ fecha }}" min="{{ hoy }}" onchange="this.form.submit()"></label>
+        {% if empleados %}
+        <label style="flex:1">Con quién <select name="empleado" onchange="this.form.submit()">
+            <option value="">Cualquiera</option>
+            {% for e in empleados %}<option value="{{ e }}" {% if e == empleado %}selected{% endif %}>{{ e }}</option>{% endfor %}
+        </select></label>
+        {% endif %}
+        <noscript><button type="submit">Ver huecos</button></noscript>
+    </form>
+    {% if huecos %}
+    <form method="post" action="" class="formulario">
+        <input type="hidden" name="fecha" value="{{ fecha }}">
+        <input type="hidden" name="empleado" value="{{ empleado }}">
+        <input type="text" name="web" value="" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true">
+        <fieldset>
+            <legend>Hora ({{ fecha }})</legend>
+            <div class="huecos">
+                {% for h in huecos %}<label class="hueco"><input type="radio" name="hora" value="{{ h }}" required> {{ h }}</label>{% endfor %}
+            </div>
+        </fieldset>
+        <label>Tu nombre <input name="nombre" required maxlength="80" autocomplete="name"></label>
+        <label>Tu teléfono <input name="telefono" required inputmode="tel" autocomplete="tel" placeholder="600 000 000"></label>
+        <label>Qué quieres <small>(opcional)</small> <input name="servicio" maxlength="80" placeholder="Corte, tinte…"></label>
+        <button type="submit">{{ ('Reservar y pagar la señal (' ~ senal ~ ' €)') if senal else 'Reservar' }}</button>
+    </form>
+    {% else %}
+    <p>No quedan huecos ese día. Prueba con otro.</p>
+    {% endif %}
+</section>
+<p class="secundario">Cada cita dura {{ 30 }} minutos. Si necesitas cambiarla, escribe al negocio.</p>
+{% endblock %}

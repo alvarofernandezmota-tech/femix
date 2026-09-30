@@ -4,13 +4,12 @@ Sin `FEMIX_SAAS=1` la portada es el JSON de siempre y el alta no existe. Con el 
 el alta además necesita `FEMIX_SAAS_REGISTRO=1` (así se puede cerrar sin apagar lo demás).
 """
 import logging
-import os
 import time
 from datetime import datetime
 
 from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import JSONResponse
-from fastapi.templating import Jinja2Templates
+from ..plantillas import plantillas
 
 from femix.saas import datos_empresa, pagos, registro_abierto, saas_activo
 from femix.saas.planes import DIAS_PRUEBA, planes_publicos
@@ -20,7 +19,7 @@ from femix.saas.suscripciones import AlmacenSuscripciones, nueva_prueba
 from .auth import AlmacenInquilinos, abrir_sesion, directorio_datos_web
 
 _log = logging.getLogger(__name__)
-_templates = Jinja2Templates(directory=os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates"))
+_templates = plantillas()
 router = APIRouter()
 
 ALTAS_POR_HORA = 5
@@ -120,6 +119,9 @@ async def webhook_stripe(request: Request):
     except ValueError as exc:
         _log.warning("Webhook de Stripe rechazado: %s", exc)
         return JSONResponse({"error": "firma"}, status_code=400)
+    senal = pagos.senal_de(evento)
+    if senal is not None:
+        return {"recibido": True, "senal": _aplicar_senal(senal) if senal["pagada"] else False}
     try:
         inquilino_id = pagos.aplicar_evento(evento, AlmacenSuscripciones(directorio_datos_web()),
                                             existe=AlmacenPerfiles(directorio_datos_web()).existe)
@@ -129,3 +131,28 @@ async def webhook_stripe(request: Request):
         _log.exception("Webhook de Stripe %s no aplicado", evento.get("id"))
         return {"recibido": True, "inquilino": False}
     return {"recibido": True, "inquilino": bool(inquilino_id)}
+
+
+def _aplicar_senal(senal: dict) -> bool:
+    """La señal de una reserva web está pagada: la cita deja de estar en el aire. Si la cita ya
+    no existe (caducó antes de que llegara el aviso), se devuelve el dinero y queda apuntado."""
+    from .. import panel_comun
+    from femix.infraestructura.actividad import Actividad
+    inquilino_id, cita_id = senal["inquilino_id"], senal["cita_id"]
+    try:
+        reservas = panel_comun.reservas_de(directorio_datos_web(), inquilino_id)
+        cita = reservas.marcar_senal_pagada(cita_id, senal["ref"] or None) if reservas is not None else None
+    except Exception:
+        _log.exception("Señal de %s/%s no aplicada", inquilino_id, cita_id)
+        return False
+    if cita is not None:
+        return True
+    devuelto = pagos.reembolsar(senal["payment_intent"])
+    _log.warning("Señal pagada de una reserva que ya no existe: %s/%s (reembolso: %s)", inquilino_id, cita_id, devuelto)
+    try:
+        Actividad(directorio_datos_web()).incidencia(
+            inquilino_id, "senal", f"Señal pagada de la cita {cita_id}, que ya había caducado; "
+            + ("dinero devuelto." if devuelto else "NO se pudo devolver: revisar en Stripe."))
+    except Exception:
+        _log.warning("No se pudo apuntar la incidencia de la señal", exc_info=True)
+    return False

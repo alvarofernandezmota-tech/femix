@@ -43,12 +43,14 @@ def actividad(directorio: str, inquilino_id: "str | None", limite: int = 30) -> 
             "incidencias": registro.ultimos("incidencias", inquilino_id, limite)}
 
 
-def _horario(directorio: str, inquilino_id: str) -> list:
+def _horario(directorio: str, inquilino_id: str) -> "tuple[list, list]":
+    """(horario, empleados) del perfil; vacíos si no hay perfil legible."""
     try:
         perfil = AlmacenPerfiles(directorio).obtener(inquilino_id)
-        return perfil.validado().horario if perfil else []
+        perfil = perfil.validado() if perfil else None
+        return (perfil.horario, perfil.empleados) if perfil else ([], [])
     except ValueError:
-        return []
+        return [], []
 
 
 def reservas_de(directorio: str, inquilino_id: str) -> "Reservas | None":
@@ -56,7 +58,8 @@ def reservas_de(directorio: str, inquilino_id: str) -> "Reservas | None":
     capacidades, _ = del_perfil(directorio, inquilino_id)
     if RESERVAS not in capacidades:
         return None
-    return Reservas(_horario(directorio, inquilino_id), almacen_dominio(directorio, inquilino_id), RelojZona())
+    horario, empleados = _horario(directorio, inquilino_id)
+    return Reservas(horario, almacen_dominio(directorio, inquilino_id), RelojZona(), empleados=empleados)
 
 
 def proximas_reservas(directorio: str, inquilino_id: str) -> "list | None":
@@ -129,3 +132,29 @@ def accion_aprendizaje(directorio: str, inquilino_id: str, accion: str, id_item:
     if not hecho:
         raise KeyError(id_item)
     return "aprendizaje"
+
+
+def estadisticas(directorio: str, inquilino_id: str, ahora: "datetime | None" = None) -> dict:
+    """Números para el panel: citas próximas y de la semana pasada, clientes distintos (30 días),
+    mensajes e incidencias (7 días) y lo que tarda el bot de media."""
+    from datetime import timedelta
+    ahora = ahora or datetime.now()
+    hoy = ahora.date()
+    hace7, hace30 = (hoy - timedelta(days=7)).isoformat(), (hoy - timedelta(days=30)).isoformat()
+    en7 = (hoy + timedelta(days=7)).isoformat()
+    registro = Actividad(directorio)
+    mensajes = [m for m in registro.ultimos("mensajes", inquilino_id, 20000, sin_tope=True) if str(m.get("fecha", ""))[:10] >= hace7]
+    incidencias = [i for i in registro.ultimos("incidencias", inquilino_id, 5000, sin_tope=True) if str(i.get("fecha", ""))[:10] >= hace7]
+    segundos = [float(m.get("segundos") or 0) for m in mensajes if m.get("segundos")]
+    reservas = reservas_de(directorio, inquilino_id)
+    citas = reservas.citas() if reservas is not None else []
+    return {
+        "con_reservas": reservas is not None,
+        "citas_proximas": sum(1 for c in citas if hoy.isoformat() <= c["fecha"] <= en7),
+        "citas_semana_pasada": sum(1 for c in citas if hace7 <= c["fecha"] < hoy.isoformat()),
+        "clientes_30_dias": len({c.get("usuario_id") or c.get("nombre") for c in citas if c["fecha"] >= hace30}),
+        "mensajes_7_dias": len(mensajes),
+        "usuarios_7_dias": len({m.get("usuario_id") for m in mensajes}),
+        "incidencias_7_dias": len(incidencias),
+        "segundos_medio": round(sum(segundos) / len(segundos), 1) if segundos else None,
+    }

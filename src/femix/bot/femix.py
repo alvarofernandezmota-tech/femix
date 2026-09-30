@@ -163,7 +163,10 @@ class Femix:
             contexto = f"{ahora}\n{contexto}" if contexto else ahora
         if contexto_frecuente:
             contexto = f"{contexto_frecuente}\n{contexto}" if contexto else contexto_frecuente
-        aprendido = self._aprender(usuario_id, texto_n)
+        preferencias = self._preferencias(usuario_id)
+        if preferencias:
+            contexto = f"{preferencias}\n{contexto}" if contexto else preferencias
+        aprendido = self._aprender(usuario_id, texto)   # lo que se guarda, tal cual lo escribió
         if aprendido:
             contexto = f"{aprendido}\n{contexto}" if contexto else aprendido
         respuesta, camino = self._responder(usuario_id, texto, contexto, intencion, al_avanzar, texto_n)
@@ -181,6 +184,24 @@ class Femix:
         self._registrar_memoria(usuario_id, texto, respuesta)
         self._registrar_mensaje(usuario_id, camino, inicio, texto, respuesta)
         return respuesta
+
+    def _preferencias(self, usuario_id: str) -> str:
+        """Lo que la persona eligió en «Ajustes» de la app: cómo llamarle y cómo hablarle."""
+        if self._almacen is None:
+            return ""
+        try:
+            guardado = self._almacen.cargar("preferencias", usuario_id)
+        except Exception:
+            return ""
+        if not guardado:
+            return ""
+        p = guardado[0]
+        partes = []
+        if p.get("nombre"):
+            partes.append(f"Llama al usuario «{p['nombre']}».")
+        if p.get("tono"):
+            partes.append(f"Cómo quiere que le hables: {p['tono']}.")
+        return " ".join(partes)
 
     def _registrar_memoria(self, usuario_id: str, texto: str, respuesta: str) -> None:
         """Si no se puede guardar la conversación, la respuesta ya hecha llega igual."""
@@ -305,7 +326,7 @@ class Femix:
             return None
         if not encontrado or not encontrado.strip():
             if es_pregunta(texto_n or texto):
-                self._sin_respuesta(texto_n or texto)   # el dueño la verá en su panel para contestarla
+                self._sin_respuesta(texto)   # el dueño la ve tal cual la escribió el cliente   # el dueño la verá en su panel para contestarla
             return None
         documentos = ("Información encontrada en los documentos del negocio (si la usas, di de qué documento "
                       f"sale, y no añadas datos que no estén aquí):\n{encontrado}")

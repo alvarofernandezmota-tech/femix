@@ -142,6 +142,23 @@ Para que otra persona entre así tiene que estar en tu tailnet (invitación) o u
 
 Para quitarlo: `sudo tailscale serve --bg off` (o `tailscale serve reset`).
 
+### Avisos push y señal por Stripe (opcionales)
+
+- **Push con la app cerrada**: `docker compose exec femix python -m femix.web.push` imprime tres
+  líneas `FEMIX_PUSH_VAPID_*`; se pegan en `.env` y `docker compose up -d femix`. Sin ellas los
+  avisos llegan con la app abierta y por Telegram.
+- **Señal al reservar desde la web**: necesita `STRIPE_SECRET_KEY` y `STRIPE_WEBHOOK_SECRET` (los
+  mismos del SaaS) y el webhook de Stripe apuntando a `https://<dominio>/stripe/webhook` con el
+  evento `checkout.session.completed`. Los euros se ponen por negocio en «Mi bot» o en `/admin`.
+
+### Dar de alta a cada persona (mañana)
+
+1. En `/admin` → «Nuevo inquilino»: `mama` / `hermana` / `paula`, tipo `persona`, token de su bot
+   (`@BotFather`), su ID de Telegram en permitidos, contraseña para la app.
+2. En su móvil: `https://madre.<tailnet>.ts.net/login` → «Añadir a pantalla de inicio» → «Ajustes»
+   (cómo llamarle, resúmenes) → si también tiene negocio, «Añadir mi negocio».
+3. Tu propio bot: `FEMIX_AVISOS_TELEGRAM=<tu ID>` en `.env` para `/plataforma` y los avisos de fallos.
+
 ## SaaS público (clientes de fuera): dominio + HTTPS
 
 ```bash
@@ -174,7 +191,8 @@ La restauración guarda antes lo que hay y siempre vuelve a arrancar femix, aunq
 
 ## 6. Pendiente
 
-- [ ] Primer despliegue con la revisión del 2026-09-29 y salida de `probar-todo.sh`.
-- [ ] Elegir y ajustar el modelo con los tiempos reales de madre.
+- [x] Primer despliegue (2026-09-30, `main` 560fef5): `probar-todo.sh` TODO BIEN, 3,5 s por respuesta.
+- [ ] Desplegar la fase 13 completa y dar de alta a las tres personas (ver arriba).
+- [ ] Elegir y ajustar el modelo con los tiempos reales de madre (driver de NVIDIA pendiente).
 - [ ] Release v1.0.0 (etiqueta en `main`).
 - [ ] Teléfono (gjallarhorn): aparcado.

@@ -3,13 +3,9 @@
 {% block titulo %}{{ 'Hoy' if dias == 1 else 'Semana' }} — {{ inquilino.nombre }}{% endblock %}
 
 {% block content %}
-<nav class="pestanas">
-    <a href="/usuario/" class="{{ 'activa' if dias == 1 else '' }}">Hoy</a>
-    <a href="/usuario/semana" class="{{ 'activa' if dias == 7 else '' }}">Semana</a>
-    <a href="/usuario/chat">Chat</a>
-    <a href="/usuario/panel">Mi bot</a>
-</nav>
+{% set activa = 'hoy' if dias == 1 else 'semana' %}{% include "comun/_pestanas.html" %}
 <h2>{{ titulo }}</h2>
+{% if dueno_de_los_datos %}<p class="secundario">Datos del usuario de Telegram {{ dueno_de_los_datos }} (los mismos que ve tu bot).</p>{% endif %}
 {% if aviso %}<p class="aviso aviso-ok">{{ aviso }}</p>{% endif %}
 {% if error %}<p class="aviso aviso-error">{{ error }}</p>{% endif %}
 
@@ -43,7 +39,7 @@
     <h3>💇 Reservas de clientes</h3>
     <ul class="lista">
         {% for c in reservas %}
-        <li><span class="hora">{{ cuando(c.fecha, c.hora) }}</span> {{ c.nombre }}{% if c.servicio %} · {{ c.servicio }}{% endif %} <small>({{ c.duracion }} min)</small>
+        <li><span class="hora">{{ cuando(c.fecha, c.hora) }}</span> {{ c.nombre }}{% if c.servicio %} · {{ c.servicio }}{% endif %}{% if c.empleado %} · con {{ c.empleado }}{% endif %} <small>({{ c.duracion }} min)</small>{% if c.senal_pagada %} 💶{% elif c.senal_pendiente %} ⏳{% endif %}
             <form method="post" action="/usuario/reservas/{{ c.id }}/anular" class="inline" onsubmit="return confirm('¿Anular esta reserva?');">
                 <input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit" class="quitar" title="Anular">✕</button></form></li>
         {% else %}<li class="secundario">Sin reservas.</li>{% endfor %}
@@ -84,6 +80,20 @@
         <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="dias" value="{{ dias }}">
         <input name="descripcion" required maxlength="200" placeholder="Nueva tarea">
         <button type="submit">Añadir</button>
+    </form>
+</section>
+
+<section class="tarjeta">
+    <h3>📲 En tu calendario</h3>
+    {% if calendario %}
+    <p class="secundario">Suscríbete a esta dirección desde Google Calendar («Añadir por URL») o el calendario del iPhone («Añadir calendario suscrito»): tus citas, agenda y recordatorios aparecerán allí solos.</p>
+    <p><code class="url">{{ calendario }}</code></p>
+    {% else %}
+    <p class="secundario">Ver tu agenda de femix dentro de Google Calendar o del calendario del iPhone.</p>
+    {% endif %}
+    <form method="post" action="/usuario/calendario/activar" class="inline">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit">{{ 'Cambiar la dirección' if calendario else 'Activar' }}</button>
     </form>
 </section>
 

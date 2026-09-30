@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Cookie, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
+from ..plantillas import plantillas
 
 from femix.infraestructura.documentos import documento
 from femix.inquilino.perfil import AlmacenPerfiles
@@ -18,7 +18,7 @@ DURACION_SESION_HORAS = 24
 router = APIRouter(tags=["auth"])
 
 _DIRECTORIO_TEMPLATES = os.path.join(os.path.dirname(__file__), "..", "templates")
-_templates = Jinja2Templates(directory=_DIRECTORIO_TEMPLATES)
+_templates = plantillas()
 
 
 def directorio_datos_web() -> str:

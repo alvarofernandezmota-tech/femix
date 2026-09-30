@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
-from fastapi.templating import Jinja2Templates
+from ..plantillas import plantillas
 from pydantic import BaseModel, field_validator
 
 from femix.dominio.personal.diario import Diario
@@ -20,7 +20,7 @@ from .auth import Inquilino, comprobar_origen, directorio_datos_web, obtener_inq
 router = APIRouter(prefix="/usuario", tags=["usuario"], dependencies=[Depends(comprobar_origen)])
 
 _DIRECTORIO_TEMPLATES = os.path.join(os.path.dirname(__file__), "..", "templates")
-_templates = Jinja2Templates(directory=_DIRECTORIO_TEMPLATES)
+_templates = plantillas()
 
 
 def _carpeta(inquilino: Inquilino) -> str:
@@ -166,6 +166,8 @@ def _contexto(inquilino: Inquilino, csrf: str, request: Request, **extra) -> dic
         "preguntas": panel_comun.preguntas_de(directorio, inquilino.id).listar(),
         "aprendizaje": panel_comun.resumen_aprendizaje(directorio, inquilino.id),
         "reservas": panel_comun.proximas_reservas(directorio, inquilino.id),
+        "estadisticas": panel_comun.estadisticas(directorio, inquilino.id),
+        "cuentas": __import__("femix.web.rutas.dia", fromlist=["cuentas_vinculadas"]).cuentas_vinculadas(inquilino.id),
         "catalogo": [c for c in CATALOGO.values() if c.disponible],
         "permitidas": set(resumen["plan"].capacidades),
         "planes": planes_publicos(),
@@ -267,8 +269,12 @@ async def guardar_bot(
     whatsapp_token: str = Form(""),
     quitar_whatsapp: bool = Form(False),
     whatsapp_plantilla_cita: str = Form(""),
+    enlace_resenas: str = Form(""),
+    empleados: str = Form(""),
+    senal_euros: str = Form(""),
 ):
-    from .admin import leer_horario, leer_responsable
+    from femix.inquilino.perfil import leer_empleados
+    from .admin import leer_horario, leer_responsable, leer_senal
     directorio = directorio_datos_web()
     almacen = AlmacenPerfiles(directorio)
     # Solo las que permite su plan; las que tenga encendidas fuera del plan se conservan (vuelven
@@ -282,7 +288,8 @@ async def guardar_bot(
             horario=leer_horario(horario), capacidades=[c for c in capacidades if c in permitidas] + fuera_del_plan,
             nombre_asistente=nombre_asistente, tono=tono, telegram_abierto=abierto,
             telegram_responsable=leer_responsable(responsable),
-            telegram_permitidos=leer_ids_telegram(permitidos),
+            telegram_permitidos=leer_ids_telegram(permitidos), enlace_resenas=enlace_resenas.strip(),
+            empleados=leer_empleados(empleados), senal_euros=leer_senal(senal_euros),
         )
 
         # El bot del .env: su token y sus permitidos los manda el .env, no el formulario.
@@ -301,8 +308,11 @@ async def guardar_bot(
         def con_whatsapp(anterior, token_actual, whatsapp_actual) -> PerfilInquilino:
             return _replace(
                 base, telegram_token="" if quitar_token else (telegram_token.strip() or token_actual),
-                # Los conectores MCP solo los toca el dueño de la plataforma: se conservan.
+                # Los conectores MCP, el dueño y el usuario de la app los pone el dueño de la
+                # plataforma (o Ajustes): se conservan, que este formulario no los conoce.
                 mcp_servidores=anterior.mcp_servidores if anterior else [],
+                dueno_id=anterior.dueno_id if anterior else "",
+                telegram_usuario_panel=anterior.telegram_usuario_panel if anterior else 0,
                 whatsapp_telefono_id="" if quitar_whatsapp else whatsapp_telefono_id,
                 whatsapp_plantilla_cita="" if quitar_whatsapp else whatsapp_plantilla_cita,
                 whatsapp_token="" if quitar_whatsapp else (whatsapp_token.strip() or whatsapp_actual),

@@ -16,13 +16,13 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Cookie, Depends, File, Form, Header, HTTPException, Request, UploadFile, status
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
+from ..plantillas import plantillas
 from pydantic import BaseModel
 
 from femix.bot.fabrica import almacen_dominio
 from femix.inquilino.capacidades import CATALOGO
 from femix.inquilino.perfil import (
-    DIAS, TIPOS, AlmacenPerfiles, Franja, PerfilIlegible, PerfilInquilino, leer_ids_telegram,
+    DIAS, TIPOS, AlmacenPerfiles, Franja, PerfilIlegible, PerfilInquilino, leer_empleados, leer_ids_telegram,
 )
 from femix.inquilino.personalidad import prompt_sistema_de
 from femix.llm.prompts import PROMPT_SISTEMA
@@ -49,7 +49,7 @@ NOMBRE_ESTADO_BOTS = ".estado_bots.json"
 INTERVALO_BOTS_POR_DEFECTO = 30.0
 
 _DIRECTORIO_TEMPLATES = os.path.join(os.path.dirname(__file__), "..", "templates")
-_templates = Jinja2Templates(directory=_DIRECTORIO_TEMPLATES)
+_templates = plantillas()
 
 AVISOS = {
     "creado": "Inquilino creado.",
@@ -267,6 +267,16 @@ def leer_horario(texto: str) -> list:
 
 
 
+def leer_senal(texto: str) -> int:
+    """Euros de la señal del formulario: vacío = 0."""
+    texto = (texto or "").strip().replace("€", "").strip()
+    if not texto:
+        return 0
+    if not texto.isdigit():
+        raise ValueError("La señal son euros enteros (0 = sin señal)")
+    return int(texto)
+
+
 def leer_responsable(texto: str) -> int:
     """El ID del responsable desde el formulario: vacío = nadie."""
     texto = (texto or "").strip()
@@ -353,6 +363,7 @@ def _contexto_detalle(inquilino_id: str, sesion: dict, documentos=(), **extra) -
         "preguntas": panel_comun.preguntas_de(directorio, inquilino_id).listar() if not ilegible else [],
         "aprendizaje": panel_comun.resumen_aprendizaje(directorio, inquilino_id),
         "reservas": panel_comun.proximas_reservas(directorio, inquilino_id) if not ilegible else None,
+        "estadisticas": panel_comun.estadisticas(directorio, inquilino_id) if not ilegible else None,
         **extra,
     }
 
@@ -461,6 +472,11 @@ async def guardar_perfil(
     whatsapp_token: str = Form(""),
     quitar_whatsapp: bool = Form(False),
     whatsapp_plantilla_cita: str = Form(""),
+    enlace_resenas: str = Form(""),
+    usuario_panel: str = Form(""),
+    dueno_id: str = Form(""),
+    empleados: str = Form(""),
+    senal_euros: str = Form(""),
     mcp: str = Form(""),
 ):
     inquilino_id = _id_valido(inquilino_id)
@@ -488,7 +504,9 @@ async def guardar_perfil(
             inquilino_id=inquilino_id, nombre=nombre, tipo=tipo, descripcion=descripcion,
             horario=leer_horario(horario), capacidades=capacidades,
             nombre_asistente=nombre_asistente, tono=tono,
-            telegram_abierto=abierto, telegram_responsable=leer_responsable(responsable),
+            telegram_abierto=abierto, telegram_responsable=leer_responsable(responsable), enlace_resenas=enlace_resenas.strip(),
+            telegram_usuario_panel=leer_responsable(usuario_panel), dueno_id=dueno_id.strip(),
+            empleados=leer_empleados(empleados), senal_euros=leer_senal(senal_euros),
         )
         if contexto["perfil_ilegible"]:
             almacen.reparar(con_telegram(base, None))

@@ -3,12 +3,7 @@
 {% block titulo %}Mi bot — {{ inquilino.nombre }}{% endblock %}
 
 {% block content %}
-<nav class="pestanas">
-    <a href="/usuario/">Hoy</a>
-    <a href="/usuario/semana">Semana</a>
-    <a href="/usuario/chat">Chat</a>
-    <a href="/usuario/panel" class="activa">Mi bot</a>
-</nav>
+{% set activa = 'bot' %}{% include "comun/_pestanas.html" %}
 <h2>Mi bot</h2>
 {% if aviso %}<p class="aviso aviso-ok">{{ aviso }}</p>{% endif %}
 {% if error %}<p class="aviso aviso-error">{{ error }}</p>{% endif %}
@@ -35,6 +30,12 @@
         </label>
         <label>Nombre del asistente <input name="nombre_asistente" maxlength="40" value="{{ perfil.nombre_asistente if perfil else '' }}" placeholder="Femix"></label>
         <label>Tono <input name="tono" maxlength="300" value="{{ perfil.tono if perfil else '' }}" placeholder="Cercano y directo."></label>
+        <label>Enlace para reseñas <small>(Google, etc.: el bot lo manda al cliente cuando termina su cita; vacío = no pide)</small>
+            <input name="enlace_resenas" type="url" value="{{ perfil.enlace_resenas if perfil else '' }}" placeholder="https://g.page/r/…/review"></label>
+        <label>Equipo <small>(nombres separados por comas si hay varias personas con agenda propia; vacío = una sola agenda)</small>
+            <input name="empleados" value="{{ perfil.empleados|join(', ') if perfil else '' }}" placeholder="Ana, Luis, Marta"></label>
+        <label>Señal al reservar desde la web <small>(euros que se cobran por tarjeta con Stripe; 0 = sin señal)</small>
+            <input name="senal_euros" inputmode="numeric" pattern="[0-9]*" value="{{ perfil.senal_euros if perfil and perfil.senal_euros else '' }}" placeholder="0"></label>
         <fieldset>
             <legend>Herramientas del bot</legend>
             {% for c in catalogo %}
@@ -74,6 +75,7 @@
 
 {% include "comun/_conocimiento.html" %}
 {% include "comun/_aprendizaje.html" %}
+{% include "comun/_estadisticas.html" %}
 {% include "comun/_reservas.html" %}
 {% include "comun/_actividad.html" %}
 

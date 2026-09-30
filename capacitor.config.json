@@ -1,0 +1,16 @@
+{
+  "appId": "es.femix.app",
+  "appName": "femix",
+  "webDir": "www",
+  "server": {
+    "url": "https://TU-DOMINIO",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#22255e"
+  },
+  "plugins": {
+    "SplashScreen": { "launchShowDuration": 0 }
+  }
+}

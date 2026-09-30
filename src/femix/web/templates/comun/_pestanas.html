@@ -1,0 +1,14 @@
+{# Pestañas de la app de una persona. Necesita: activa ("hoy"|"semana"|"chat"|"bot"|"ajustes"), csrf, cuentas. #}
+<nav class="pestanas">
+    <a href="/usuario/" class="{{ 'activa' if activa == 'hoy' else '' }}">Hoy</a>
+    <a href="/usuario/semana" class="{{ 'activa' if activa == 'semana' else '' }}">Semana</a>
+    <a href="/usuario/chat" class="{{ 'activa' if activa == 'chat' else '' }}">Chat</a>
+    <a href="/usuario/panel" class="{{ 'activa' if activa == 'bot' else '' }}">Mi bot</a>
+    <a href="/usuario/ajustes" class="{{ 'activa' if activa == 'ajustes' else '' }}">Ajustes</a>
+    {% for c in cuentas or [] %}
+    <form method="post" action="/usuario/cambiar" class="inline cuenta">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="destino" value="{{ c.id }}">
+        <button type="submit" title="Cambiar a {{ c.nombre }}">{{ '🏪 Mi negocio' if c.tipo == 'empresa' else '🏠 Mi vida' }}</button>
+    </form>
+    {% endfor %}
+</nav>

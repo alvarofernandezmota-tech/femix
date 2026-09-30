@@ -148,7 +148,7 @@ def test_admin_ve_planes_actividad_y_cambia_suscripcion(entorno):
                      data={"csrf": csrf, "plan": "pro", "estado": "activa"}, follow_redirects=False)
     assert r.status_code == 303
     assert AlmacenSuscripciones(str(entorno)).obtener("acme").plan == "pro"
-    assert "49 €/mes" in cliente.get("/admin/", headers={"Accept": "text/html"}).text
+    assert "79 €/mes" in cliente.get("/admin/", headers={"Accept": "text/html"}).text
 
 
 def test_preguntas_y_documentos_desde_el_panel_del_cliente(entorno):
