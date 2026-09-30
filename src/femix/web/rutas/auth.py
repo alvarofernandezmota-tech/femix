@@ -259,9 +259,15 @@ def obtener_inquilino_actual(session_id: "str | None" = Cookie(default=None)) ->
     return inquilino
 
 
+AVISOS_LOGIN = {"dueno": "A la cuenta del dueño se entra con su contraseña."}
+
+
 @router.get("/login")
 async def formulario_login(request: Request):
-    return _templates.TemplateResponse(request, "login.html", {})
+    return _templates.TemplateResponse(request, "login.html", {
+        "aviso": AVISOS_LOGIN.get(request.query_params.get("aviso", ""), ""),
+        "usuario": request.query_params.get("usuario", "")[:30],
+    })
 
 
 FALLOS_POR_HORA = 10
@@ -295,10 +301,13 @@ async def procesar_login(request: Request, inquilino_id: str = Form(...), passwo
     return abrir_sesion(inquilino)
 
 
-def abrir_sesion(inquilino: Inquilino) -> RedirectResponse:
-    """Sesión del panel del inquilino (también tras darse de alta en /registro)."""
+def abrir_sesion(inquilino: Inquilino, origen: str = "login") -> RedirectResponse:
+    """Sesión del panel del inquilino (también tras darse de alta en /registro).
+
+    `origen`: «login» si vino de una contraseña; «cambio» si se abrió desde otra cuenta vinculada
+    (`/usuario/cambiar`). Solo una sesión abierta con contraseña vale para el panel del dueño."""
     session_id = AlmacenSesiones().crear(
-        inquilino.id, huella=huella_password(inquilino.password_hash), csrf=secrets.token_urlsafe(32),
+        inquilino.id, huella=huella_password(inquilino.password_hash), csrf=secrets.token_urlsafe(32), origen=origen,
     )
     respuesta = RedirectResponse(url="/usuario/", status_code=status.HTTP_303_SEE_OTHER)
     respuesta.set_cookie(

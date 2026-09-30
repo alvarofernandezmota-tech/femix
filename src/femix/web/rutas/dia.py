@@ -19,6 +19,7 @@ from femix.dominio.personal.tareas import Tareas
 from femix.inquilino.perfil import AlmacenPerfiles, PerfilIlegible
 
 from .. import panel_comun
+from ..dueno import es_dueno
 from .auth import (AlmacenInquilinos, Inquilino, abrir_sesion, comprobar_csrf, comprobar_origen, csrf_de_sesion,
                    directorio_datos_web, obtener_inquilino_actual)
 
@@ -253,6 +254,10 @@ async def cambiar_de_cuenta(destino: str = Form(...), inquilino: Inquilino = Dep
     destino = destino.strip()
     if not any(c["id"] == destino for c in cuentas_vinculadas(inquilino.id)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Esa cuenta no está vinculada a la tuya")
+    if es_dueno(destino):
+        # La cuenta del dueño abre el panel de administración: a esa se entra con contraseña,
+        # no desde el negocio (quien tenga la contraseña del negocio no es el dueño).
+        return RedirectResponse(url=f"/login?aviso=dueno&usuario={destino}", status_code=status.HTTP_303_SEE_OTHER)
     accesos = AlmacenInquilinos(directorio_datos_web())
     otro = accesos.obtener(destino)
     if otro is None:

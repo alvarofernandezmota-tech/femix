@@ -733,3 +733,25 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   valiendo. `web/dueno.py`, `requerir_admin`, `comun/_pestanas.html`. Test en `test_web_admin.py`.
 - `python -m femix.web.acceso <inquilino> <nombre> [contraseña]`: da o cambia la contraseña de la app
   desde la terminal de madre (cierra las sesiones abiertas).
+
+## 2026-09-30 — Lanzamiento en un paso (`feat/panel-web`)
+- `scripts/lanzar.sh [dueño] [nombre] [--sin-desplegar]`: despliega `main`, completa el `.env`
+  (`FEMIX_WEB_DUENO`, `FEMIX_AVISOS_TELEGRAM`, claves de push, correo), deja al dueño listo y
+  ejecuta `probar-todo.sh`; imprime dónde entrar. Repetible; no enseña secretos.
+- `python -m femix.web.lanzar <inquilino> <nombre> [--nueva-contrasena] [--contrasena X]`: crea o
+  completa el perfil del dueño (permitidos del `.env`, usuario de la app, nombre del asistente,
+  capacidades por defecto), da acceso a la app y repasa el `.env` con OK/FALTA. Tests en
+  `tests/test_lanzar.py`.
+- `docs/LANZAMIENTO.md` (guía de cero a usarlo), comando `/lanzar` para Claude Code en madre,
+  enlaces en `docs/README.md`, `PRODUCCION_MADRE.md` y `CLAUDE.md`.
+- Revisión adversarial del lanzamiento (23 hallazgos, todos arreglados): a la cuenta del dueño no se
+  cambia con «Mi vida» (se entra con contraseña) y `/admin` solo acepta sesiones abiertas con
+  contraseña (`origen=login`); el id del dueño no se puede registrar por `/registro`;
+  `FEMIX_WEB_DUENO` se escribe solo cuando el perfil y el acceso ya existen; la contraseña de la app
+  no va en la línea de comandos (`--pedir`) ni se imprime fuera de un terminal; `lanzar.sh` valida
+  opciones y el id, no pisa un dueño distinto sin `--cambiar-dueno`, escribe el `.env` sin `sed`
+  (valores con `&` o `|`), corrige CRLF, no borra claves de push si no genera nuevas y avisa si
+  falta `FEMIX_PUSH_EMAIL`; `femix.web.lanzar` valida la forma del token, distingue el inquilino del
+  `.env`, reactiva un dueño de baja, no pisa el usuario de la app ni el nombre, exige 8 caracteres y
+  no traga IDs mal escritos; `.claude/settings.json` permite `scripts/lanzar.sh`; la guía no lleva
+  la IP de madre.

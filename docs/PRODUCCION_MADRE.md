@@ -13,6 +13,9 @@ Guía paso a paso para desplegar, comprobar y mantener femix en `madre`. Detalle
 - **Canal principal: Telegram.** WhatsApp es un conector más sobre el mismo bot.
 - `main` en GitHub es lo que corre en madre.
 
+> Atajo: `scripts/lanzar.sh` hace los pasos 2 y 3 de esta guía, completa el `.env` y deja al
+> dueño listo. Guía corta en [LANZAMIENTO.md](LANZAMIENTO.md).
+
 ## 1. Primera vez
 
 ```bash
@@ -155,7 +158,7 @@ Para quitarlo: `sudo tailscale serve --bg off` (o `tailscale serve reset`).
 ### Tu usuario y contraseña de la app (una sola entrada)
 
 ```bash
-docker compose exec femix python -m femix.web.acceso varo "Varo"   # imprime una contraseña nueva (o pásala como 3.er argumento)
+docker compose exec femix python -m femix.web.acceso varo "Varo"   # imprime una contraseña nueva (o --pedir para escribirla tú)
 grep -q '^FEMIX_WEB_DUENO=' .env || echo 'FEMIX_WEB_DUENO=varo' >> .env
 docker compose up -d femix
 ```

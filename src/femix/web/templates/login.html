@@ -3,9 +3,10 @@
 {% block titulo %}Iniciar sesión — Femix{% endblock %}
 
 {% block content %}
+{% if aviso %}<p class="aviso aviso-ok">{{ aviso }}</p>{% endif %}
 <form class="formulario-login" method="post" action="/login">
     <label for="inquilino_id">Usuario</label>
-    <input type="text" id="inquilino_id" name="inquilino_id" required autofocus>
+    <input type="text" id="inquilino_id" name="inquilino_id" required autofocus value="{{ usuario or '' }}">
 
     <label for="password">Contraseña</label>
     <input type="password" id="password" name="password" required>

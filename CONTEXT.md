@@ -37,7 +37,9 @@ corrector; una persona con dos calendarios (vida + negocio vinculados por `dueno
 «Mi vida»/«Mi negocio», alta desde Ajustes); reservas públicas con empleados y señal por Stripe;
 resúmenes, reseñas, lista de espera, «En números». Fase 14 en parte: reranker opcional y
 `capacitor.config.json` + `docs/apk.md`. Ver `docs/app.md`, `docs/operacion.md`.
-Siguiente: desplegar en madre y dar de alta a las tres personas (`docs/PRODUCCION_MADRE.md`);
+Desplegado en madre el 2026-09-30 (`main` 7f21aa0): app en `https://madre.<tailnet>.ts.net`, una sola
+entrada para el dueño (`FEMIX_WEB_DUENO`), `scripts/lanzar.sh` lo deja todo listo (`docs/LANZAMIENTO.md`).
+Siguiente: dar de alta a las tres personas desde la pestaña Admin;
 driver de NVIDIA y modelo; Google Play; release v1.0.0.
 
 ## Qué funciona de verdad
