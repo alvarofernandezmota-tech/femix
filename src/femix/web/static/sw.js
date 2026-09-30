@@ -19,3 +19,22 @@ self.addEventListener("fetch", (evento) => {
   if (evento.request.method !== "GET" || !ESTATICOS.includes(url.pathname)) return;
   evento.respondWith(caches.match(evento.request).then((r) => r || fetch(evento.request)));
 });
+
+// --- Avisos push (con la app cerrada) ---
+self.addEventListener("push", (evento) => {
+  let datos = {};
+  try { datos = evento.data ? evento.data.json() : {}; } catch (e) { datos = { cuerpo: evento.data && evento.data.text() }; }
+  evento.waitUntil(self.registration.showNotification(datos.titulo || "Femix", {
+    body: datos.cuerpo || "", icon: "/static/icono-192.png", badge: "/static/icono-192.png",
+    data: { url: datos.url || "/usuario/chat" },
+  }));
+});
+
+self.addEventListener("notificationclick", (evento) => {
+  evento.notification.close();
+  const url = (evento.notification.data && evento.notification.data.url) || "/usuario/chat";
+  evento.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((ventanas) => {
+    for (const v of ventanas) { if ("focus" in v) { v.navigate(url); return v.focus(); } }
+    return self.clients.openWindow(url);
+  }));
+});

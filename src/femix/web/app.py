@@ -13,7 +13,9 @@ from fastapi.staticfiles import StaticFiles
 
 from .limites import LimiteDeCuerpo
 from .rutas.admin import router as admin_router
+from .rutas.calendario import router as calendario_router
 from .rutas.chat import router as chat_router
+from .rutas.push import router as push_router
 from .rutas.dia import router as dia_router
 from .rutas.publico import router as publico_router
 from .rutas.admin import router_acceso as admin_acceso_router
@@ -39,8 +41,24 @@ async def ciclo_de_vida(_app):
         crear_esquema(url)
     # Recordatorio de citas por WhatsApp (plantilla aprobada): cada 10 min, en segundo plano.
     tarea = asyncio.create_task(_recordar_whatsapp())
+    # Avisos push a la app instalada (recordatorios vencidos), cada minuto, si hay claves VAPID.
+    tarea_push = asyncio.create_task(_avisar_push())
     yield
     tarea.cancel()
+    tarea_push.cancel()
+
+
+async def _avisar_push(cada: float = 60) -> None:
+    from femix.web import push
+    while True:
+        try:
+            if push.configurado():
+                await asyncio.to_thread(push.avisar_pendientes, directorio_datos_web())
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logging.getLogger(__name__).warning("Fallo mandando avisos push", exc_info=True)
+        await asyncio.sleep(cada)
 
 
 async def _recordar_whatsapp(cada: float = 600) -> None:
@@ -72,6 +90,8 @@ async def service_worker():
 app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(publico_router)
+app.include_router(calendario_router)
+app.include_router(push_router)
 app.include_router(dia_router)      # antes que usuario: se queda con GET /usuario/
 app.include_router(usuario_router)
 # Antes que el panel: /admin/login no puede exigir sesión de administrador.

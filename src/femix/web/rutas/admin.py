@@ -464,6 +464,7 @@ async def guardar_perfil(
     whatsapp_plantilla_cita: str = Form(""),
     enlace_resenas: str = Form(""),
     usuario_panel: str = Form(""),
+    dueno_id: str = Form(""),
     mcp: str = Form(""),
 ):
     inquilino_id = _id_valido(inquilino_id)
@@ -492,7 +493,7 @@ async def guardar_perfil(
             horario=leer_horario(horario), capacidades=capacidades,
             nombre_asistente=nombre_asistente, tono=tono,
             telegram_abierto=abierto, telegram_responsable=leer_responsable(responsable), enlace_resenas=enlace_resenas.strip(),
-            telegram_usuario_panel=leer_responsable(usuario_panel),
+            telegram_usuario_panel=leer_responsable(usuario_panel), dueno_id=dueno_id.strip(),
         )
         if contexto["perfil_ilegible"]:
             almacen.reparar(con_telegram(base, None))

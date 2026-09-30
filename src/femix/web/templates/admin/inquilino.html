@@ -93,6 +93,8 @@
         <label>Tono <small>(cómo habla; vacío = cercano y directo)</small>
             <input name="tono" maxlength="300" value="{{ perfil.tono if perfil else '' }}" placeholder="Cercano y directo, sin formalismos excesivos.">
         </label>
+        <label>Dueño <small>(si este negocio es de una persona con su propio asistente: su identificador, p. ej. <code>ana</code>; su app tendrá «Mi negocio»)</small>
+            <input name="dueno_id" value="{{ perfil.dueno_id if perfil else '' }}" pattern="[A-Za-z0-9._\-]*"></label>
         <label>Enlace para reseñas <small>(Google, etc.: el bot lo manda al cliente cuando termina su cita; vacío = no pide)</small>
             <input name="enlace_resenas" type="url" value="{{ perfil.enlace_resenas if perfil else '' }}" placeholder="https://g.page/r/…/review"></label>
 

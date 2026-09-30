@@ -3,12 +3,7 @@
 {% block titulo %}Mi bot — {{ inquilino.nombre }}{% endblock %}
 
 {% block content %}
-<nav class="pestanas">
-    <a href="/usuario/">Hoy</a>
-    <a href="/usuario/semana">Semana</a>
-    <a href="/usuario/chat">Chat</a>
-    <a href="/usuario/panel" class="activa">Mi bot</a>
-</nav>
+{% set activa = 'bot' %}{% include "comun/_pestanas.html" %}
 <h2>Mi bot</h2>
 {% if aviso %}<p class="aviso aviso-ok">{{ aviso }}</p>{% endif %}
 {% if error %}<p class="aviso aviso-error">{{ error }}</p>{% endif %}

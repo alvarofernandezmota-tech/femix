@@ -87,3 +87,107 @@ def test_service_worker_en_la_raiz(tmp_path, monkeypatch):
     for icono in manifiesto["icons"]:
         assert cliente.get(icono["src"]).status_code == 200, icono
     assert any(i["purpose"] == "maskable" for i in manifiesto["icons"])
+
+
+# --- una persona, dos calendarios: vida y negocio vinculados; ajustes ------------------------
+
+def _con_negocio(tmp_path, monkeypatch):
+    cliente, csrf = _entrar(tmp_path, monkeypatch)
+    AlmacenPerfiles(str(tmp_path)).crear(PerfilInquilino("pelu", "Peluquería", tipo="empresa", dueno_id="mama",
+                                                         telegram_permitidos=[123456789]))
+    return cliente, csrf
+
+
+def test_cuentas_vinculadas_en_los_dos_sentidos(tmp_path, monkeypatch):
+    from femix.web.rutas.dia import cuentas_vinculadas, modo_de
+    _con_negocio(tmp_path, monkeypatch)
+    assert [c["id"] for c in cuentas_vinculadas("mama")] == ["pelu"]
+    assert [c["id"] for c in cuentas_vinculadas("pelu")] == ["mama"]
+    assert cuentas_vinculadas("nadie") == []
+    assert modo_de("mama", cuentas_vinculadas("mama")) == "ambos"
+    assert modo_de("pelu", []) == "negocio" and modo_de("mama", []) == "vida"
+
+
+def test_cambiar_de_cuenta_solo_entre_vinculadas(tmp_path, monkeypatch):
+    cliente, csrf = _con_negocio(tmp_path, monkeypatch)
+    AlmacenPerfiles(str(tmp_path)).crear(PerfilInquilino("otro", "Otro", tipo="empresa"))
+    assert "Mi negocio" in cliente.get("/usuario/").text
+    assert cliente.post("/usuario/cambiar", data={"csrf": csrf, "destino": "otro"}).status_code == 403
+    r = cliente.post("/usuario/cambiar", data={"csrf": csrf, "destino": "pelu"}, follow_redirects=False)
+    assert r.status_code in (302, 303)
+    # Ahora la sesión es la del negocio (acceso creado al vuelo) y desde él se vuelve a «Mi vida».
+    pagina = cliente.get("/usuario/").text
+    assert "Peluquería" in pagina and "Mi vida" in pagina
+    assert AlmacenInquilinos(str(tmp_path)).obtener("pelu") is not None
+
+
+def test_ajustes_se_guardan_y_el_bot_los_usa(tmp_path, monkeypatch):
+    from femix.bot.femix import Femix
+    cliente, csrf = _entrar(tmp_path, monkeypatch)
+    assert "Tu asistente, a tu manera" in cliente.get("/usuario/ajustes").text
+    r = cliente.post("/usuario/ajustes", data={"csrf": csrf, "nombre": "  Ana  ", "tono": "corto y directo",
+                                                "quiero_noche": "true", "resumen_noche": "22:15"}, follow_redirects=False)
+    assert r.status_code == 303
+    almacen = almacen_dominio(str(tmp_path), "mama")
+    guardado = almacen.cargar("preferencias", "123456789")[0]
+    assert guardado == {"nombre": "Ana", "tono": "corto y directo", "resumen_noche": "22:15", "resumen_semana": ""}
+    assert "22:15" in cliente.get("/usuario/ajustes").text
+    texto = Femix(inquilino_id="mama", directorio_datos=str(tmp_path), almacen=almacen)._preferencias("123456789")
+    assert "«Ana»" in texto and "corto y directo" in texto
+    assert Femix(inquilino_id="mama", directorio_datos=str(tmp_path), almacen=almacen)._preferencias("999") == ""
+    assert cliente.post("/usuario/ajustes", data={"csrf": csrf, "quiero_noche": "true", "resumen_noche": "mal"}).status_code == 400
+
+
+def test_anadir_mi_negocio_desde_ajustes(tmp_path, monkeypatch):
+    cliente, csrf = _entrar(tmp_path, monkeypatch)
+    pagina = cliente.get("/usuario/ajustes").text
+    assert "Solo tu vida" in pagina and "Añadir mi negocio" in pagina
+    assert cliente.post("/usuario/negocio/crear", data={"csrf": csrf, "nombre": "  "}).status_code == 400
+    r = cliente.post("/usuario/negocio/crear", data={"csrf": csrf, "nombre": "Peluquería Ana"}, follow_redirects=False)
+    assert r.status_code == 303 and "hecho=negocio" in r.headers["location"]
+    negocio = AlmacenPerfiles(str(tmp_path)).obtener("mama-negocio")
+    assert negocio.tipo == "empresa" and negocio.dueno_id == "mama" and "reservas" in negocio.capacidades
+    assert negocio.telegram_permitidos == [123456789] and negocio.telegram_token == ""   # su bot lo pone ella
+    pagina = cliente.get(r.headers["location"]).text
+    assert "Tu negocio ya tiene su cuenta" in pagina and "Mi negocio" in pagina and "tu negocio</strong>" in pagina
+    # Ya tiene las dos: no se crea una tercera.
+    assert cliente.post("/usuario/negocio/crear", data={"csrf": csrf, "nombre": "Otra"}).status_code == 400
+
+
+def test_anadir_mi_vida_desde_un_negocio(tmp_path, monkeypatch):
+    monkeypatch.setenv("FEMIX_WEB_DATOS_DIR", str(tmp_path))
+    monkeypatch.delenv("FEMIX_BASE_DATOS_URL", raising=False)
+    AlmacenPerfiles(str(tmp_path)).crear(PerfilInquilino("pelu", "Peluquería", tipo="empresa", telegram_permitidos=[5]))
+    AlmacenInquilinos(str(tmp_path)).crear("pelu", "Peluquería", "clave-secreta")
+    cliente = TestClient(app, base_url="https://testserver")
+    cliente.post("/login", data={"inquilino_id": "pelu", "password": "clave-secreta"})
+    pagina = cliente.get("/usuario/ajustes").text
+    csrf = re.search(r'name="csrf" value="([^"]+)"', pagina).group(1)
+    assert "Solo tu negocio" in pagina and "Añadir mi vida personal" in pagina
+    r = cliente.post("/usuario/negocio/crear", data={"csrf": csrf, "nombre": "Ana"}, follow_redirects=False)
+    assert r.status_code == 303 and "hecho=vida" in r.headers["location"]
+    assert AlmacenPerfiles(str(tmp_path)).obtener("pelu").dueno_id == "pelu-vida"
+    assert AlmacenPerfiles(str(tmp_path)).obtener("pelu-vida").tipo == "persona"
+    assert "Mi vida" in cliente.get("/usuario/").text
+
+
+def test_resumenes_a_la_hora_que_eligio_cada_persona(tmp_path):
+    from datetime import datetime
+    from conectores.telegram.resumenes import _toca, pendientes
+    almacen = almacen_dominio(str(tmp_path), "mama")
+    AgendaPersonal("111", almacen=almacen).agregar("Médico", "2026-10-07", "10:00")
+    almacen.guardar("preferencias", "111", [{"resumen_noche": "19:30", "resumen_semana": ""}])
+
+    class Reloj:
+        def __init__(self, cuando): self._cuando = cuando
+        def ahora(self): return self._cuando
+
+    assert _toca(datetime(2026, 10, 6, 19, 30), "19:30") and not _toca(datetime(2026, 10, 6, 19, 29), "19:30")
+    assert not _toca(datetime(2026, 10, 6, 23, 0), "") and not _toca(datetime(2026, 10, 6, 23, 0), "mal")
+    assert pendientes(str(tmp_path), "mama", (111,), Reloj(datetime(2026, 10, 6, 19, 0))) == []
+    lista = pendientes(str(tmp_path), "mama", (111,), Reloj(datetime(2026, 10, 6, 19, 45)))
+    assert [(u, c) for u, _, c in lista] == [("111", "noche")]
+    # El lunes no quiere resumen de la semana: solo la noche (con algo para el martes).
+    AgendaPersonal("111", almacen=almacen).agregar("Dentista", "2026-10-06", "12:00")
+    lista = pendientes(str(tmp_path), "mama", (111,), Reloj(datetime(2026, 10, 5, 20, 0)))
+    assert [c for _, _, c in lista] == ["noche"]

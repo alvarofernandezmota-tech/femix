@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block titulo %}Ajustes — {{ inquilino.nombre }}{% endblock %}
+
+{% block content %}
+{% set activa = 'ajustes' %}{% include "comun/_pestanas.html" %}
+<h2>Tu asistente, a tu manera</h2>
+{% if aviso %}<p class="aviso aviso-ok">{{ aviso }}</p>{% endif %}
+{% if error %}<p class="aviso aviso-error">{{ error }}</p>{% endif %}
+<section class="tarjeta">
+    <form method="post" action="/usuario/ajustes" class="formulario">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label>Cómo quieres que te llame <input name="nombre" maxlength="40" value="{{ preferencias.nombre }}" placeholder="Ana, mamá, jefe…"></label>
+        <label>Cómo quieres que te hable <small>(opcional)</small>
+            <input name="tono" maxlength="200" value="{{ preferencias.tono }}" placeholder="Corto y directo · Con cariño · Sin emojis…"></label>
+        <fieldset>
+            <legend>Resúmenes por Telegram</legend>
+            <label class="casilla"><input type="checkbox" name="quiero_noche" value="true" {% if preferencias.resumen_noche %}checked{% endif %}> Cada noche, lo de mañana, a las
+                <input type="time" name="resumen_noche" value="{{ preferencias.resumen_noche or '21:00' }}" style="width:auto"></label>
+            <label class="casilla"><input type="checkbox" name="quiero_semana" value="true" {% if preferencias.resumen_semana %}checked{% endif %}> Los lunes, la semana, a las
+                <input type="time" name="resumen_semana" value="{{ preferencias.resumen_semana or '08:00' }}" style="width:auto"></label>
+        </fieldset>
+        <button type="submit">Guardar</button>
+    </form>
+    <p class="secundario">También puedes decírselo al bot: «llámame Ana», «recuerda que prefiero las citas por la mañana». Lo que aprende de ti se ve en «Mi bot».</p>
+</section>
+
+<section class="tarjeta">
+    <h3>Qué lleva tu asistente</h3>
+    {% if modo == 'ambos' %}
+    <p>🏠 <strong>Tu vida</strong> y 🏪 <strong>tu negocio</strong>, cada uno con su bot, sus datos y su calendario. Cambias de uno a otro con los botones de arriba.</p>
+    {% elif modo == 'negocio' %}
+    <p>🏪 <strong>Solo tu negocio</strong>: citas de clientes, horario, preguntas frecuentes y documentos.</p>
+    <form method="post" action="/usuario/negocio/crear" class="formulario fila">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input name="nombre" maxlength="80" required placeholder="Tu nombre (para tu cuenta personal)">
+        <button type="submit">Añadir mi vida personal</button>
+    </form>
+    <p class="secundario">Tendrás una segunda cuenta, aparte y vinculada: agenda, tareas, diario y recordatorios tuyos, con su propio bot.</p>
+    {% else %}
+    <p>🏠 <strong>Solo tu vida</strong>: agenda, tareas, diario, recordatorios y avisos.</p>
+    <form method="post" action="/usuario/negocio/crear" class="formulario fila">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input name="nombre" maxlength="80" required placeholder="Nombre del negocio">
+        <button type="submit">Añadir mi negocio</button>
+    </form>
+    <p class="secundario">Tendrás una segunda cuenta, aparte y vinculada: reservas de clientes, horario, precios y preguntas frecuentes, con su propio bot y su propia página de reservas. Tus cosas personales no se mezclan con las del negocio.</p>
+    {% endif %}
+    <p class="secundario">El nombre de tu asistente, su tono y lo que sabe hacer (voz, documentos, reservas…) se eligen en <a href="/usuario/panel">Mi bot</a>.</p>
+</section>
+{% endblock %}

@@ -19,6 +19,23 @@ COLECCION = "resumenes"
 _log = logging.getLogger(__name__)
 
 
+def _preferencias(almacen, usuario: str) -> dict:
+    """Las horas que eligió cada persona en «Ajustes» (vacío = no quiere ese resumen)."""
+    guardado = almacen.cargar("preferencias", usuario)
+    base = {"resumen_noche": f"{HORA_NOCHE:02d}:00", "resumen_semana": f"{HORA_SEMANA:02d}:00"}
+    return {**base, **(guardado[0] if guardado else {})}
+
+
+def _toca(ahora, hora_texto: str) -> bool:
+    if not hora_texto:
+        return False
+    try:
+        h, m = (int(x) for x in hora_texto.split(":"))
+    except ValueError:
+        return False
+    return (ahora.hour, ahora.minute) >= (h, m)
+
+
 def _marcas(almacen, usuario: str) -> dict:
     guardado = almacen.cargar(COLECCION, usuario)
     return dict(guardado[0]) if guardado else {}
@@ -33,12 +50,13 @@ def pendientes(directorio: str, inquilino_id: str, permitidos, reloj, reservas=N
     for usuario in sorted(str(u) for u in permitidos or ()):
         marcas = _marcas(almacen, usuario)
         comun = dict(directorio_datos=directorio, almacen=almacen, reloj=reloj, reservas=reservas)
-        if ahora.weekday() == 0 and ahora.hour >= HORA_SEMANA and marcas.get("semana") != hoy:
+        preferencias = _preferencias(almacen, usuario)
+        if ahora.weekday() == 0 and _toca(ahora, preferencias["resumen_semana"]) and marcas.get("semana") != hoy:
             if hay_algo(usuario, 7, **comun):
                 salida.append((usuario, "📆 Tu semana:\n" + resumen(usuario, 7, **comun), "semana"))
             else:
                 marcar(almacen, usuario, "semana", hoy)
-        if ahora.hour >= HORA_NOCHE and marcas.get("noche") != hoy:
+        if _toca(ahora, preferencias["resumen_noche"]) and marcas.get("noche") != hoy:
             if hay_algo(usuario, 1, desde_dias=1, **comun):
                 salida.append((usuario, "🌙 Para mañana:\n" + resumen(usuario, 1, desde_dias=1, **comun), "noche"))
             else:

@@ -80,6 +80,9 @@ class PerfilInquilino:
     # De quién son los datos que enseña la app (agenda, chat, tareas): un ID de Telegram de los
     # permitidos. 0 = el primero de la lista.
     telegram_usuario_panel: int = 0
+    # Un negocio puede ser de una persona que también tiene su asistente personal: el identificador
+    # de ese inquilino. Con él, la app pasa de «Mi vida» a «Mi negocio» sin otro login.
+    dueno_id: str = ""
     # Fase 3: cómo se presenta y habla su bot. Vacíos = los de Femix.
     nombre_asistente: str = ""
     tono: str = ""
@@ -119,6 +122,12 @@ class PerfilInquilino:
             raise ValueError("El ID de Telegram del usuario de la app no es válido") from None
         if isinstance(self.telegram_usuario_panel, bool) or usuario_panel < 0 or usuario_panel > 10**15:
             raise ValueError("El ID de Telegram del usuario de la app no es válido")
+        dueno_id = self.dueno_id or ""
+        if not isinstance(dueno_id, str):
+            raise ValueError("El dueño tiene que ser el identificador de un inquilino")
+        dueno_id = validar_inquilino_id(dueno_id.strip()) if dueno_id.strip() else ""
+        if dueno_id and dueno_id == (self.inquilino_id or ""):
+            raise ValueError("Un inquilino no puede ser su propio dueño")
         enlace_resenas = self.enlace_resenas or ""
         if not isinstance(enlace_resenas, str):
             raise ValueError("El enlace de reseñas tiene que ser un texto")
@@ -161,6 +170,7 @@ class PerfilInquilino:
             whatsapp_plantilla_cita=whatsapp_plantilla_cita,
             enlace_resenas=enlace_resenas,
             telegram_usuario_panel=usuario_panel,
+            dueno_id=dueno_id,
             mcp_servidores=_validar_mcp(self.mcp_servidores),
         )
 
@@ -266,6 +276,11 @@ def _validar_permitidos(permitidos) -> list:
             raise ValueError(f"{usuario!r} no es un ID de usuario de Telegram")
         validos.add(usuario)
     return sorted(validos)
+
+
+def replace_perfil(perfil: "PerfilInquilino", **cambios) -> "PerfilInquilino":
+    """Una copia del perfil con esos campos cambiados y validada (para `AlmacenPerfiles.modificar`)."""
+    return replace(perfil, **cambios).validado()
 
 
 class PerfilIlegible(ValueError):

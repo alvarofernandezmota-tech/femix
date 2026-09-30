@@ -161,8 +161,28 @@
       }
     } catch (e) { /* sin red: se reintenta */ }
   }
+  // --- Suscripción push: para que los recordatorios lleguen con la app cerrada ---
+  function aBytes(base64url) {
+    const relleno = "=".repeat((4 - (base64url.length % 4)) % 4);
+    const crudo = atob((base64url + relleno).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(crudo, (c) => c.charCodeAt(0));
+  }
+  async function suscribirPush() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    try {
+      const r = await fetch("/usuario/push/clave");
+      if (!r.ok) return;                      // sin claves VAPID en el servidor: avisa solo Telegram
+      const { publica } = await r.json();
+      const registro = await navigator.serviceWorker.ready;
+      const sub = await registro.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: aBytes(publica) });
+      await fetch("/usuario/push/suscribir", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRF": csrf },
+                                              body: JSON.stringify(sub.toJSON()) });
+    } catch (e) { /* sin permiso o sin red: se reintenta en la próxima visita */ }
+  }
   if ("Notification" in window && Notification.permission === "default") {
-    texto.addEventListener("focus", () => Notification.requestPermission(), { once: true });
+    texto.addEventListener("focus", () => Notification.requestPermission().then((p) => { if (p === "granted") suscribirPush(); }), { once: true });
+  } else if ("Notification" in window && Notification.permission === "granted") {
+    suscribirPush();
   }
   revisarAvisos();
   setInterval(revisarAvisos, 60000);

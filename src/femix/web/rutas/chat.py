@@ -26,7 +26,7 @@ from femix.inquilino.capacidades import VOZ
 
 from ..bots import bots
 from .auth import Inquilino, comprobar_origen, csrf_de_sesion, directorio_datos_web, obtener_inquilino_actual
-from .dia import usuario_principal
+from .dia import cuentas_vinculadas, usuario_principal
 
 _log = logging.getLogger(__name__)
 router = APIRouter(prefix="/usuario/chat", tags=["chat"], dependencies=[Depends(comprobar_origen)])
@@ -57,7 +57,7 @@ async def pantalla(request: Request, inquilino: Inquilino = Depends(obtener_inqu
     historial = await asyncio.to_thread(femix.historial, usuario)
     return _templates.TemplateResponse(request, "usuario/chat.html", {
         "inquilino": inquilino, "csrf": csrf, "historial": historial[-30:], "con_voz": VOZ in capacidades,
-        "nombre_bot": _nombre_bot(directorio, inquilino.id),
+        "nombre_bot": _nombre_bot(directorio, inquilino.id), "cuentas": await asyncio.to_thread(cuentas_vinculadas, inquilino.id),
     })
 
 

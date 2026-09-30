@@ -209,3 +209,5 @@ details summary { cursor: pointer; color: #1a1a2e; font-weight: 600; margin-top:
 .cifra strong { font-size: 1.4rem; color: #22255e; }
 .cifra span { color: #666; font-size: 0.85em; }
 .cifra.mal strong { color: #b42318; }
+
+code.url { display: block; word-break: break-all; background: #f3f4fa; padding: 0.5rem; border-radius: 6px; font-size: 0.85em; }
