@@ -28,7 +28,8 @@ En `.env` no pueden faltar:
 |---|---|
 | `TELEGRAM_BOT_TOKEN`, `FEMIX_TELEGRAM_PERMITIDOS` | el bot del `.env` y quién puede usarlo |
 | `FEMIX_DB_CLAVE` | clave de Postgres |
-| `FEMIX_WEB_ADMIN_TOKEN` | entrar en el panel del dueño (`/admin`) |
+| `FEMIX_WEB_ADMIN_TOKEN` | entrar en el panel del dueño (`/admin`) con token |
+| `FEMIX_WEB_DUENO` | tu identificador de inquilino (`varo`): entras en la app y ves la pestaña «Admin» sin token |
 | `HUGIN_LLM_MODELO`, `HUGIN_LLM_MODELO_RAPIDO`, `HUGIN_LLM_KEEP_ALIVE=-1` | modelos de Ollama, siempre cargados |
 | `FEMIX_EMPRESA_NOMBRE`, `_NIF`, `_DIRECCION`, `_EMAIL` | datos legales en términos y privacidad |
 

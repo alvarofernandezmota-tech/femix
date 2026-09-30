@@ -726,3 +726,8 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
 - Docs: `app.md`, `operacion.md`, `rag.md`, `PRODUCCION_MADRE.md` (push, señal, alta de mañana),
   `ROADMAP.md`, `mejoras.md`. Tests: `test_web_dia.py`, `test_empleados_senal.py`,
   `test_calendario_push.py`, `test_reranker.py` (1067 en verde).
+
+## 2026-09-30 — Una sola entrada para el dueño (`feat/panel-web`)
+- `FEMIX_WEB_DUENO=<inquilino>`: el dueño de la plataforma entra en la app con su usuario y
+  contraseña y ve la pestaña «🛠 Admin»; su sesión vale en `/admin` (con su CSRF). El token sigue
+  valiendo. `web/dueno.py`, `requerir_admin`, `comun/_pestanas.html`. Test en `test_web_admin.py`.

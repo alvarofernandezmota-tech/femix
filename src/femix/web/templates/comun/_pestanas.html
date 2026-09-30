@@ -5,6 +5,7 @@
     <a href="/usuario/chat" class="{{ 'activa' if activa == 'chat' else '' }}">Chat</a>
     <a href="/usuario/panel" class="{{ 'activa' if activa == 'bot' else '' }}">Mi bot</a>
     <a href="/usuario/ajustes" class="{{ 'activa' if activa == 'ajustes' else '' }}">Ajustes</a>
+    {% if inquilino and es_dueno(inquilino.id) %}<a href="/admin/" class="admin">🛠 Admin</a>{% endif %}
     {% for c in cuentas or [] %}
     <form method="post" action="/usuario/cambiar" class="inline cuenta">
         <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="destino" value="{{ c.id }}">

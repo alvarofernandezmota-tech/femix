@@ -22,6 +22,8 @@ def version_estaticos() -> str:
 
 
 def plantillas() -> Jinja2Templates:
+    from .dueno import es_dueno
     t = Jinja2Templates(directory=DIRECTORIO)
     t.env.globals["version_estaticos"] = version_estaticos()
+    t.env.globals["es_dueno"] = es_dueno     # la pestaña «Admin» solo para el dueño de la plataforma
     return t

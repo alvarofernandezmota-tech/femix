@@ -33,7 +33,8 @@ from femix.saas.suscripciones import ESTADOS, AlmacenSuscripciones
 
 from .. import panel_comun
 from ..documentos import ingerir_subida, ingerir_web, listar_documentos
-from .auth import (
+from ..dueno import es_dueno
+from .auth import (sesion_de_usuario_valida, 
     AlmacenInquilinos,
     AlmacenSesiones,
     directorio_datos_web,
@@ -82,12 +83,19 @@ async def requerir_admin(
     request: Request,
     x_admin_token: "str | None" = Header(default=None),
     femix_admin: "str | None" = Cookie(default=None),
+    session_id: "str | None" = Cookie(default=None),
 ) -> dict:
     if verificar_token_admin(x_admin_token):
         return {"csrf": None}
     sesion = _sesiones_admin().obtener(femix_admin) if token_admin_configurado() else None
     if sesion is not None and not secrets.compare_digest(sesion.get("huella", ""), _huella_token()):
         sesion = None
+    if sesion is None:
+        # Una sola entrada: el dueño de la plataforma (FEMIX_WEB_DUENO) entra en la app con su
+        # usuario y su misma sesión vale aquí. Su CSRF es el de esa sesión.
+        de_usuario = sesion_de_usuario_valida(session_id)
+        if de_usuario is not None and es_dueno(de_usuario.get("inquilino_id")):
+            sesion = {"csrf": de_usuario.get("csrf", ""), "dueno": de_usuario["inquilino_id"]}
     if sesion is None:
         if request.method == "GET" and "text/html" in request.headers.get("accept", ""):
             raise HTTPException(status_code=status.HTTP_303_SEE_OTHER, headers={"Location": "/admin/login"})
@@ -404,6 +412,7 @@ async def dashboard(request: Request, sesion: dict = Depends(requerir_admin)):
         request,
         "admin/dashboard.html",
         {
+            "dueno": sesion.get("dueno"),
             "inquilinos": filas,
             "stats": _calcular_stats(directorio, filas),
             "proceso": _proceso_de_bots(estado),
