@@ -93,8 +93,10 @@ async def requerir_admin(
     if sesion is None:
         # Una sola entrada: el dueño de la plataforma (FEMIX_WEB_DUENO) entra en la app con su
         # usuario y su misma sesión vale aquí. Su CSRF es el de esa sesión.
+        # Solo si esa sesión se abrió con su contraseña: una abierta desde una cuenta vinculada
+        # («Mi vida» desde su negocio) no es prueba de que sea el dueño quien está delante.
         de_usuario = sesion_de_usuario_valida(session_id)
-        if de_usuario is not None and es_dueno(de_usuario.get("inquilino_id")):
+        if de_usuario is not None and es_dueno(de_usuario.get("inquilino_id")) and de_usuario.get("origen") == "login":
             sesion = {"csrf": de_usuario.get("csrf", ""), "dueno": de_usuario["inquilino_id"]}
     if sesion is None:
         if request.method == "GET" and "text/html" in request.headers.get("accept", ""):

@@ -293,6 +293,11 @@ def _validar_permitidos(permitidos) -> list:
     return sorted(validos)
 
 
+def token_telegram_valido(token: "str | None") -> bool:
+    """Tiene la forma de los tokens de @BotFather (`123456:AAAA…`)."""
+    return bool(token) and _PATRON_TOKEN.fullmatch(token.strip()) is not None
+
+
 def _validar_empleados(lista) -> list:
     if not isinstance(lista, (list, tuple)):
         raise ValueError("empleados tiene que ser una lista de nombres")

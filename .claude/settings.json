@@ -1,6 +1,7 @@
 {
   "permissions": {
     "allow": [
+      "Bash(scripts/lanzar.sh:*)",
       "Bash(scripts/desplegar.sh:*)",
       "Bash(scripts/probar-todo.sh:*)",
       "Bash(scripts/ci.sh:*)",

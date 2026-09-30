@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from ..plantillas import plantillas
 
 from femix.saas import datos_empresa, pagos, registro_abierto, saas_activo
+from ..dueno import es_dueno
 from femix.saas.planes import DIAS_PRUEBA, planes_publicos
 from femix.inquilino.perfil import AlmacenPerfiles
 from femix.saas.suscripciones import AlmacenSuscripciones, nueva_prueba
@@ -97,6 +98,8 @@ async def registrar(
         tipo = "empresa"
     if not acepto:
         return error("Tienes que aceptar los términos y la política de privacidad.")
+    if es_dueno(inquilino_id.strip().lower()):
+        return error("Ese identificador no está disponible.")
     try:
         perfil = _crear_inquilino(inquilino_id.strip().lower(), nombre, tipo, password)
     except ValueError as exc:

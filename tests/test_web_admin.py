@@ -193,7 +193,58 @@ def test_dar_acceso_desde_la_terminal(tmp_path, monkeypatch, capsys):
     monkeypatch.delenv("FEMIX_BASE_DATOS_URL", raising=False)
     generada = dar_acceso("varo", "Varo")
     assert len(generada) >= 8 and AlmacenInquilinos(str(tmp_path)).verificar_credenciales("varo", generada)
-    assert main(["varo", "Varo", "OtraClave12"]) == 0 and "OtraClave12" in capsys.readouterr().out
+    # La contraseña no va en la línea de comandos: se pide sin eco (--pedir) o se genera.
+    respuestas = iter(["OtraClave12", "OtraClave12"])
+    assert main(["varo", "Varo", "--pedir"], pedir=lambda _: next(respuestas)) == 0
+    salida = capsys.readouterr().out
+    assert "OtraClave12" not in salida and "Contraseña cambiada" in salida
     assert AlmacenInquilinos(str(tmp_path)).verificar_credenciales("varo", "OtraClave12")
     assert not AlmacenInquilinos(str(tmp_path)).verificar_credenciales("varo", generada)   # la vieja ya no vale
-    assert main(["varo", "Varo", "corta"]) == 1 and main([]) == 2
+    assert AlmacenInquilinos(str(tmp_path)).obtener("varo").nombre == "Varo"
+    assert main(["varo", "--pedir"], pedir=lambda _: "corta") == 1
+    assert main(["varo", "Varo", "OtraClave12"]) == 2 and main([]) == 2      # ya no se acepta por argumento
+    assert main(["varo"]) == 0 and AlmacenInquilinos(str(tmp_path)).obtener("varo").nombre == "Varo"   # sin nombre: se conserva
+
+
+def test_a_la_cuenta_del_dueno_no_se_cambia_sin_contrasena(tmp_path, monkeypatch):
+    """Quien tenga la contraseña del negocio vinculado no puede hacerse dueño (ni admin) con «Mi vida»."""
+    from femix.inquilino.perfil import AlmacenPerfiles, PerfilInquilino
+    from femix.web.rutas.auth import AlmacenInquilinos
+    monkeypatch.setenv("FEMIX_WEB_DATOS_DIR", str(tmp_path))
+    monkeypatch.delenv("FEMIX_BASE_DATOS_URL", raising=False)
+    monkeypatch.setenv("FEMIX_WEB_DUENO", "varo")
+    AlmacenPerfiles(str(tmp_path)).crear(PerfilInquilino("varo", "Varo", tipo="persona"))
+    AlmacenPerfiles(str(tmp_path)).crear(PerfilInquilino("pelu", "Pelu", tipo="empresa", dueno_id="varo"))
+    AlmacenInquilinos(str(tmp_path)).crear("varo", "Varo", "clave-secreta")
+    AlmacenInquilinos(str(tmp_path)).crear("pelu", "Pelu", "clave-negocio")
+    cliente = TestClient(app, base_url="https://testserver")
+    cliente.post("/login", data={"inquilino_id": "pelu", "password": "clave-negocio"})
+    import re
+    csrf = re.search(r'name="csrf" value="([^"]+)"', cliente.get("/usuario/").text).group(1)
+    r = cliente.post("/usuario/cambiar", data={"csrf": csrf, "destino": "varo"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"].startswith("/login?aviso=dueno")
+    assert "con su contraseña" in cliente.get(r.headers["location"]).text
+    assert cliente.get("/admin/", headers={"Accept": "text/html"}, follow_redirects=False).status_code == 303
+    assert cliente.post("/admin/inquilinos/varo/password", data={"csrf": csrf, "password": "pisada-12345"}).status_code == 403
+    assert AlmacenInquilinos(str(tmp_path)).verificar_credenciales("varo", "clave-secreta")
+    # El dueño, desde su vida, sí pasa a su negocio; pero esa sesión «de cambio» no abre el admin.
+    cliente.cookies.clear()
+    cliente.post("/login", data={"inquilino_id": "varo", "password": "clave-secreta"})
+    csrf = re.search(r'name="csrf" value="([^"]+)"', cliente.get("/usuario/").text).group(1)
+    assert cliente.get("/admin/", headers={"Accept": "text/html"}).status_code == 200
+    assert cliente.post("/usuario/cambiar", data={"csrf": csrf, "destino": "pelu"}, follow_redirects=False).status_code == 303
+    assert "Pelu" in cliente.get("/usuario/").text
+    assert cliente.get("/admin/", headers={"Accept": "text/html"}, follow_redirects=False).status_code == 303
+
+
+def test_el_id_del_dueno_no_se_puede_registrar(tmp_path, monkeypatch):
+    monkeypatch.setenv("FEMIX_WEB_DATOS_DIR", str(tmp_path))
+    monkeypatch.delenv("FEMIX_BASE_DATOS_URL", raising=False)
+    monkeypatch.setenv("FEMIX_WEB_DUENO", "varo")
+    monkeypatch.setenv("FEMIX_SAAS", "1")
+    monkeypatch.setenv("FEMIX_SAAS_REGISTRO", "1")
+    cliente = TestClient(app, base_url="https://testserver")
+    r = cliente.post("/registro", data={"inquilino_id": "Varo", "nombre": "Yo", "email": "x@y.es",
+                                        "password": "contrasena-larga-1", "tipo": "persona", "acepto": "true"})
+    assert r.status_code == 400 and "no está disponible" in r.text
+    assert cliente.get("/admin/inquilinos").status_code == 403

@@ -744,3 +744,14 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   `tests/test_lanzar.py`.
 - `docs/LANZAMIENTO.md` (guía de cero a usarlo), comando `/lanzar` para Claude Code en madre,
   enlaces en `docs/README.md`, `PRODUCCION_MADRE.md` y `CLAUDE.md`.
+- Revisión adversarial del lanzamiento (23 hallazgos, todos arreglados): a la cuenta del dueño no se
+  cambia con «Mi vida» (se entra con contraseña) y `/admin` solo acepta sesiones abiertas con
+  contraseña (`origen=login`); el id del dueño no se puede registrar por `/registro`;
+  `FEMIX_WEB_DUENO` se escribe solo cuando el perfil y el acceso ya existen; la contraseña de la app
+  no va en la línea de comandos (`--pedir`) ni se imprime fuera de un terminal; `lanzar.sh` valida
+  opciones y el id, no pisa un dueño distinto sin `--cambiar-dueno`, escribe el `.env` sin `sed`
+  (valores con `&` o `|`), corrige CRLF, no borra claves de push si no genera nuevas y avisa si
+  falta `FEMIX_PUSH_EMAIL`; `femix.web.lanzar` valida la forma del token, distingue el inquilino del
+  `.env`, reactiva un dueño de baja, no pisa el usuario de la app ni el nombre, exige 8 caracteres y
+  no traga IDs mal escritos; `.claude/settings.json` permite `scripts/lanzar.sh`; la guía no lleva
+  la IP de madre.

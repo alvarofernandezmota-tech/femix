@@ -158,7 +158,7 @@ Para quitarlo: `sudo tailscale serve --bg off` (o `tailscale serve reset`).
 ### Tu usuario y contraseña de la app (una sola entrada)
 
 ```bash
-docker compose exec femix python -m femix.web.acceso varo "Varo"   # imprime una contraseña nueva (o pásala como 3.er argumento)
+docker compose exec femix python -m femix.web.acceso varo "Varo"   # imprime una contraseña nueva (o --pedir para escribirla tú)
 grep -q '^FEMIX_WEB_DUENO=' .env || echo 'FEMIX_WEB_DUENO=varo' >> .env
 docker compose up -d femix
 ```
