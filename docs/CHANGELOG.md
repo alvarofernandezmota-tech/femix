@@ -733,3 +733,14 @@ Dos cosas distintas, igual que en `hugin` (leído, no tocado):
   valiendo. `web/dueno.py`, `requerir_admin`, `comun/_pestanas.html`. Test en `test_web_admin.py`.
 - `python -m femix.web.acceso <inquilino> <nombre> [contraseña]`: da o cambia la contraseña de la app
   desde la terminal de madre (cierra las sesiones abiertas).
+
+## 2026-09-30 — Lanzamiento en un paso (`feat/panel-web`)
+- `scripts/lanzar.sh [dueño] [nombre] [--sin-desplegar]`: despliega `main`, completa el `.env`
+  (`FEMIX_WEB_DUENO`, `FEMIX_AVISOS_TELEGRAM`, claves de push, correo), deja al dueño listo y
+  ejecuta `probar-todo.sh`; imprime dónde entrar. Repetible; no enseña secretos.
+- `python -m femix.web.lanzar <inquilino> <nombre> [--nueva-contrasena] [--contrasena X]`: crea o
+  completa el perfil del dueño (permitidos del `.env`, usuario de la app, nombre del asistente,
+  capacidades por defecto), da acceso a la app y repasa el `.env` con OK/FALTA. Tests en
+  `tests/test_lanzar.py`.
+- `docs/LANZAMIENTO.md` (guía de cero a usarlo), comando `/lanzar` para Claude Code en madre,
+  enlaces en `docs/README.md`, `PRODUCCION_MADRE.md` y `CLAUDE.md`.

@@ -13,6 +13,9 @@ Guía paso a paso para desplegar, comprobar y mantener femix en `madre`. Detalle
 - **Canal principal: Telegram.** WhatsApp es un conector más sobre el mismo bot.
 - `main` en GitHub es lo que corre en madre.
 
+> Atajo: `scripts/lanzar.sh` hace los pasos 2 y 3 de esta guía, completa el `.env` y deja al
+> dueño listo. Guía corta en [LANZAMIENTO.md](LANZAMIENTO.md).
+
 ## 1. Primera vez
 
 ```bash

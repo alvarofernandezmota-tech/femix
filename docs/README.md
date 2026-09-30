@@ -18,6 +18,7 @@
 - [operacion.md](operacion.md): pasar a una persona, recordatorio de citas, avisos de fallos, correos y RGPD.
 
 ## Operación
+- [LANZAMIENTO.md](LANZAMIENTO.md): **lanzarlo todo en un paso** (`scripts/lanzar.sh`), dónde entrar, alta de cada persona, día a día.
 - [docker.md](docker.md): despliegue con Docker y Ollama en el host.
 - [PRODUCCION_MADRE.md](PRODUCCION_MADRE.md): **cómo proceder en madre**: primera vez, desplegar, `probar-todo.sh` y problemas conocidos.
 - [INFRAESTRUCTURA.md](INFRAESTRUCTURA.md): servicios y cómo revivirlo todo.
