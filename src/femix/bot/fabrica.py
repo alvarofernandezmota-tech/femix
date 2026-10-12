@@ -18,6 +18,7 @@ from .femix import Femix
 DIRECTORIO_DATOS = "datos"
 VARIABLE_INQUILINO = "FEMIX_INQUILINO_ID"
 NOMBRE_MEMORIA = "memoria.json"
+NOMBRE_CONFIRMACIONES = "confirmaciones.json"
 
 def inquilino_desde_entorno(defecto: str = "default") -> str:
     """Lee `FEMIX_INQUILINO_ID` y lo valida **al arrancar**, no en la primera búsqueda.
@@ -168,7 +169,14 @@ def construir_femix(
         # Experimental: el modelo ve solo las herramientas de los especialistas del mensaje.
         from ..colmena.integracion import FemixColmena
         clase = FemixColmena
-    return clase(inquilino_id=inquilino_id, directorio_datos=carpeta, buscador=buscador, reloj=reloj, **extra)
+    bot = clase(inquilino_id=inquilino_id, directorio_datos=carpeta, buscador=buscador, reloj=reloj, **extra)
+    if clase is not Femix:
+        # Con la colmena: los mensajes compuestos van por pasos y las acciones destructivas piden
+        # confirmación (que sobrevive entre mensajes, en la carpeta del inquilino).
+        from ..colmena.confirmaciones import Confirmaciones
+        bot.usar_planes = True
+        bot.confirmaciones = Confirmaciones(os.path.join(carpeta, NOMBRE_CONFIRMACIONES))
+    return bot
 
 def _horario_del_perfil(directorio_datos: str, inquilino_id: str, con_empleados: bool = False):
     """Sin perfil legible, sin horario: y sin horario no se reserva (regla de las reservas)."""
