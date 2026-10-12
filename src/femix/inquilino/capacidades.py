@@ -24,6 +24,7 @@ CATALOGO: dict[str, Capacidad] = {
         Capacidad("reservas", "Reservas de clientes contra el horario del perfil (/reserva). Para empresas.", True),
         Capacidad("conectores_mcp", "Herramientas externas por MCP (calendario, correo, Notion...) que configura el dueño.", True),
         Capacidad("tool_calling", "Entiende lo que pides con palabras y lo hace: tareas, agenda, diario, avisos, reservas y buscar en documentos.", True),
+        Capacidad("colmena", "Experimental: el modelo ve solo las herramientas de los especialistas que pide el mensaje. Necesita tool_calling.", True),
     )
 }
 
@@ -32,10 +33,12 @@ VOZ = "voz"
 RESERVAS = "reservas"
 DOCUMENTOS = "documentos"
 TOOL_CALLING = "tool_calling"
+COLMENA = "colmena"
 
 # Reservas no va por defecto: es de empresas, se enciende en su perfil. Tool calling sí: sin él el
 # bot solo apunta cosas con comandos (/tarea...), y lo normal es pedírselo con palabras.
-POR_DEFECTO: tuple[str, ...] = tuple(n for n, c in CATALOGO.items() if c.disponible and n not in ("reservas", "busqueda_web", "conectores_mcp"))
+# La colmena es experimental: apagada por defecto, se enciende a mano en el inquilino del dueño.
+POR_DEFECTO: tuple[str, ...] = tuple(n for n, c in CATALOGO.items() if c.disponible and n not in ("reservas", "busqueda_web", "conectores_mcp", "colmena"))
 
 
 def validar_capacidades(nombres) -> list[str]:

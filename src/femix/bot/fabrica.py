@@ -6,7 +6,7 @@ y límites del plan salen de aquí; el resto del código recibe las piezas ya mo
 import os
 
 from ..dominio.negocio.reservas import Reservas
-from ..inquilino.capacidades import DOCUMENTOS, MEMORIA, POR_DEFECTO, RESERVAS, TOOL_CALLING
+from ..inquilino.capacidades import COLMENA, DOCUMENTOS, MEMORIA, POR_DEFECTO, RESERVAS, TOOL_CALLING
 from ..infraestructura.almacen_json import AlmacenJson
 from ..infraestructura.almacen_postgres import VARIABLE_URL, AlmacenPostgres
 from ..llm.modelos import SelectorDeModelos
@@ -163,7 +163,12 @@ def construir_femix(
             # Fase 6: suscripción vigente y límite de mensajes del plan en cada mensaje.
             from ..saas.control import ControlDeUso
             extra["control"] = ControlDeUso(inquilino_id, directorio_datos, reloj)
-    return Femix(inquilino_id=inquilino_id, directorio_datos=carpeta, buscador=buscador, reloj=reloj, **extra)
+    clase = Femix
+    if COLMENA in capacidades:
+        # Experimental: el modelo ve solo las herramientas de los especialistas del mensaje.
+        from ..colmena.integracion import FemixColmena
+        clase = FemixColmena
+    return clase(inquilino_id=inquilino_id, directorio_datos=carpeta, buscador=buscador, reloj=reloj, **extra)
 
 def _horario_del_perfil(directorio_datos: str, inquilino_id: str, con_empleados: bool = False):
     """Sin perfil legible, sin horario: y sin horario no se reserva (regla de las reservas)."""
