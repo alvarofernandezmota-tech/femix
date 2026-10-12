@@ -51,6 +51,26 @@ PALABRAS_HERRAMIENTAS = (
 # "el tiempo" sueltas son charla ("hasta mañana", "de hecho", "tengo tiempo libre") y mandaban cada
 # despedida al camino más lento.
 
+# Frases de uso personal que no llevan una palabra suelta fiable, sino una construcción
+# (issue #33, medidas con scripts/medir-router.py). Todas son estrechas a propósito: «quita esa
+# cara», «ya está hecho un lío» o «tengo sueño a las tantas» siguen siendo charla.
+PATRONES_HERRAMIENTAS = (
+    # «qué tengo hoy / mañana / esta semana / el jueves»
+    r"\bqu[eé] tengo (?:hoy|mañana|manana|pasado mañana|esta semana|la semana|este fin de semana"
+    r"|el (?:lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo))\b",
+    r"\balgo libre\b",
+    # completar o quitar: «tacha lo de…», «quítalo de la lista», «borra la tarea…»
+    r"\b(?:tacha|tachar|quítalo|quitalo|quítala|quitala)\b",
+    r"\b(?:quita|borra|elimina|borrar|eliminar) (?:la|el|lo|los|las|mi|mis)\b",
+    r"\bya est[aá] hech[oa] lo (?:de|del)\b",
+    # diario y avisos dichos sin la palabra clave
+    r"\bdejar constancia\b",
+    r"\bno me dejes olvidar\b",
+    # una cita dicha como afirmación: «el viernes tengo veterinario a las 11»
+    r"\btengo\b.*\ba las? \d{1,2}\b",
+)
+_PATRONES_EXTRA = tuple(re.compile(p) for p in PATRONES_HERRAMIENTAS)
+
 # Router: preguntas sobre el negocio o sus documentos. No necesitan herramientas (el modelo grande
 # con 10 funciones es el camino más lento en CPU): se buscan los documentos y contesta el modelo
 # rápido, en directo.
@@ -84,7 +104,9 @@ _PATRON_CONSULTA_SI_PREGUNTA = re.compile(r"\b(?:%s)\b" % "|".join(PALABRAS_CONS
 def necesita_herramientas(texto: "str | None") -> bool:
     """¿Pide el mensaje consultar o cambiar datos reales? Reglas, sin gastar una llamada al LLM."""
     limpio = (texto or "").strip().lower()
-    return bool(limpio) and bool(_PATRON_HERRAMIENTAS.search(limpio))
+    if not limpio:
+        return False
+    return bool(_PATRON_HERRAMIENTAS.search(limpio)) or any(p.search(limpio) for p in _PATRONES_EXTRA)
 
 
 def es_consulta(texto: "str | None") -> bool:
