@@ -26,6 +26,8 @@ class Plan:
 
 
 _TODAS = tuple(n for n, c in CATALOGO.items() if c.disponible)
+# La colmena es experimental: solo el plan interno (el del dueño) hasta que pase su evaluación.
+_VENDIBLES = tuple(n for n in _TODAS if n != "colmena")
 
 PLANES = {
     p.nombre: p for p in (
@@ -33,7 +35,7 @@ PLANES = {
         Plan("prueba", f"Prueba ({DIAS_PRUEBA} días)", 0, 300,
              ("memoria_largo_plazo", "documentos", "reservas", "tool_calling")),
         Plan("basico", "Básico", 29, 2000, ("memoria_largo_plazo", "documentos", "reservas", "tool_calling"), de_pago=True),
-        Plan("pro", "Pro", 79, 10000, _TODAS, de_pago=True),
+        Plan("pro", "Pro", 79, 10000, _VENDIBLES, de_pago=True),
     )
 }
 
