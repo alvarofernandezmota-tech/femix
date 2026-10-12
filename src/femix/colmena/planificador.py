@@ -1,24 +1,27 @@
-"""Planificador por reglas: convierte una petición compuesta en un `Plan`.
+"""Planificador: convierte una petición compuesta en un `Plan`.
 
-Sin modelo y sin red. Solo propone un plan cuando está seguro; ante cualquier duda devuelve None y
-el mensaje sigue el camino de siempre (el modelo con las herramientas de los especialistas).
+Dos vías, y las dos acaban en el mismo `Plan` validado:
+  - reglas (sin modelo, sin red): divide con conectores y asigna especialista por palabras clave;
+  - modelo (opcional): una función `proponer(texto)` devuelve los pasos en datos y aquí se validan
+    con rigor. El modelo no tiene límites de frase, pero nunca se fía: un plan inválido se descarta.
 
-Un mensaje se convierte en plan si:
-  - se divide en 2 a MAX_PASOS trozos con conectores ("y", "luego", "después", ";");
-  - cada trozo se reconoce como trabajo de UN especialista;
-  - intervienen al menos dos especialistas distintos (con uno solo basta el modelo).
+Si la vía del modelo no da un plan válido (o falla), se prueban las reglas. Ante cualquier duda
+devuelve None y el mensaje sigue el camino de siempre.
 
-"luego" y "después" ordenan: el paso depende del anterior y no corre si el anterior falla. Un simple
-"y" deja los pasos independientes. En un trozo con varias palabras clave gana la primera que aparece:
-"apúntame una tarea para pedir otra cita" es de `personal`, no de `reservas`.
+Reglas: se divide en 2 a MAX_PASOS trozos con conectores ("y", "luego", "después", ";"); cada trozo
+es de UN especialista; intervienen al menos dos distintos. "luego" y "después" ordenan: el paso
+depende del anterior. En un trozo con varias palabras clave gana la primera que aparece.
 """
 from __future__ import annotations
 
+import logging
 import re
 
 from .coordinador import PALABRAS, _plano
 from .especialistas import ESPECIALISTAS
 from .plan import Paso, Plan
+
+_log = logging.getLogger(__name__)
 
 MAX_PASOS = 5
 
@@ -43,8 +46,7 @@ def _ordena(separador: str) -> bool:
     return plano not in (";", "y")
 
 
-def plan_para(texto: str) -> "Plan | None":
-    """El plan para un mensaje compuesto, o None si no es compuesto o hay cualquier duda."""
+def plan_por_reglas(texto: str) -> "Plan | None":
     partes = _SEPARADOR.split(texto or "")
     trozos = [t.strip() for t in partes[0::2]]
     separadores = partes[1::2]
@@ -58,3 +60,46 @@ def plan_para(texto: str) -> "Plan | None":
         depende = (f"p{i}",) if i > 0 and _ordena(separadores[i - 1]) else ()
         pasos.append(Paso(f"p{i + 1}", esp, trozo, depende_de=depende))
     return Plan(pasos)
+
+
+def plan_desde_datos(datos) -> "Plan | None":
+    """Valida un plan propuesto como datos: lista de {id, especialista, peticion, depende_de}.
+
+    Devuelve None si algo no cuadra: no es lista, hay menos de 2 o más de MAX_PASOS pasos, falta un
+    campo, el especialista no existe, o el plan tiene ids repetidos, dependencias rotas o ciclos.
+    """
+    if not isinstance(datos, list) or not (2 <= len(datos) <= MAX_PASOS):
+        return None
+    pasos = []
+    for d in datos:
+        if not isinstance(d, dict):
+            return None
+        id_, esp, peticion = d.get("id"), d.get("especialista"), d.get("peticion")
+        depende = d.get("depende_de", [])
+        if not all(isinstance(x, str) and x.strip() for x in (id_, esp, peticion)):
+            return None
+        if esp not in ESPECIALISTAS:
+            return None
+        if not isinstance(depende, (list, tuple)) or not all(isinstance(x, str) for x in depende):
+            return None
+        pasos.append(Paso(id_.strip(), esp, peticion.strip(), depende_de=tuple(depende)))
+    try:
+        return Plan(pasos)
+    except ValueError:
+        return None
+
+
+def plan_para(texto: str, proponer=None) -> "Plan | None":
+    """El plan para un mensaje, o None si no es compuesto o hay cualquier duda.
+
+    `proponer(texto) -> list[dict]` es opcional (un modelo); se valida y, si no sirve, se usan las reglas.
+    """
+    if proponer is not None:
+        try:
+            plan = plan_desde_datos(proponer(texto))
+        except Exception:
+            _log.warning("El planificador con modelo falló; se prueban las reglas", exc_info=True)
+            plan = None
+        if plan is not None:
+            return plan
+    return plan_por_reglas(texto)
