@@ -1,7 +1,7 @@
 """Coordinador por reglas: decide qué especialistas hacen falta para un mensaje.
 
 Sin modelo y sin red: palabras clave sobre el texto ya normalizado. Sirve para dos cosas:
-  - enenseñar al modelo SOLO las herramientas de los especialistas implicados (un modelo pequeño
+  - enseñar al modelo SOLO las herramientas de los especialistas implicados (un modelo pequeño
     se equivoca menos con 3 herramientas que con 14);
   - marcar qué acciones son destructivas y piden confirmación antes de ejecutarse.
 
