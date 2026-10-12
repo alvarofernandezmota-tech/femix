@@ -1,0 +1,23 @@
+{
+  "documentos": [
+    {
+      "id": "peluqueria-ejemplo",
+      "fuente": "peluqueria-ejemplo.txt",
+      "texto": "# Precios\nCorte de pelo mujer: 25 €.\nCorte de pelo hombre: 15 €.\nTinte completo: 45 €.\nMechas: 60 €.\n\n# Horario\nAbrimos de martes a viernes de 9:30 a 20:00. Los sábados de 9:00 a 14:00. Domingos y lunes cerramos.\n\n# Cancelaciones\nPuedes cancelar o cambiar tu cita hasta 24 horas antes sin coste. Si no avisas, cobramos el 50 % del servicio.\n\n# Ubicación\nEstamos en la calle Mayor 12, junto a la plaza del Ayuntamiento. Hay aparcamiento público a 50 metros.\n\n# Pagos\nAceptamos efectivo, tarjeta y Bizum. No admitimos cheques.\n\n# Productos\nVendemos champú sin sulfatos, mascarilla de keratina y aceite de argán."
+    }
+  ],
+  "casos": [
+    {"pregunta": "¿cuánto cuesta un tinte?", "contiene": "Tinte completo"},
+    {"pregunta": "precio del corte de hombre", "contiene": "Corte de pelo hombre"},
+    {"pregunta": "¿cuánto valen las mechas?", "contiene": "Mechas: 60"},
+    {"pregunta": "¿abrís los sábados?", "contiene": "sábados de 9:00"},
+    {"pregunta": "¿abrís el lunes?", "contiene": "lunes cerramos"},
+    {"pregunta": "¿puedo cancelar mi cita?", "contiene": "24 horas antes"},
+    {"pregunta": "si no aviso de la cita, ¿me cobran algo?", "contiene": "50 %"},
+    {"pregunta": "¿en qué calle estáis?", "contiene": "calle Mayor 12"},
+    {"pregunta": "¿hay aparcamiento cerca?", "contiene": "aparcamiento público"},
+    {"pregunta": "¿aceptan Bizum?", "contiene": "Bizum"},
+    {"pregunta": "¿puedo pagar con tarjeta?", "contiene": "tarjeta"},
+    {"pregunta": "¿vendéis champú sin sulfatos?", "contiene": "sin sulfatos"}
+  ]
+}
