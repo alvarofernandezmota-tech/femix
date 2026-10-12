@@ -68,7 +68,7 @@ def _comprobar_invariantes(perfil: PerfilInquilino):
 def test_catalogo_coherente_con_sus_constantes():
     assert all(nombre == capacidad.nombre for nombre, capacidad in CATALOGO.items())
     # POR_DEFECTO va en el orden del catálogo y las constantes apuntan a capacidades disponibles.
-    assert list(POR_DEFECTO) == [n for n in CATALOGO if CATALOGO[n].disponible and n not in ("reservas", "busqueda_web", "conectores_mcp")]
+    assert list(POR_DEFECTO) == [n for n in CATALOGO if CATALOGO[n].disponible and n not in ("reservas", "busqueda_web", "conectores_mcp", "colmena")]
     assert {MEMORIA, VOZ, DOCUMENTOS, "tool_calling"} == set(POR_DEFECTO)
     with pytest.raises(FrozenInstanceError):
         CATALOGO[VOZ].disponible = False
@@ -197,7 +197,7 @@ def test_nombre_asistente_se_mide_tras_juntar_espacios():
     assert len(_perfil(nombre_asistente=palabras).validado().nombre_asistente) == 40
 
 
-@pytest.mark.parametrize("nombre", ["　", " \t\n\r ", "\x0b\x0c", "  "])
+@pytest.mark.parametrize("nombre", ["　", " \t\n\r ", "\x0b\x0c", "  "])
 def test_nombre_solo_con_espacios_unicode_es_vacio(nombre):
     with pytest.raises(ValueError, match="vacío"):
         _perfil(nombre=nombre).validado()
