@@ -10,7 +10,8 @@ devuelve None y el mensaje sigue el camino de siempre.
 
 Reglas: se divide en 2 a MAX_PASOS trozos con conectores ("y", "luego", "después", ";"); cada trozo
 es de UN especialista; intervienen al menos dos distintos. "luego" y "después" ordenan: el paso
-depende del anterior. En un trozo con varias palabras clave gana la primera que aparece.
+depende del anterior (también tras un punto y coma: "...; después ..."). En un trozo con varias
+palabras clave gana la primera que aparece.
 """
 from __future__ import annotations
 
@@ -25,8 +26,9 @@ _log = logging.getLogger(__name__)
 
 MAX_PASOS = 5
 
+_ORDEN = r"(?:luego|despu[eé]s|entonces)"
 _SEPARADOR = re.compile(
-    r"\s*(;|\by\s+(?:luego|despu[eé]s|entonces)\b|\b(?:luego|despu[eé]s)\b|\by\b)\s*",
+    rf"\s*(;(?:\s*(?:y\s+)?{_ORDEN}\b)?|\by\s+{_ORDEN}\b|\b(?:luego|despu[eé]s)\b|\by\b)\s*",
     re.IGNORECASE,
 )
 
