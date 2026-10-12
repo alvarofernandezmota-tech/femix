@@ -12,6 +12,7 @@ from ..agentes.cadena import CadenaDeAgentes
 from ..agentes.peticion import Peticion
 from ..agentes.subagente import Subagente
 from ..llm.modelos import TAREA_COMPLEJA, TAREA_RAPIDA, SelectorDeModelos
+from ..mente.atajos import comando_de_agenda
 from ..mente.decidir import es_consulta, es_pregunta, necesita_agente, necesita_herramientas
 from ..mente.entender import clasificar_intencion
 from ..mente.memoria import Memoria
@@ -149,6 +150,15 @@ class Femix:
         except Exception:
             _log.warning("El corrector falló; se sigue con el texto tal cual", exc_info=True)
             texto_n = texto
+        # Issue #36: «qué tengo hoy/semana» es `/hoy` o `/semana`, que no necesitan el modelo.
+        atajo = comando_de_agenda(texto_n)
+        if atajo is not None:
+            respuesta = ejecutar_comando(
+                usuario_id, atajo, directorio_datos=self._directorio_datos, almacen=self._almacen, reservas=self._reservas,
+                reloj=self._reloj,
+            )
+            self._registrar_mensaje(usuario_id, "comando", inicio, texto, respuesta)
+            return respuesta
         frecuente, contexto_frecuente = self._pregunta_frecuente(texto_n)
         if frecuente is not None:
             self._registrar_memoria(usuario_id, texto, frecuente)
