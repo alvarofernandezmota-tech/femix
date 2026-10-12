@@ -5,8 +5,8 @@ especialistas implicados en el mensaje en vez de todo el catálogo. Todo lo dem�
 preguntas frecuentes, límites del plan, registro) es idéntico, y un fallo del coordinador nunca
 impide responder: se cae al catálogo completo.
 
-Pendiente (bloque 4): que `bot/fabrica.py` construya esta clase cuando el inquilino tenga la
-capacidad `colmena` y registrar esa capacidad en `inquilino/capacidades.py` (apagada por defecto).
+Conexión: `bot/fabrica.py` construye esta clase cuando el inquilino tiene la capacidad `colmena`
+(`inquilino/capacidades.py`: experimental, apagada por defecto y solo en el plan interno).
 """
 import logging
 
