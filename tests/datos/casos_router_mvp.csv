@@ -1,0 +1,61 @@
+accion,frase,esperado
+tarea,apunta comprar pan,herramientas
+tarea,apúntame una tarea llamar al dentista,herramientas
+tarea,anota que tengo que pagar la luz,herramientas
+tarea,añade a mis tareas renovar el dni,herramientas
+tarea,apuntame k tengo q lavar el coche,herramientas
+tarea,ponme una tarea de revisar el correo,herramientas
+tarea,pon en mis tareas pasear al perro,herramientas
+tarea,que tareas pendientes tengo,herramientas
+recordatorio,recuérdame mañana a las 9 llamar al banco,herramientas
+recordatorio,avísame a las 8 de tomar la pastilla,herramientas
+recordatorio,recuerdame sacar la basura esta noche,herramientas
+recordatorio,ponme un recordatorio para el viernes a las 18:00,herramientas
+recordatorio,avisame en una hora de apagar el horno,herramientas
+recordatorio,no me dejes olvidar llevar al perro al vete,herramientas
+recordatorio,recuerdame k mañana tengo medico,herramientas
+recordatorio,avísame cuando sean las 7 de la tarde,herramientas
+cita,apunta médico el lunes a las 10,herramientas
+cita,mete en la agenda dentista el jueves a las 17:30,herramientas
+cita,tengo cita con el fisio el martes,herramientas
+cita,anota una reunión el miércoles a las 12,herramientas
+cita,agenda una cena con Paula el sábado,herramientas
+cita,el viernes tengo veterinario a las 11,herramientas
+cita,cambia mi cita del lunes al martes,herramientas
+cita,cancela la cita del dentista,herramientas
+consulta_agenda,qué tengo hoy,herramientas
+consulta_agenda,qué tengo esta semana,herramientas
+consulta_agenda,¿qué tengo mañana?,herramientas
+consulta_agenda,enséñame mi agenda de la semana,herramientas
+consulta_agenda,tengo algo libre el jueves por la tarde,herramientas
+consulta_agenda,que hay en mi calendario de hoy,herramientas
+consulta_agenda,dime mis citas de esta semana,herramientas
+consulta_agenda,cuando es mi próxima cita,herramientas
+diario,apunta en el diario que hoy ha sido un buen día,herramientas
+diario,escribe en mi diario que estoy cansado,herramientas
+diario,hoy he caminado con el perro por la sierra,herramientas
+diario,anota en el diario que he terminado la fase 13,herramientas
+diario,quiero dejar constancia de que hoy he avanzado con git,herramientas
+diario,en el diario pon que me duele la espalda,herramientas
+diario,diario: hoy toca descanso,herramientas
+diario,hoy he aprendido lo que es una rama en git,herramientas
+completar,marca como hecha la tarea de la compra,herramientas
+completar,ya he llamado al dentista quítalo de la lista,herramientas
+completar,borra la tarea de renovar el dni,herramientas
+completar,completa la tarea de revisar el correo,herramientas
+completar,ya está hecho lo del banco,herramientas
+completar,tacha lo de pagar la luz,herramientas
+completar,elimina el recordatorio de las 8,herramientas
+completar,quita la cita del lunes,herramientas
+charla,hola buenos días,charla
+charla,hasta mañana,charla
+charla,gracias,charla
+charla,de hecho tengo tiempo libre,charla
+charla,cuéntame un chiste,charla
+charla,qué tal estás,charla
+charla,estoy un poco agobiado hoy,charla
+charla,qué es una rama en git,charla
+charla,buenas noches,charla
+charla,vale perfecto,charla
+charla,tengo hambre,charla
+charla,me aburro,charla
